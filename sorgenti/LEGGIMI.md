@@ -12,3 +12,5 @@ App: https://passilombardi.github.io/ · Anteprima Claude: https://claude.ai/art
 - Sul sito l'app usa GPS, tile OpenStreetMap, Nominatim (vie), routing.openstreetmap.de (percorsi), Overpass (posti intorno) e Wikipedia. Nell'anteprima no: lì le vie si toccano sulla mappa.
 - Regole: contenuti adatti a bambini, niente marchi, niente nomi personali. Separata dal Gioco della Vita: non metterla su giocodellavitapm.github.io.
 - Commit con identità passilombardi <passilombardi@users.noreply.github.com>.
+- Voce: di default la voce italiana più naturale del telefono (bella(): Natural/Premium/Google…); le mp3 di Sara si usano solo se scelte o se il telefono non ha voci naturali. Schermata «La voce della guida» (tab-voce), scelta salvata in localStorage passi_voce.
+- Racconti solo vicino: raggio(L,modo) decide quanto vicino devi essere, uguale in percorsi e in Dove sono. Nel giro di Lallio i capitoli delle chiese partono a 80 m dalla chiesa vera (POI OSM).
