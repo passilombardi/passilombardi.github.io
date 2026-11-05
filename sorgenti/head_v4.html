@@ -1,0 +1,137 @@
+<title>Passi Lombardi</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: mappa topografica sempre visibile; sotto (telefono) o a destra (computer) le schermate dell'app: Home → Percorso → In cammino */
+:root{--carta:#eef0e6;--terra:#d9dccb;--inchiostro:#1d2a24;--tenue:#5d6b63;--lago:#7fb3c9;--percorso:#c2410c;--tu:#0f766e;--pannello:#fbfcf7;--linea:#c9cdbd;--accento:#0f766e;--su-accento:#ffffff;--scheda:#f3f5ec;
+ --f-titolo:'Bricolage Grotesque',system-ui,sans-serif;--f-testo:'Atkinson Hyperlegible',system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--carta:#151d19;--terra:#1e2823;--inchiostro:#e7eee9;--tenue:#9aaba1;--lago:#2f5f73;--percorso:#fb923c;--tu:#2dd4bf;--pannello:#1a231f;--linea:#2e3b34;--accento:#2dd4bf;--su-accento:#062520;--scheda:#212c27;color-scheme:dark}}
+:root[data-theme="dark"]{--carta:#151d19;--terra:#1e2823;--inchiostro:#e7eee9;--tenue:#9aaba1;--lago:#2f5f73;--percorso:#fb923c;--tu:#2dd4bf;--pannello:#1a231f;--linea:#2e3b34;--accento:#2dd4bf;--su-accento:#062520;--scheda:#212c27;color-scheme:dark}
+html,body{height:100%}
+body{background:var(--carta);color:var(--inchiostro);font:16px/1.45 var(--f-testo);overflow:hidden}
+#app{height:100%;display:grid;grid-template-rows:38% 62%}
+#app.cammino{grid-template-rows:55% 45%}
+@media (min-width:900px){#app,#app.cammino{grid-template-columns:1fr 420px;grid-template-rows:1fr}}
+#mappa{position:relative;min-height:0;overflow:hidden;touch-action:none}
+canvas{display:block;width:100%;height:100%}
+.marchio{position:absolute;top:10px;left:max(12px,env(safe-area-inset-left,0px));background:var(--pannello);border:1px solid var(--linea);border-radius:12px;padding:5px 12px;font:800 17px var(--f-titolo)}
+.marchio small{display:block;font:400 10.5px var(--f-testo);color:var(--tenue);letter-spacing:.06em;text-transform:uppercase}
+.zoom{position:absolute;right:max(12px,env(safe-area-inset-right,0px));bottom:10px;display:flex;flex-direction:column;gap:6px}
+.zoom button{width:40px;height:40px;border-radius:50%;border:1px solid var(--linea);background:var(--pannello);color:var(--inchiostro);font:700 19px var(--f-testo);cursor:pointer}
+.scala{position:absolute;left:max(12px,env(safe-area-inset-left,0px));bottom:12px;font-size:12px;color:var(--tenue);background:var(--pannello);border-radius:8px;padding:2px 8px}
+#pan{background:var(--pannello);border-top:1px solid var(--linea);overflow:auto;min-height:0;min-width:0}
+@media (min-width:900px){#pan{border-top:0;border-left:1px solid var(--linea)}}
+.sch{padding-block:14px 22px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px}
+.sch>*{flex-shrink:0}
+h1{font:800 26px/1.1 var(--f-titolo);margin:0;letter-spacing:-.015em;text-wrap:balance}
+h2{font:800 13px var(--f-titolo);margin:4px 0 0;letter-spacing:.08em;text-transform:uppercase;color:var(--tenue)}
+.sotto{color:var(--tenue);margin:0;font-size:15px}
+.indietro{align-self:flex-start;border:0;background:none;color:var(--accento);font:700 15px var(--f-testo);cursor:pointer;padding:0}
+.lista{display:flex;flex-direction:column;gap:8px}
+.card{box-sizing:border-box;display:grid;grid-template-columns:48px 1fr auto;gap:12px;align-items:center;text-align:left;border:1px solid var(--linea);background:var(--scheda);color:var(--inchiostro);border-radius:14px;padding:10px 12px;cursor:pointer;font:inherit;width:100%}
+.card .ico{width:48px;height:48px;border-radius:12px;display:grid;place-items:center;font-size:24px;background:var(--pannello)}
+.card b{display:block;font:800 16px/1.2 var(--f-titolo)}
+.card small{color:var(--tenue);font-size:13px}
+.card .fr{color:var(--accento);font-weight:700;font-size:20px}
+.card.grande{border-color:var(--accento);box-shadow:inset 0 0 0 1px var(--accento)}
+.cerca{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:12px;border:1px solid var(--linea);background:var(--carta);color:var(--inchiostro);font:inherit}
+.dati{display:flex;gap:8px;flex-wrap:wrap}
+.dati span{background:var(--scheda);border-radius:999px;padding:4px 12px;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.tappe{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.tappe li{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--linea)}
+.tappe .n{width:26px;height:26px;border-radius:50%;background:var(--percorso);color:#fff;display:grid;place-items:center;font:800 13px var(--f-titolo)}
+.tappe li.fatta .n{background:var(--tenue)}
+.tappe b{font-weight:700}
+.tappe small{display:block;color:var(--tenue);font-size:13px}
+.play{width:38px;height:38px;border-radius:50%;border:1px solid var(--linea);background:var(--pannello);color:var(--accento);cursor:pointer;font-size:15px}
+.btn{border:0;border-radius:999px;padding:13px 20px;font:700 16px var(--f-testo);cursor:pointer;background:var(--terra);color:var(--inchiostro)}
+.btn.primo{background:var(--accento);color:var(--su-accento)}
+.btn.lungo{width:100%}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--percorso);outline-offset:2px}
+.riga{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:14px;color:var(--tenue)}
+select{background:var(--carta);color:var(--inchiostro);border:1px solid var(--linea);border-radius:10px;padding:9px;font:inherit;width:100%}
+label.campo{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:14px}
+.player{background:var(--scheda);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.player .top{display:flex;gap:12px;align-items:center}
+.player .gplay{width:54px;height:54px;border-radius:50%;border:0;background:var(--accento);color:var(--su-accento);font-size:22px;cursor:pointer;flex:0 0 auto}
+.player .tit{min-width:0}
+.player .tit small{color:var(--percorso);font-weight:700;font-size:13px}
+.player .tit b{display:block;font:800 19px/1.2 var(--f-titolo)}
+.barra{height:6px;border-radius:3px;background:var(--linea);overflow:hidden}
+.barra i{display:block;height:100%;width:0;background:var(--accento);transition:width .2s}
+.player p{margin:0;font-size:15.5px}
+.prossima{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px dashed var(--linea);border-radius:12px;padding:8px 12px;font-size:14px}
+.prossima b{font-size:16px}
+.stato{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-variant-numeric:tabular-nums}
+.stato div{background:var(--scheda);border-radius:10px;padding:6px 10px}
+.stato small{display:block;color:var(--tenue);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+.stato b{font:800 18px var(--f-titolo)}
+.nota{font-size:12.5px;color:var(--tenue);margin:0}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{border:1px solid var(--linea);background:var(--scheda);color:var(--inchiostro);border-radius:999px;padding:6px 12px;font:700 13px var(--f-testo);cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--accento);color:var(--su-accento);border-color:var(--accento)}
+#pan{display:flex;flex-direction:column}
+#scroll{flex:1;overflow:auto;min-height:0}
+nav.tab{flex:0 0 auto;display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--linea);background:var(--pannello);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav.tab button{border:0;background:none;color:var(--tenue);font:700 12px var(--f-testo);padding:8px 2px 9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav.tab button span{font-size:20px;line-height:1}
+nav.tab button[aria-current="page"]{color:var(--accento)}
+#app.cammino nav.tab{display:none}
+.liv{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.liv.verde{background:#16a34a}.liv.blu{background:#2563eb}.liv.rosso{background:#dc2626}
+.card .ico{position:relative}
+.card .ico .liv{position:absolute;right:-3px;bottom:-3px;width:14px;height:14px;border:2px solid var(--scheda);margin:0}
+.interr{display:flex;flex-direction:column;gap:6px}
+.interr label{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--scheda);border-radius:12px;padding:10px 12px;font-weight:700;cursor:pointer}
+.interr input{width:22px;height:22px;accent-color:var(--accento)}
+.stato{grid-template-columns:repeat(2,1fr)}
+@media (min-width:420px){.stato{grid-template-columns:repeat(4,1fr)}}
+.eser{background:var(--scheda);border:2px solid var(--percorso);border-radius:16px;padding:12px;display:flex;gap:12px;align-items:center}
+.eser .big{font-size:40px}
+.via-in{display:flex;flex-direction:column;gap:6px;background:var(--scheda);border-radius:12px;padding:10px}
+.via-in input{padding:9px;border-radius:10px;border:1px solid var(--linea);background:var(--carta);color:var(--inchiostro);font:inherit}
+.via-in .ok{color:var(--accento);font-weight:700;font-size:14px}
+.via-in .btn{padding:9px 14px;font-size:14px}
+.btn.attesa{background:var(--percorso);color:#fff}
+.legenda{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;color:var(--tenue)}
+.res{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.res div{background:var(--scheda);border-radius:12px;padding:10px;text-align:center}
+.res b{display:block;font:800 22px var(--f-titolo)}
+.res small{color:var(--tenue);font-size:12px}
+.ciao h1{font-size:28px}
+.passi3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;counter-reset:p}
+.passi3 div{background:var(--scheda);border-radius:14px;padding:10px 8px;text-align:center;font-size:13px;line-height:1.25}
+.passi3 div b{display:block;font-size:24px;margin-bottom:2px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{border:1px solid var(--linea);background:var(--scheda);color:var(--inchiostro);border-radius:16px;padding:14px 12px;text-align:left;cursor:pointer;font:inherit;display:flex;flex-direction:column;gap:4px;min-height:104px}
+.tile .e{font-size:30px;line-height:1}
+.tile b{font:800 17px/1.15 var(--f-titolo)}
+.tile small{color:var(--tenue);font-size:13px;line-height:1.25}
+.tile.forte{background:var(--accento);color:var(--su-accento);border-color:var(--accento)}
+.tile.forte small{color:inherit;opacity:.85}
+.passo-n{display:flex;gap:10px;align-items:flex-start}
+.passo-n>.num{flex:0 0 30px;height:30px;border-radius:50%;background:var(--accento);color:var(--su-accento);display:grid;place-items:center;font:800 15px var(--f-titolo)}
+.passo-n>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.passo-n h3{margin:4px 0 0;font:800 18px var(--f-titolo)}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--scheda);border-radius:12px;padding:3px;gap:3px}
+.seg button{border:0;border-radius:9px;padding:8px;background:none;color:var(--inchiostro);font:700 14px var(--f-testo);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--pannello);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.qui{background:var(--scheda);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:4px}
+.qui small{color:var(--tenue);font-size:12px;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.qui b{font:800 20px var(--f-titolo)}
+.avviso{background:var(--scheda);border-left:4px solid var(--percorso);border-radius:10px;padding:10px 12px;font-size:14px}
+.gioco{background:var(--scheda);border-radius:12px;padding:8px 12px;font-size:14.5px}
+.attrib{position:absolute;right:62px;bottom:10px;font-size:10px;color:var(--tenue);background:var(--pannello);border-radius:6px;padding:1px 6px;display:none}
+.attrib.on{display:block}
+input.testo,textarea{padding:9px;border-radius:10px;border:1px solid var(--linea);background:var(--carta);color:var(--inchiostro);font:inherit;width:100%;box-sizing:border-box}
+</style>
+
+<div id="app">
+ <div id="mappa"><canvas id="cv" aria-label="Mappa della Lombardia"></canvas>
+  <div class="marchio">Passi Lombardi<small>la guida che ti racconta la strada</small></div>
+  <div class="zoom"><button id="zin" aria-label="Avvicina">+</button><button id="zout" aria-label="Allontana">−</button><button id="segui" aria-label="Centra su di te">◎</button></div>
+  <div class="scala" id="scala">1 km</div><div class="attrib" id="attrib">© OpenStreetMap</div>
+ </div>
+ <div id="pan"><div id="scroll"></div><nav class="tab" aria-label="Menu">
+  <button data-tab="home"><span>🧭</span>Scopri</button><button data-tab="dove"><span>📍</span>Dove sono</button><button data-tab="percorsi"><span>🗺️</span>Percorsi</button><button data-tab="crea"><span>✏️</span>Da via a via</button><button data-tab="risultati"><span>🏅</span>Risultati</button></nav></div>
+</div>
