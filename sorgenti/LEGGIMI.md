@@ -2,8 +2,10 @@
 
 App: https://passilombardi.github.io/ · Anteprima Claude: https://claude.ai/artifact/Bqqwa8JJh8jkhTdRUmkgVT
 
-- `build.sh` crea la pagina: head_v4.html + script_v4.js, con dentro luoghi.js (/*LUOGHI*/), esercizi.js (/*ESERCIZI*/) e giochi.js (/*GIOCHI*/). Cambiare il percorso della cartella in build.sh.
-- index.html del sito = doctype + head (manifest, icone, sw) + pagina costruita + </body></html>.
+- `bash sorgenti/build.sh` crea sorgenti/index.html (la pagina per l'anteprima, non va su git) e l'index.html del sito (doctype + head con manifest, icone, sw + pagina + </body></html>). La pagina = head_v4.html + script_v4.js con dentro luoghi.js (/*LUOGHI*/), esercizi.js (/*ESERCIZI*/) e giochi.js (/*GIOCHI*/).
+- Se cambiano le voci, alzare il numero della cache in sw.js (passi-vN), se no i telefoni tengono le vecchie.
+- Da via a via: partenza «Da qui» (GPS), vie suggerite da Nominatim mentre si scrive, percorso con le svolte (OSRM steps) dette a voce 40 m prima. I percorsi pronti sul sito seguono le strade vere (sullaStrada).
+- Dove sono: «Dimmi dove sono» dice via, paese e i posti intorno con la direzione; se la via ha il nome di un posto vicino (piazza San Bernardino → chiesa di San Bernardino) racconta il posto.
 - Voci: `a/*.mp3`. L{i} = LUOGHI[i] (nome + racconto + gioco), C{i} = LALLIO.cap[i], E{i} = ESERCIZI[i], F* = FRASI. Se cambia l'ordine o il testo dei luoghi, rigenerare quelle voci.
 - Voci con kokoro-onnx, voce it 'if_sara', modello int8 dalla release github thewh1teagle/kokoro-onnx model-files-v1.0; mp3 mono 32k. gen.py jobs.json cartella parte n.
 - Icona: icon.js (Playwright).

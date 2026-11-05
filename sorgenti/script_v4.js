@@ -33,7 +33,7 @@ function proietta(p,cum,q){let best=[1e12,0];for(let i=1;i<p.length;i++){const a
 function tappeDi(T){const p=T.p,cum=lungo(p),tot=cum.at(-1);
  if(T.cap)return T.cap.map(([f,n,txt],i)=>({n,txt,at:f*tot,ico:'📖',clip:'C'+i}));
  const out=[];tutti().forEach(L=>{const [d,at]=proietta(p,cum,[L[1],L[2]]);const lim=L[4]==='m'||L[4]==='x'?Math.min(Math.max(L[3],120),350):Math.min(L[3],T.m==='auto'?4000:2500);if(d<=lim)out.push({n:L[0],txt:L[4]==='x'?L[5]:storia(L),at,ico:ICO[L[4]],L,clip:L[4]==='x'?null:'L'+LI.get(L)})});
- (T.vie||[]).forEach(v=>out.push({n:v.n,txt:v.txt,at:v.at,ico:'🛣️',via:1}));
+ (T.vie||[]).forEach(v=>out.push({n:v.n,txt:v.txt,at:v.at,ico:v.ico||'🛣️',via:1,svolta:v.svolta}));
  return out.sort((a,b)=>a.at-b.at)}
 function eserciziDi(T){if(T.m==='auto'||T.m==='bici')return [];const passo=T.m==='corsa'?1000:700,out=[];let k=0;
  for(let at=passo;at<T.tot-200&&out.length<6;at+=passo){if(T.tappe.some(t=>Math.abs(t.at-at)<120))at+=150;out.push({es:k%ESERCIZI.length,at});k++}return out}
@@ -48,11 +48,22 @@ const passaVicino=(T,c,R)=>T.p.some((q,i)=>i&&proietta([T.p[i-1],q],[0,dist(T.p[
 // ---------- servizi del sito vero: vie, strade, posti intorno ----------
 async function cercaVia(testo,paese){if(!SITO)throw new Error('anteprima');const q=encodeURIComponent(testo+', '+paese+', Lombardia');
  const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=it&accept-language=it`);const j=await r.json();if(!j.length)throw new Error('non trovata');return [+j[0].lat,+j[0].lon]}
+async function suggerisciVie(testo,paese){if(!SITO)return [];const q=encodeURIComponent(testo+', '+paese+', Lombardia');
+ try{const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=6&countrycodes=it&accept-language=it&addressdetails=1`);const j=await r.json();const vist=new Set();
+  return j.map(x=>{const a=x.address||{};const n=a.road||a.square||a.pedestrian||a.footway||x.name||x.display_name.split(',')[0];return {n,dove:a.village||a.town||a.city||'',pt:[+x.lat,+x.lon]}}).filter(x=>{const k=x.n+x.dove;if(vist.has(k))return false;vist.add(k);return true})}catch(e){return []}}
 let ultVia=0,ultViaPos=null;
 async function nomeVia(p){if(!SITO)return '';if(Date.now()-ultVia<4000||ultViaPos&&dist(p,ultViaPos)<40)return S.via;ultVia=Date.now();ultViaPos=p;
- try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${p[0]}&lon=${p[1]}&format=json&zoom=17&accept-language=it`);const j=await r.json();const a=j.address||{};return a.road||a.pedestrian||a.square||a.footway||S.via}catch(e){return S.via}}
-async function stradaTra(pts,modo){if(!SITO)return null;const prof=modo==='auto'?'routed-car':modo==='bici'?'routed-bike':'routed-foot';
- try{const r=await fetch(`https://routing.openstreetmap.de/${prof}/route/v1/driving/${pts.map(p=>p[1].toFixed(6)+','+p[0].toFixed(6)).join(';')}?overview=full&geometries=geojson`);const j=await r.json();if(!j.routes||!j.routes[0])return null;return j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]])}catch(e){return null}}
+ try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${p[0]}&lon=${p[1]}&format=json&zoom=17&accept-language=it`);const j=await r.json();const a=j.address||{};S.paese=a.village||a.town||a.city||a.hamlet||S.paese||'';return a.square||a.road||a.pedestrian||a.footway||S.via}catch(e){return S.via}}
+// percorso lungo le strade vere, con le svolte: «gira a destra in via Roma»
+async function stradaTra(pts,modo,svolte){if(!SITO)return null;const prof=modo==='auto'?'routed-car':modo==='bici'?'routed-bike':'routed-foot';
+ try{const r=await fetch(`https://routing.openstreetmap.de/${prof}/route/v1/driving/${pts.map(p=>p[1].toFixed(6)+','+p[0].toFixed(6)).join(';')}?overview=full&geometries=geojson${svolte?'&steps=true':''}`);const j=await r.json();if(!j.routes||!j.routes[0])return null;
+  const p=j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);if(!svolte)return p;
+  const st=[];j.routes[0].legs.forEach(l=>l.steps.forEach(x=>{const m=x.maneuver;if(m.type==='arrive'||m.type==='depart'||!x.name)return;const prima=st.at(-1);if(prima&&prima.nome===x.name)return;st.push({nome:x.name,mod:m.modifier||'',tipo:m.type,pt:[m.location[1],m.location[0]]})}));
+  return {p,st}}catch(e){return null}}
+const SVOLTA={left:'gira a sinistra',right:'gira a destra','slight left':'tieni la sinistra','slight right':'tieni la destra','sharp left':'gira tutto a sinistra','sharp right':'gira tutto a destra',straight:'vai dritto',uturn:'torna indietro'};
+const frase=v=>{const n=v.nome.replace(/^(via|viale|piazza|piazzale|corso|largo|vicolo|strada)\b/i,w=>w.toLowerCase());const pre=/^(via|viale|corso|vicolo|largo)\b/i.test(n)?'in ':/^(piazza|piazzale)\b/i.test(n)?'in ':'su ';
+ if(v.tipo==='roundabout'||v.tipo==='rotary')return `Alla rotonda prendi ${n}`;const a=SVOLTA[v.mod]||'continua';return (a.charAt(0).toUpperCase()+a.slice(1))+' '+pre+n};
+const ICOSV={left:'⬅️',right:'➡️','slight left':'↖️','slight right':'↗️','sharp left':'⬅️','sharp right':'➡️',straight:'⬆️',uturn:'↩️'};
 const POI=new Map();let poiZone=new Set();
 async function postiIntorno(p){if(!SITO)return;const k=p[0].toFixed(2)+','+p[1].toFixed(2);if(poiZone.has(k))return;poiZone.add(k);
  const q=`[out:json][timeout:20];(nwr(around:900,${p[0]},${p[1]})[name][~"^(amenity|historic|tourism|leisure)$"~"^(place_of_worship|school|library|townhall|theatre|monument|memorial|castle|church|ruins|museum|attraction|artwork|viewpoint|park|sports_centre|stadium|playground)$"];);out center tags 80;`;
@@ -129,14 +140,16 @@ function uscite(){try{return JSON.parse(localStorage.getItem('passi_uscite')||'[
 function salvaUscita(){if(S.fatto<100||S.salvata)return;S.salvata=1;const u=uscite();u.unshift({n:S.tour.n,m:S.modo,km:S.fatto,s:S.tempo,d:Date.now(),t:S.detti.size});try{localStorage.setItem('passi_uscite',JSON.stringify(u.slice(0,50)))}catch(e){}}
 // ---------- schermate ----------
 let schermo='home',luogoSel=null,filtro='',filtroT='tutti';
-function prepara(T){S.tour=T;T.eser=eserciziDi(T);S.rotta=T.p;S.cum=lungo(T.p);S.tot=S.cum.at(-1);S.fatto=0;S.tempo=0;S.salvata=0;S.pos=T.p[0];S.dir=brg(T.p[0],T.p[1]);S.detti.clear();S.modo=T.m;S.vel=T.m==='auto'?80:40;S.esercizi=T.m==='piedi'||T.m==='corsa'}
+async function sullaStrada(T){if(!SITO||T.suStrada||T.lineaVera!==undefined)return;T.suStrada=1;const r=await stradaTra(T.p,T.m==='corsa'?'piedi':T.m);if(!r||r.length<2)return;
+ T.p=r;T.tot=lungo(r).at(-1);T.tappe=tappeDi(T);T.eser=eserciziDi(T);if(S.tour===T&&!S.va&&S.fatto===0){prepara(T);if(schermo==='percorso'){fit(T.p);render()}}}
+function prepara(T){sullaStrada(T);S.tour=T;T.eser=eserciziDi(T);S.rotta=T.p;S.cum=lungo(T.p);S.tot=S.cum.at(-1);S.fatto=0;S.tempo=0;S.salvata=0;S.pos=T.p[0];S.dir=brg(T.p[0],T.p[1]);S.detti.clear();S.modo=T.m;S.vel=T.m==='auto'?80:40;S.esercizi=T.m==='piedi'||T.m==='corsa'}
 function vai(s,arg){if(s==='percorso'&&schermo!=='cammino'&&schermo!=='percorso')S.da=schermo==='luogo'?{s:'luogo',L:luogoSel}:{s:schermo};
  if(schermo==='dove'&&s!=='dove'&&s!=='mio')fermaGps();
  schermo=s;if(s==='percorso'&&arg&&arg!==S.tour){prepara(arg);fit(arg.p)}else if(s==='percorso'){fit(S.tour.p)}
  if(['home','percorsi','risultati'].includes(s)){S.va=false;S.tour=null;S.rotta=null;S.disegna=false;zitto();fit(CONFINE,20)}
  if(s==='dove'){S.tour=null;S.rotta=null;S.disegna=false;S.va=false;center(...S.pos);V.z=Math.max(V.z,0.03);avviaGps()}
  if(s==='luogo'){luogoSel=arg;S.rotta=null;S.tour=null;S.disegna=false;zitto();center(arg[1],arg[2]);V.z=arg[0]==='Lallio'?0.03:arg[4]==='c'?0.004:arg[4]==='n'?0.0015:arg[4]==='p'?0.012:0.03}
- if(s==='crea'){zitto();S.tour=null;S.rotta=null;S.disegna=true;S.punti=[];S.attesa=null;if(!S.campi)nuovoCrea('Lallio','Bergamo');const p=puntoDi(S.campi[0]);if(p){center(...p);V.z=Math.max(V.z,0.01)}}
+ if(s==='crea'){zitto();S.tour=null;S.rotta=null;S.disegna=true;S.punti=[];S.attesa=null;if(!S.campi)nuovoCrea('Lallio','Lallio');const p=puntoDi(S.campi[0]);if(p){center(...p);V.z=Math.max(V.z,0.01)}}
  $('app').classList.toggle('cammino',s==='cammino');setTimeout(size,0);render();$('scroll').scrollTop=0}
 function card(ico,tit,sub,on,liv){return `<button class="card" data-on="${on}"><span class="ico">${ico}${liv?pallino(liv):''}</span><span><b>${esc(tit)}</b><small>${sub}</small></span><span class="fr">›</span></button>`}
 function cardT(T){const l=livello(T);return card(T.cap?'📖':MODI[T.m].split(' ')[0],T.n,`${esc(T.area)} · ${km(T.tot)} · ${durata(T.tot,T.m)} · ${T.tappe.length} tappe${l==='verde'&&T.m==='piedi'?' · ♿ adatto a tutti':''}`,'t'+TOURS.indexOf(T),l)}
@@ -144,24 +157,24 @@ const chipsModo=()=>`<div class="chips" role="group" aria-label="Come vai">${Obj
 const notaAnteprima=t=>SITO?'':`<p class="avviso">${t}</p>`;
 function render(){const P=$('scroll');let h='';
  document.querySelectorAll('nav.tab button').forEach(b=>b.setAttribute('aria-current',b.dataset.tab===({luogo:'home',percorso:S.da&&S.da.s==='crea'?'crea':'percorsi',mio:'dove'}[schermo]||schermo)?'page':'false'));
- if(schermo==='home'){h=`<div class="sch"><div class="ciao"><h1>Ciao! Dove andiamo oggi?</h1><p class="sotto">Passi Lombardi ti racconta a voce quello che vedi, mentre cammini, corri o vai in bici.</p></div>
-  <div class="passi3"><div><b>👆</b>1. Scegli dove andare</div><div><b>▶️</b>2. Premi «Inizia»</div><div><b>🎧</b>3. Cammina e ascolta</div></div>
-  <div class="tiles">
-   <button class="tile forte" data-on="tab-dove"><span class="e">📍</span><b>Dove sono</b><small>Ti racconto cosa c'è proprio qui</small></button>
-   <button class="tile" data-on="tab-crea"><span class="e">🛣️</span><b>Da via a via</b><small>Scegli tu da dove parti e dove arrivi</small></button>
-   <button class="tile" data-on="tab-percorsi"><span class="e">🗺️</span><b>Percorsi pronti</b><small>${TOURS.length} giri, verdi, blu e rossi</small></button>
-   <button class="tile" data-on="l${LI.get(LP('Lallio'))}"><span class="e">🏡</span><b>Lallio</b><small>La sua storia in 7 racconti</small></button></div>
+ if(schermo==='home'){const TL=TOURS[0];h=`<div class="sch"><div class="ciao"><h1>Ciao! Cosa facciamo oggi?</h1><p class="sotto">Metti le cuffie e cammina: Passi Lombardi ti racconta a voce le strade e i posti che incontri.</p></div>
+  <button class="grande-dove" data-on="tab-dove"><span class="e">📍</span><b>Dove sono?</b><small>Ti dico in che via sei e cosa c'è di bello intorno a te</small></button>
+  <div class="sezione"><h2>Cammina con la guida</h2><div class="tiles">
+   <button class="tile" data-on="tab-crea"><span class="e">🛣️</span><b>Da via a via</b><small>Scegli tu dove partire e dove arrivare</small></button>
+   <button class="tile" data-on="tab-percorsi"><span class="e">🗺️</span><b>Percorsi pronti</b><small>${TOURS.length} giri: verdi, blu e rossi</small></button></div></div>
+  <div class="sezione"><h2>🏡 Lallio</h2><div class="lista">${cardT(TL)}${card('🏡','Cosa c\'è a Lallio','I posti, i racconti e i giri del paese','l'+LI.get(LP('Lallio')))}</div></div>
+  <div class="sezione"><h2>Scopri una città</h2><div class="chips" role="group" aria-label="Scegli una città">${PROV.map(n=>`<button data-on="l${LI.get(LP(n))}">${esc(n)}</button>`).join('')}</div>
+  <input class="cerca" id="cerca" placeholder="🔎 Cerca una città, un paese o un posto…" value="${esc(filtro)}" aria-label="Cerca un posto"><div class="lista" id="tutti"></div></div>
   ${instEv?'<button class="btn primo lungo" data-on="installa">📲 Installa l\'app sul telefono</button>':''}
-  <h2>Cosa c'è a…</h2><div class="chips" role="group" aria-label="Scegli una città">${PROV.map(n=>`<button data-on="l${LI.get(LP(n))}">${esc(n)}</button>`).join('')}</div>
-  <input class="cerca" id="cerca" placeholder="🔎 Cerca una città, un paese o un posto…" value="${esc(filtro)}" aria-label="Cerca un posto"><div class="lista" id="tutti"></div>
   ${SITO?'<p class="nota">La tua posizione resta sul telefono e non viene salvata da nessuna parte. Per la mappa, le vie e i posti intorno la guida usa OpenStreetMap e Wikipedia. <a href="privacy.html">Privacy</a></p>':'<p class="nota">Con il GPS e la mappa delle strade: passilombardi.github.io</p>'}</div>`}
  else if(schermo==='dove'){const vic=vicini(S.pos,6);h=`<div class="sch"><div><h1>📍 Dove sono</h1><p class="sotto">Tieni il telefono in tasca: quando passi vicino a qualcosa di bello, la guida te lo racconta.</p></div>
-  <div class="qui"><small>${S.gps?'Sei qui':'Posizione'}</small><b>${esc(S.via||(vic[0]&&vic[0].d<1500?'Vicino a '+vic[0].n:'…'))}</b><span class="sotto">${S.gps?'Il GPS è acceso':'Sto cercando il GPS… Se non risponde, tocca la mappa dove sei.'}</span></div>
+  <div class="qui"><small>${S.gps?'Sei qui':'Posizione'}</small><b>${esc(S.via||(vic[0]&&vic[0].d<1500?'Vicino a '+vic[0].n:'…'))}</b>${S.paese?`<span class="dirvia">a ${esc(S.paese)}</span>`:''}${vic[0]&&vic[0].d<300?`<span class="dirvia">${vic[0].ico} ${esc(vic[0].n)}: ${lato(brg(S.pos,vic[0].p))}, ${quanto(vic[0].d)}</span>`:''}<span class="sotto">${S.gps?'Il GPS è acceso ✓':SITO?'Sto cercando il GPS… Se non risponde, tocca la mappa dove sei.':'Anteprima: tocca la mappa dove sei.'}</span></div>
+  <button class="btn primo lungo" data-on="dimmi">🔊 Dimmi dove sono</button>
   <div class="player"><div class="top"><div class="tit"><small>${ora?esc(ora.dove):'In ascolto'}</small><b>${ora?esc(ora.tit):'Cammina!'}</b></div></div><div class="barra"><i></i></div><p>${ora?esc(ora.txt):'Appena arrivi vicino a un posto, parte il racconto.'}</p>${ora?'<button class="btn" data-on="zitto">■ Ferma</button>':''}</div>
   <div class="interr"><label>🎧 Racconta da solo quando passo vicino<input type="checkbox" data-sw="auto" ${S.auto?'checked':''}></label></div>
   <h2>Cosa c'è intorno</h2><div class="lista">${vic.map(v=>card(v.ico,v.n,km(v.d)+' · '+v.tipo,v.on)).join('')||'<p class="nota">Niente di famoso qui vicino. Prova a spostarti!</p>'}</div>
   ${card('⭐','Aggiungi un posto tuo','Per esempio la tua chiesa, il parco o la scuola, con la sua storia','tab-mio')}
-  /div>`}
+  </div>`}
  else if(schermo==='mio'){h=`<div class="sch"><button class="indietro" data-on="tab-dove">‹ Indietro</button><div><h1>⭐ Aggiungi un posto tuo</h1><p class="sotto">Quando ci passi vicino, la guida racconta la storia che scrivi tu.</p></div>
   <label class="campo">Come si chiama?<input class="testo" id="mN" placeholder="Per esempio: Chiesa di San Bernardino"></label>
   <label class="campo">La sua storia<textarea id="mS" rows="4" placeholder="Scrivi cosa c'è di bello o di curioso"></textarea></label>
@@ -187,30 +200,36 @@ function render(){const P=$('scroll');let h='';
   <button class="btn primo lungo" data-on="inizia">▶ Inizia il percorso</button>
   <h2>Come vai?</h2>${chipsModo()}
   <div class="interr"><label>🎧 Racconti dei posti<input type="checkbox" data-sw="racconti" ${S.racconti?'checked':''}></label>${T.eser.length?`<label>💪 Esercizi lungo la strada<input type="checkbox" data-sw="esercizi" ${S.esercizi?'checked':''}></label>`:''}</div>
-  <h2>Cosa incontri</h2><ol class="tappe">${T.tappe.map((t,i)=>`<li><span class="n">${i+1}</span><span><b>${t.ico||''} ${esc(t.n)}</b><small>dopo ${km(t.at)}</small></span><button class="play" data-tp="${i}" aria-label="Ascolta ${esc(t.n)}">${ora&&ora.tit===t.n?'■':'▶'}</button></li>`).join('')||'<li><span></span><span>Nessun posto famoso lungo questa strada, ma puoi chiedere «Cosa c\'è intorno?» mentre cammini.</span></li>'}</ol>
+  <h2>${T.vie&&T.vie.some(v=>v.svolta)?'Le vie e le cose che incontri':'Cosa incontri'}</h2><ol class="tappe">${T.tappe.map((t,i)=>`<li><span class="n">${i+1}</span><span><b>${t.ico||''} ${esc(t.n)}</b><small>dopo ${km(t.at)}</small></span><button class="play" data-tp="${i}" aria-label="Ascolta ${esc(t.n)}">${ora&&ora.tit===t.n?'■':'▶'}</button></li>`).join('')||'<li><span></span><span>Nessun posto famoso lungo questa strada, ma puoi chiedere «Cosa c\'è intorno?» mentre cammini.</span></li>'}</ol>
   ${SITO?'<p class="nota">Lungo la strada la guida trova anche chiese, parchi e scuole dalla mappa.</p>':''}</div>`}
  else if(schermo==='cammino'){const T=S.tour,nx=T.tappe.find(t=>!S.detti.has(t.n)),es=ora&&ora.es!=null?ESERCIZI[ora.es]:null;h=`<div class="sch">
   <div class="player"><div class="top"><button class="gplay" data-on="pausa" aria-label="${S.va?'Pausa':'Continua'}">${S.va?'❚❚':'▶'}</button><div class="tit"><small>${ora?esc(ora.dove):S.via?'🛣️ '+esc(S.via):'In cammino'}</small><b>${ora?esc(ora.tit):esc(T.n)}</b></div></div>
    <div class="barra"><i></i></div>${es?`<div class="eser"><span class="big">${es[1]}</span><p>${esc(es[2])}</p></div>`:`<p>${ora?esc(ora.txt):'La guida parla quando arrivi vicino a una tappa. Intanto guarda intorno!'}</p>`}</div>
-  ${nx?`<div class="prossima"><span>Prossima tappa<br><b>${esc(nx.n)}</b></span><span><b id="sNx">${km(Math.max(0,nx.at-S.fatto))}</b></span></div>`:''}
+  ${nx?`<div class="prossima"><span>${nx.svolta?nx.ico+' Prossima svolta':'Prossima tappa'}<br><b>${esc(nx.n)}</b></span><span><b id="sNx">${km(Math.max(0,nx.at-S.fatto))}</b></span></div>`:''}
   <div class="stato"><div><small>Fatti</small><b id="sKm">${km(S.fatto)}</b></div><div><small>Mancano</small><b id="sRes">${km(Math.max(0,S.tot-S.fatto))}</b></div><div><small>Tempo</small><b id="sT">${orologio(S.tempo)}</b></div><div><small>${S.modo==='corsa'?'Passo':'Tappe'}</small><b id="sP">${S.modo==='corsa'?passo():S.detti.size+'/'+T.tappe.length}</b></div></div>
   <div class="riga"><button class="btn" data-on="intorno">👀 Cosa c'è intorno?</button><button class="btn" data-on="gpscam">${S.gps?'📍 GPS acceso':'📍 Usa il GPS'}</button><button class="btn" data-on="fine">■ Fine</button></div>
   ${S.gps?'':`<div class="riga"><label for="vel">Velocità della prova</label><input type="range" id="vel" min="1" max="120" value="${S.vel}"><span>×${S.vel}</span></div>`}</div>`}
  else if(schermo==='crea'){const n=S.campi.length;
-  const campo=(c,i)=>{const tit=i===0?'Da dove parti?':i===n-1?'Dove arrivi?':'Passi anche da…';const num=i===0?'A':i===n-1?'B':'+';
+  const paesi=['Lallio',...PROV,...LUOGHI.filter(L=>L[4]==='p'&&L[0]!=='Lallio').map(L=>L[0]).sort()];
+  const campo=(c,i)=>{const tit=i===0?'Da dove parti?':i===n-1?'Dove vuoi arrivare?':'Passi anche da…';const num=i===0?'A':i===n-1?'B':'+';
+   const scelte=(i===0?[['qui','📍 Da qui']]:[]).concat([['via','🛣️ Una via'],['luogo','🏛️ Un posto']]);
+   let corpo='';
+   if(c.tipo==='qui')corpo=`<div class="qui"><small>Partenza</small><b>${S.gps?esc(S.via||'Dove sei adesso'):'Dove sei adesso'}</b><span class="sotto">${S.gps?'Il GPS ti ha trovato ✓':SITO?'Accendo il GPS quando prepari il percorso.':'Nell\'anteprima tocca la mappa per dire dove sei.'}</span></div>`;
+   else if(c.tipo==='via')corpo=`<label class="campo">Paese o città<select data-paese="${i}">${paesi.map(p=>`<option ${p===c.paese?'selected':''}>${esc(p)}</option>`).join('')}</select></label>
+    <label class="campo">Nome della via<input class="testo" data-cv="${i}" placeholder="Per esempio: via Roma" value="${esc(c.via)}" autocomplete="off"></label>
+    <div class="sugg" id="sug${i}"></div>
+    ${c.pt?`<span class="ok">✓ ${esc(c.via)} è sulla mappa</span>`:''}${c.err?`<span class="nota">${esc(c.err)}</span>`:''}
+    <button class="link${S.attesa===i?' attesa':''}" data-pt="${i}">${S.attesa===i?'👆 Adesso tocca la mappa…':c.pt?'Non è il punto giusto? Toccalo sulla mappa':'Oppure toccala sulla mappa'}</button>`;
+   else corpo=`<select data-c="${i}" aria-label="Scegli il posto">${LUOGHI.slice().sort((a,b)=>a[0].localeCompare(b[0],'it')).map(L=>`<option ${L[0]===c.luogo?'selected':''}>${esc(L[0])}</option>`).join('')}</select>`;
    return `<div class="passo-n"><span class="num">${num}</span><div><h3>${tit}</h3>
-   <div class="seg" role="group"><button data-tipo="${i}:via" aria-pressed="${c.tipo==='via'}">🛣️ Una via</button><button data-tipo="${i}:luogo" aria-pressed="${c.tipo==='luogo'}">🏛️ Un posto</button></div>
-   ${c.tipo==='via'?`<input class="testo" data-cv="${i}" placeholder="Per esempio: via Roma" value="${esc(c.via)}" aria-label="Nome della via">
-    <label class="campo">In quale paese o città?<select data-paese="${i}">${['Lallio',...PROV,...LUOGHI.filter(L=>L[4]==='p'&&L[0]!=='Lallio').map(L=>L[0]).sort()].map(p=>`<option ${p===c.paese?'selected':''}>${esc(p)}</option>`).join('')}</select></label>
-    ${SITO?`<button class="btn" data-trova="${i}">🔎 Trova la via</button>`:''}<button class="btn${S.attesa===i?' attesa':''}" data-pt="${i}">${S.attesa===i?'👆 Ora tocca la mappa…':c.pt?'📍 Sposta il punto sulla mappa':'📍 Tocca la mappa dove si trova'}</button>${c.pt?'<span class="ok">✓ Trovata sulla mappa</span>':''}${c.err?`<span class="nota">${esc(c.err)}</span>`:''}`
-   :`<select data-c="${i}">${LUOGHI.slice().sort((a,b)=>a[0].localeCompare(b[0],'it')).map(L=>`<option ${L[0]===c.luogo?'selected':''}>${esc(L[0])}</option>`).join('')}</select>`}
-   ${i>0&&i<n-1?`<button class="indietro" data-togli="${i}">Togli questa tappa</button>`:''}</div></div>`};
-  h=`<div class="sch"><div><h1>🛣️ Da via a via</h1><p class="sotto">Scegli da dove parti e dove arrivi. La guida ti racconta tutto quello che c'è lungo la strada.</p></div>
+   <div class="seg" style="grid-template-columns:repeat(${scelte.length},1fr)" role="group">${scelte.map(([k,t])=>`<button data-tipo="${i}:${k}" aria-pressed="${c.tipo===k}">${t}</button>`).join('')}</div>
+   ${corpo}${i>0&&i<n-1?`<button class="link" data-togli="${i}">✕ Togli questa tappa</button>`:''}</div></div>`};
+  h=`<div class="sch"><div><h1>🛣️ Da via a via</h1><p class="sotto">Dimmi da dove parti e dove vuoi arrivare. Io ti dico dove girare e ti racconto le cose belle che trovi per strada.</p></div>
   ${S.campi.map(campo).join('')}
-  <button class="btn" data-on="addvia">＋ Aggiungi una via da cui passare</button>
+  <button class="link" data-on="addvia">＋ Voglio passare anche da un'altra via</button>
   <div class="passo-n"><span class="num">🚶</span><div><h3>Come ci vai?</h3>${chipsModo()}</div></div>
   <button class="btn primo lungo" data-on="creaok">✓ Prepara il percorso</button>
-  <p class="nota" id="creaMsg">${SITO?'Il percorso segue le strade vere.':'Anteprima: la linea va dritta da un punto all\'altro, perché qui non c\'è la mappa delle strade. Sul sito vero la guida trova la via da sola e segue le strade.'}</p></div>`}
+  <p class="nota" id="creaMsg">${SITO?'Il percorso segue le strade vere.':'Anteprima: la linea va dritta da un punto all\'altro. Sul sito vero la guida trova le vie da sola, segue le strade e ti dice dove girare.'}</p></div>`}
  else if(schermo==='risultati'){const u=uscite(),tk=u.reduce((a,x)=>a+x.km,0),ts=u.reduce((a,x)=>a+x.s,0);
   h=`<div class="sch"><div><h1>🏅 I miei risultati</h1><p class="sotto">Tutte le tue uscite, salvate su questo telefono.</p></div>
   <div class="res"><div><b>${u.length}</b><small>uscite</small></div><div><b>${km(tk)}</b><small>in tutto</small></div><div><b>${orologio(ts)}</b><small>di tempo</small></div></div>
@@ -219,12 +238,15 @@ function render(){const P=$('scroll');let h='';
  P.innerHTML=h;bind();if(schermo==='home')cerca();draw()}
 function passo(){if(S.fatto<50)return '–';const sk=S.tempo/(S.fatto/1000);return Math.floor(sk/60)+'′'+String(Math.round(sk%60)).padStart(2,'0')+'″'}
 function cerca(){const q=filtro.toLowerCase(),el=$('tutti');if(!q){el.innerHTML='';return}const L=LUOGHI.filter(L=>L[0].toLowerCase().includes(q)).slice(0,30);el.innerHTML=L.map(L=>card(ICO[L[4]],L[0],TIPO[L[4]],'l'+LI.get(L))).join('')||'<p class="nota">Nessun posto con questo nome.</p>';bindIn(el)}
-function vicini(p,n){const a=tutti().map(L=>({n:L[0],d:dist(p,[L[1],L[2]]),ico:ICO[L[4]],tipo:TIPO[L[4]],on:L[4]==='x'?'mio':'l'+LI.get(L)}));
- POI.forEach((P,k)=>a.push({n:P.n,d:dist(p,[P.la,P.lo]),ico:'📌',tipo:tipoPoi(P.t),on:'poi:'+k}));return a.sort((x,y)=>x.d-y.d).slice(0,n)}
+function vicini(p,n){const a=tutti().map(L=>({n:L[0],p:[L[1],L[2]],d:dist(p,[L[1],L[2]]),ico:ICO[L[4]],tipo:TIPO[L[4]],on:L[4]==='x'?'mio':'l'+LI.get(L)}));
+ POI.forEach((P,k)=>a.push({n:P.n,p:[P.la,P.lo],d:dist(p,[P.la,P.lo]),ico:'📌',tipo:tipoPoi(P.t),on:'poi:'+k,P,k}));return a.sort((x,y)=>x.d-y.d).slice(0,n)}
 // ---------- da via a via ----------
-function nuovoCrea(da,a){S.campi=[{tipo:'via',luogo:da,via:'',paese:LP(da)&&(LP(da)[4]==='c'||LP(da)[4]==='p')?da:'Lallio',pt:null},{tipo:'via',luogo:a,via:'',paese:LP(a)&&(LP(a)[4]==='c'||LP(a)[4]==='p')?a:'Lallio',pt:null}]}
-function puntoDi(c){if(c.tipo==='via')return c.pt;const L=LP(c.luogo);return L?[L[1],L[2]]:null}
-function nomeDi(c){return c.tipo==='via'?(c.via.trim()||'la via'):c.luogo}
+function nuovoCrea(da,a){S.campi=[{tipo:SITO?'qui':'via',luogo:da,via:'',paese:LP(da)&&(LP(da)[4]==='c'||LP(da)[4]==='p')?da:'Lallio',pt:null},{tipo:'via',luogo:a,via:'',paese:LP(a)&&(LP(a)[4]==='c'||LP(a)[4]==='p')?a:'Lallio',pt:null}]}
+function puntoDi(c){if(c.tipo==='qui')return S.pos;if(c.tipo==='via')return c.pt;const L=LP(c.luogo);return L?[L[1],L[2]]:null}
+function nomeDi(c){return c.tipo==='qui'?(S.via||'dove sei'):c.tipo==='via'?(c.via.trim()||'la via'):c.luogo}
+async function mostraVie(i){const c=S.campi[i],el=$('sug'+i);if(!el)return;el.innerHTML='<span class="nota">Cerco…</span>';const L=await suggerisciVie(c.via.trim(),c.paese);
+ el.innerHTML=L.length?L.map((x,k)=>`<button data-sv="${k}">📍 <b>${esc(x.n)}</b> <small>${esc(x.dove)}</small></button>`).join(''):'<span class="nota">Non la trovo. Controlla il nome, oppure toccala sulla mappa.</span>';
+ el.querySelectorAll('[data-sv]').forEach(b=>b.onclick=()=>{const x=L[+b.dataset.sv];c.via=x.n;c.pt=x.pt;c.err='';center(...x.pt);V.z=Math.max(V.z,0.05);render()})}
 async function trova(i){const c=S.campi[i];c.err='';if(!c.via.trim()){c.err='Scrivi prima il nome della via.';return render()}
  try{c.pt=await cercaVia(c.via.trim(),c.paese);center(...c.pt);V.z=Math.max(V.z,0.05)}catch(e){c.err='Non la trovo. Controlla il nome, oppure tocca la mappa dove si trova.';S.attesa=i}render()}
 function bind(){const P=$('scroll');bindIn(P);const c=$('cerca');if(c)c.oninput=()=>{filtro=c.value;cerca()};
@@ -235,10 +257,10 @@ function bind(){const P=$('scroll');bindIn(P);const c=$('cerca');if(c)c.oninput=
  P.querySelectorAll('[data-asc]').forEach(b=>b.onclick=()=>{const L=LUOGHI[+b.dataset.asc],k='L'+b.dataset.asc;if(ora&&ora.clip===k){zitto();return render()}ascolta(L[0],storia(L),k);render()});
  P.querySelectorAll('[data-cap]').forEach(b=>b.onclick=()=>{const i=+b.dataset.cap,c=LALLIO.cap[i];if(ora&&ora.clip==='C'+i){zitto();return render()}ascolta(c[1],c[2],'C'+i);render()});
  P.querySelectorAll('[data-tp]').forEach(b=>b.onclick=()=>{const t=S.tour.tappe[+b.dataset.tp];if(ora&&ora.tit===t.n){zitto();return render()}if(t.poi)raccontoPoi(t.poi).then(x=>{ascolta(t.n,x.txt,x.clip);render()});else{ascolta(t.n,t.txt,t.clip);render()}});
- P.querySelectorAll('[data-tipo]').forEach(b=>b.onclick=()=>{const [i,t]=b.dataset.tipo.split(':');S.campi[+i].tipo=t;S.attesa=null;render()});
+ P.querySelectorAll('[data-tipo]').forEach(b=>b.onclick=()=>{const [i,t]=b.dataset.tipo.split(':');S.campi[+i].tipo=t;S.attesa=null;if(t==='qui'&&SITO&&!S.gps)avviaGps();render()});
  P.querySelectorAll('[data-c]').forEach(s=>s.onchange=()=>{const c=S.campi[+s.dataset.c];c.luogo=s.value;const p=puntoDi(c);if(p)center(...p);render()});
  P.querySelectorAll('[data-paese]').forEach(s=>s.onchange=()=>{const c=S.campi[+s.dataset.paese];c.paese=s.value;c.pt=null;const L=LP(s.value);if(L){center(L[1],L[2]);V.z=Math.max(V.z,0.03)}render()});
- P.querySelectorAll('[data-cv]').forEach(s=>{s.oninput=()=>{const c=S.campi[+s.dataset.cv];c.via=s.value;draw()};s.onkeydown=e=>{if(e.key==='Enter'&&SITO)trova(+s.dataset.cv)}});
+ P.querySelectorAll('[data-cv]').forEach(s=>{s.oninput=()=>{const i=+s.dataset.cv,c=S.campi[i];c.via=s.value;c.pt=null;draw();clearTimeout(c.tm);if(SITO&&c.via.trim().length>=3)c.tm=setTimeout(()=>mostraVie(i),500)};s.onkeydown=e=>{if(e.key==='Enter'&&SITO)mostraVie(+s.dataset.cv)}});
  P.querySelectorAll('[data-trova]').forEach(b=>b.onclick=()=>{b.textContent='🔎 Cerco…';trova(+b.dataset.trova)});
  P.querySelectorAll('[data-pt]').forEach(b=>b.onclick=()=>{const i=+b.dataset.pt;S.attesa=S.attesa===i?null:i;const c=S.campi[i];const L=LP(c.paese);if(S.attesa===i&&L&&!c.pt){center(L[1],L[2]);V.z=Math.max(V.z,0.03)}render()});
  P.querySelectorAll('[data-togli]').forEach(b=>b.onclick=()=>{S.campi.splice(+b.dataset.togli,1);render()});
@@ -254,17 +276,22 @@ function azione(k){
  if(k==='addvia'){const ult=S.campi.at(-1);S.campi.splice(S.campi.length-1,0,{tipo:'via',luogo:'Bergamo',via:'',paese:ult.paese||'Lallio',pt:null});return render()}
  if(k==='svuota'){try{localStorage.removeItem('passi_uscite')}catch(e){}return render()}
  if(k==='salvamio'){const n=$('mN').value.trim(),s=$('mS').value.trim();if(!n)return $('mN').focus();MIEI.push({n,s:s||'Questo è un posto speciale: '+n+'.',la:S.pos[0],lo:S.pos[1]});salvaMiei();return vai('dove')}
- if(k==='zitto'){zitto();return render()}if(k==='installa'){if(instEv){instEv.prompt();instEv.userChoice.finally(()=>{instEv=null;render()})}return}
+ if(k==='zitto'){zitto();return render()}if(k==='dimmi'){diciDove();return render()}if(k==='installa'){if(instEv){instEv.prompt();instEv.userChoice.finally(()=>{instEv=null;render()})}return}
  if(k==='creaok')return creaOk();
  if(k==='inizia'){vai('cammino');parti();return}
  if(k==='pausa'){if(S.va){S.va=false;try{audio.pause()}catch(e){}try{speechSynthesis.pause()}catch(e){}}else{try{if(ora&&ora.clip)audio.play().catch(()=>{})}catch(e){}try{speechSynthesis.resume()}catch(e){}parti()}return render()}
  if(k==='intorno')return intorno();if(k==='gpscam'){if(S.gps)fermaGps();else avviaGps();return render()}
  if(k==='fine'){S.va=false;fermaGps();salvaUscita();zitto();return vai('percorso')}}
-async function creaOk(){const msg=$('creaMsg');const manca=S.campi.find(c=>c.tipo==='via'&&(!c.via.trim()||!c.pt));
- if(manca){msg.textContent=!manca.via.trim()?'Scrivi il nome di ogni via.':SITO?'Premi «Trova la via» per «'+manca.via+'», oppure toccala sulla mappa.':'Tocca la mappa dove si trova «'+manca.via+'».';msg.classList.add('avviso');return}
+async function creaOk(){const msg=$('creaMsg');
+ if(S.campi[0].tipo==='qui'&&SITO&&!S.gps){if(wid==null)avviaGps();msg.textContent='Cerco dove sei con il GPS…';for(let k=0;k<20&&!S.gps;k++)await new Promise(r=>setTimeout(r,500));
+  if(!S.gps){msg.textContent='Non trovo il GPS. Controlla che sia acceso e che il sito possa usare la posizione, oppure scegli «Una via» come partenza.';msg.classList.add('avviso');return}}
+ const manca=S.campi.find(c=>c.tipo==='via'&&(!c.via.trim()||!c.pt));
+ if(manca){msg.textContent=!manca.via.trim()?'Scrivi il nome di ogni via.':SITO?'Scegli «'+manca.via+'» dall\'elenco sotto il nome, oppure toccala sulla mappa.':'Tocca la mappa dove si trova «'+manca.via+'».';msg.classList.add('avviso');return}
  const pts=S.campi.map(puntoDi);msg.textContent='Preparo il percorso…';
- let p=await stradaTra(pts,S.modo);const vera=!!p;if(!p)p=pts;const cum=lungo(p);
- const vie=[];S.campi.forEach((c,i)=>{if(c.tipo!=='via')return;const at=vera?proietta(p,cum,c.pt)[1]:cum[i];const nome=c.via.trim();vie.push({n:nome,at,txt:i===0?`Si parte da ${nome}. Guardati intorno: questa è la tua strada di partenza.`:i===S.campi.length-1?`Sei arrivato in ${nome}. Questa era la tua meta: bravo!`:`Adesso passi da ${nome}.`})});
+ const r=await stradaTra(pts,S.modo,true);const vera=!!r;const p=r?r.p:pts;const cum=lungo(p);
+ const vie=[];S.campi.forEach((c,i)=>{if(c.tipo!=='via'&&c.tipo!=='qui')return;const pt=puntoDi(c);const at=vera?proietta(p,cum,pt)[1]:cum[i];const nome=nomeDi(c);
+  vie.push({n:i===0?'Partenza: '+nome:i===S.campi.length-1?'Arrivo: '+nome:'Passi da '+nome,at:i===S.campi.length-1?cum.at(-1)-1:at,txt:i===0?(c.tipo==='qui'?'Si parte da qui! Ti dico io dove girare, e ti racconto le cose belle che incontri.':`Si parte da ${nome}! Ti dico io dove girare, e ti racconto le cose belle che incontri.`):i===S.campi.length-1?`Sei arrivato in ${nome}. Questa era la tua meta: bravissimo!`:`Adesso passi da ${nome}.`,ico:i===0?'🟢':i===S.campi.length-1?'🏁':'🛣️'})});
+ if(r)r.st.forEach(v=>{const at=proietta(p,cum,v.pt)[1];if(at<20||at>cum.at(-1)-20)return;vie.push({n:frase(v),at,txt:frase(v)+'.',ico:ICOSV[v.mod]||'🛣️',svolta:1})});
  const T={n:`Da ${nomeDi(S.campi[0])} a ${nomeDi(S.campi.at(-1))}`,area:'Percorso fatto da te'+(vera?'':' · linea indicativa'),m:S.modo,p,vie,lineaVera:vera};T.tot=cum.at(-1);T.tappe=tappeDi(T);
  if(SITO){await postiIntorno(p[0]);await postiIntorno(p.at(-1));aggiungiPoi(T)}
  S.disegna=false;S.attesa=null;const m=S.modo;vai('percorso',T);S.modo=m;S.vel=m==='auto'?80:40;render()}
@@ -276,9 +303,18 @@ function fermaGps(){try{if(wid!=null)navigator.geolocation.clearWatch(wid)}catch
 let rendT=0;
 async function nuovaPos(){if(S.segui)center(...S.pos);
  if(schermo==='cammino'&&S.gps){const [d,at]=proietta(S.rotta,S.cum,S.pos);if(d<150&&at>S.fatto){S.tempo+=(at-S.fatto)/VEL[S.modo];S.fatto=at}controlla()}
- postiIntorno(S.pos);const v=await nomeVia(S.pos);if(v&&v!==S.via){S.via=v;if(schermo==='dove'&&S.auto)dici(v,'🛣️ Sei in','Adesso sei in '+v+'.')}
+ postiIntorno(S.pos);const v=await nomeVia(S.pos);if(v&&v!==S.via){S.via=v;if(schermo==='dove'&&S.auto){dici(v,'🛣️ Sei in','Adesso sei in '+v+(S.paese?', a '+S.paese:'')+'.');legame(v)}}
  if(schermo==='dove'&&S.auto)vicinoA(S.pos);
  draw();if(Date.now()-rendT>3000){rendT=Date.now();ui()}}
+// «Sei in piazza San Bernardino»: se c'è un posto con lo stesso nome lì vicino (la chiesa), lo racconto
+function chiave(v){return v.toLowerCase().replace(/^(via|viale|piazza|piazzale|piazzetta|corso|largo|vicolo|strada|sagrato)\s+(della |dello |delle |dei |degli |del |di |d')?/,'').trim()}
+function legame(v){const k=chiave(v);if(k.length<4)return;const c=vicini(S.pos,40).filter(x=>x.d<400&&x.n.toLowerCase().includes(k)&&!S.detti.has(x.n)&&!(x.k&&S.detti.has(x.k)));if(!c.length)return;const x=c[0];S.detti.add(x.n);if(x.k)S.detti.add(x.k);
+ const dove=lato(brg(S.pos,x.p))+', '+quanto(x.d);const testo=r=>`Qui in ${v} c'è ${x.n}: è ${dove}. ${r}`;
+ if(x.P)raccontoPoi(x.P).then(r=>dici(x.n,'📌 '+dove,testo(r.txt)));else{const L=tutti().find(L=>L[0]===x.n);if(L)dici(x.n,'📌 '+dove,testo(L[4]==='x'?L[5]:storia(L)))}}
+async function diciDove(){zitto();if(SITO&&!S.via){S.via=await nomeVia(S.pos)}const v=vicini(S.pos,6).filter(x=>x.d<500).slice(0,3);
+ let t=S.via?`Sei in ${S.via}${S.paese?', a '+S.paese:''}.`:S.paese?`Sei a ${S.paese}.`:'';
+ if(v.length)t+=' Intorno a te: '+v.map(x=>`${x.n}, ${lato(brg(S.pos,x.p))}, ${quanto(x.d)}`).join('; ')+'.';else t+=' Qui vicino non conosco posti famosi: prova a camminare un po\', e appena trovo qualcosa te lo racconto.';
+ dici('Dove sono','📍 Sei qui',t.trim());if(S.via)legame(S.via);const x=v[0];if(x&&x.d<150&&!S.detti.has(x.n)){S.detti.add(x.n);if(x.k)S.detti.add(x.k);if(x.P)raccontoPoi(x.P).then(r=>dici(x.n,'📌 '+lato(brg(S.pos,x.p)),r.txt,r.clip));else{const L=tutti().find(L=>L[0]===x.n);if(L)dici(L[0],'Sei vicino a '+ICO[L[4]],L[4]==='x'?L[5]:storia(L),L[4]==='x'?null:'L'+LI.get(L))}}}
 // racconta da solo quello che c'è proprio qui
 function vicinoA(p){tutti().forEach(L=>{const R=L[4]==='m'||L[4]==='x'?Math.max(80,Math.min(L[3],200)):L[4]==='n'?Math.min(L[3],1500):Math.min(L[3],800);if(S.detti.has(L[0])||dist(p,[L[1],L[2]])>R)return;S.detti.add(L[0]);dici(L[0],'Sei vicino a '+ICO[L[4]],L[4]==='x'?L[5]:storia(L),L[4]==='x'?null:'L'+LI.get(L))});
  POI.forEach((P,k)=>{if(S.detti.has(k)||dist(p,[P.la,P.lo])>60)return;S.detti.add(k);raccontoPoi(P).then(r=>dici(P.n,'📌 '+lato(brg(p,[P.la,P.lo])),r.txt,r.clip))})}
@@ -286,7 +322,7 @@ function vicinoA(p){tutti().forEach(L=>{const R=L[4]==='m'||L[4]==='x'?Math.max(
 function lato(b){const r=((b-S.dir)+540)%360-180;return Math.abs(r)<35?'davanti a te':Math.abs(r)>145?'dietro di te':r>0?'alla tua destra':'alla tua sinistra'}
 const quanto=m=>m<120?'proprio qui':m<1000?`a ${Math.round(m/10)*10} metri`:`a ${km(m)}`;
 function controlla(){S.tour.tappe.forEach((t,i)=>{if(S.detti.has(t.n))return;const vicino=t.L?dist(S.pos,[t.L[1],t.L[2]])<=Math.max(150,Math.min(t.L[3],S.modo==='auto'?4000:1500)):false;
- if(S.fatto>=t.at-30||vicino){S.detti.add(t.n);if(!S.racconti&&!t.via)return;const d=t.L?dist(S.pos,[t.L[1],t.L[2]]):0;const dove=`Tappa ${i+1} · `+(t.L&&d>120?lato(brg(S.pos,[t.L[1],t.L[2]]))+', '+quanto(d):'sei qui');
+ if(S.fatto>=t.at-(t.svolta?40:30)||vicino){S.detti.add(t.n);if(!S.racconti&&!t.via)return;if(t.svolta){S.coda.unshift({tit:t.n,dove:'🧭 Tra poco',txt:t.txt});prossimo();return}const d=t.L?dist(S.pos,[t.L[1],t.L[2]]):0;const dove=`Tappa ${i+1} · `+(t.L&&d>120?lato(brg(S.pos,[t.L[1],t.L[2]]))+', '+quanto(d):'sei qui');
   if(t.poi)raccontoPoi(t.poi).then(r=>dici(t.n,dove,r.txt,r.clip));else dici(t.n,dove,t.txt,t.clip)}});
  if(S.esercizi)S.tour.eser.forEach(e=>{const k='e'+e.at;if(S.detti.has(k)||S.fatto<e.at)return;S.detti.add(k);const E=ESERCIZI[e.es];dici(E[0],'💪 Esercizio',E[2],'E'+e.es,{es:e.es})})}
 function intorno(){const v=vicini(S.pos,3);const L0=tutti().find(L=>L[0]===v[0].n);
