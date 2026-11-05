@@ -124,6 +124,18 @@ nav.tab button[aria-current="page"]{color:var(--accento)}
 .attrib{position:absolute;right:62px;bottom:10px;font-size:10px;color:var(--tenue);background:var(--pannello);border-radius:6px;padding:1px 6px;display:none}
 .attrib.on{display:block}
 input.testo,textarea{padding:9px;border-radius:10px;border:1px solid var(--linea);background:var(--carta);color:var(--inchiostro);font:inherit;width:100%;box-sizing:border-box}
+.sugg{display:flex;flex-direction:column;gap:6px}
+.sugg:empty{display:none}
+.sugg button{text-align:left;border:1px solid var(--linea);background:var(--pannello);color:var(--inchiostro);border-radius:12px;padding:10px 12px;font:inherit;cursor:pointer}
+.sugg small{color:var(--tenue)}
+.link{align-self:flex-start;border:0;background:none;color:var(--accento);font:700 14px var(--f-testo);cursor:pointer;padding:4px 0;text-align:left}
+.link.attesa{color:var(--percorso)}
+.grande-dove{border:0;border-radius:20px;padding:18px 16px;background:var(--accento);color:var(--su-accento);text-align:left;font:inherit;cursor:pointer;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:center}
+.grande-dove .e{font-size:38px;grid-row:span 2}
+.grande-dove b{font:800 21px/1.15 var(--f-titolo)}
+.grande-dove small{opacity:.9;font-size:14px}
+.sezione{display:flex;flex-direction:column;gap:8px}
+.qui .dirvia{font-size:14px;color:var(--tenue)}
 </style>
 
 <div id="app">
