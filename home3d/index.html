@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2f6df6">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Home 3D PM">
+<meta name="description" content="HOME 3D DESIGN PM: progetta case e arreda stanze in 3D con mobili, materiali, luci e telecamera libera.">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>HOME 3D DESIGN PM</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Manrope:wght@700;800&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">{"imports":{"three":"./js/three.module.min.js","three/addons/":"./js/addons/"}}</script>
+</head>
+<body>
+<div class="loading" id="loading">Caricamento di HOME 3D DESIGN PM…</div>
+
+<!-- ============ HOME ============ -->
+<main id="home" hidden>
+  <div class="hwrap">
+    <header class="brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#2f6df6"/><path d="M32 12 L54 24 V44 L32 56 L10 44 V24Z" fill="#fff" opacity=".18"/><path d="M32 12 L54 24 L32 36 L10 24Z" fill="#fff"/><path d="M10 24 L32 36 V56 L10 44Z" fill="#cfe0ff"/><path d="M54 24 L32 36 V56 L54 44Z" fill="#9dbdff"/><rect x="36" y="40" width="8" height="10" fill="#2f6df6" transform="skewY(-28) translate(0,22)"/></svg>
+      <div><h1>HOME 3D DESIGN PM</h1><small>Progetta e arreda la tua casa in 3D</small></div>
+    </header>
+    <section class="hero" id="hero">
+      <img id="heroImg" alt="">
+      <div class="in"><h2>Crea la casa dei tuoi sogni</h2><p>Disegna la pianta, allarga i muri e guarda subito la casa in 3D dalla telecamera. Oltre 100 mobili, materiali veri, luci di giorno e di notte, e i tuoi mobili dalle foto.</p>
+        <button class="btn main" type="button" data-go="nuovo">＋ Nuovo progetto</button></div>
+    </section>
+    <nav class="tiles" aria-label="Menu principale">
+      <button class="tile" type="button" data-go="nuovo"><span class="ic">➕</span><b>Nuovo progetto</b><span>Casa vuota o stanza pronta</span></button>
+      <button class="tile" type="button" data-go="case"><span class="ic">🏠</span><b>Le mie case</b><span>Tutti i progetti salvati</span></button>
+      <button class="tile" type="button" data-go="catalogo"><span class="ic">🛋️</span><b>Catalogo</b><span>Mobili e oggetti in 3D</span></button>
+      <button class="tile" type="button" data-go="stanze"><span class="ic">🚪</span><b>Le mie stanze</b><span>Tutte le stanze create</span></button>
+      <button class="tile" type="button" data-go="ispirazioni"><span class="ic">✨</span><b>Ispirazioni</b><span>12 stanze già arredate</span></button>
+      <button class="tile" type="button" data-go="impostazioni"><span class="ic">⚙️</span><b>Impostazioni</b><span>Grafica, dati, tema</span></button>
+    </nav>
+    <section class="sec" id="hview"></section>
+  </div>
+</main>
+
+<!-- ============ EDITOR ============ -->
+<div id="editor" hidden>
+  <header class="etop">
+    <button class="btn icon ghost" id="eBack" type="button" aria-label="Torna alla home">←</button>
+    <button class="tt" id="eTitle" type="button" aria-label="Cambia stanza"><b id="eRoom"></b><span id="eHouse"></span></button>
+    <span class="cost" id="eCost" title="Costo dei mobili"></span>
+    <button class="btn icon ghost" id="eUndo" type="button" aria-label="Annulla">↶</button>
+    <button class="btn icon ghost" id="eRedo" type="button" aria-label="Ripeti">↷</button>
+    <button class="btn icon ghost" id="eSave" type="button" aria-label="Salva">💾</button>
+    <button class="btn icon ghost" id="eMenuBtn" type="button" aria-label="Altre funzioni" aria-haspopup="menu">⋯</button>
+  </header>
+  <div class="menu" id="eMenu" role="menu" hidden>
+    <button role="menuitem" data-m="stanza">📐 Stanza: misure e superfici</button>
+    <button role="menuitem" data-m="luce">💡 Illuminazione</button>
+    <button role="menuitem" data-m="nuovastanza">➕ Aggiungi una stanza</button>
+    <button role="menuitem" data-m="foto">📸 Fotografa la stanza</button>
+    <button role="menuitem" data-m="primadopo">↔️ Prima e dopo</button>
+    <button role="menuitem" data-m="salvaprima">📌 Usa questo come "prima"</button>
+    <button role="menuitem" data-m="incolla">📋 Incolla mobile</button>
+    <hr>
+    <button role="menuitem" data-m="eliminastanza">🗑️ Elimina questa stanza</button>
+  </div>
+  <div class="emain">
+    <section class="stage" id="stage">
+      <div class="float fl-tl">
+        <button class="btn" id="bDay" type="button" aria-label="Giorno o notte">☀️ Giorno</button>
+        <button class="btn" id="bMode" type="button" aria-label="Modalità">✨ Realistico</button>
+      </div>
+      <div class="float fl-r" role="group" aria-label="Telecamera">
+        <button class="btn" data-cam="libera" type="button" aria-pressed="true">🔄<small>Libera</small></button>
+        <button class="btn" data-cam="alto" type="button">⬇️<small>Alto</small></button>
+        <button class="btn" data-cam="fronte" type="button">🟦<small>Fronte</small></button>
+        <button class="btn" data-cam="lato" type="button">◧<small>Lato</small></button>
+        <button class="btn" data-cam="persona" type="button">🚶<small>1ª pers.</small></button>
+        <button class="btn" data-cam="pianta" type="button">🗺️<small>Pianta</small></button>
+        <button class="btn" id="zIn" type="button" aria-label="Avvicina">＋</button>
+        <button class="btn" id="zOut" type="button" aria-label="Allontana">－</button>
+      </div>
+      <div class="float fl-b" id="fpPad" hidden>
+        <div class="pad">
+          <button class="btn" data-mv="sx" type="button" aria-label="Sinistra">◀</button>
+          <button class="btn" data-mv="av" type="button" aria-label="Avanti">▲</button>
+          <button class="btn" data-mv="dx" type="button" aria-label="Destra">▶</button>
+          <span></span>
+          <button class="btn" data-mv="in" type="button" aria-label="Indietro">▼</button>
+          <span></span>
+        </div>
+      </div>
+      <canvas class="planov" id="planOv" hidden aria-label="Pianta della casa vista dall'alto"></canvas>
+      <div class="pv" id="pv" hidden><div class="pvh"><span id="pvT">📷 Telecamera</span><button class="btn icon" id="pvSwap" type="button" aria-label="Guarda a schermo intero">⤢</button></div></div>
+      <div class="float fl-br" id="planBar" role="group" aria-label="Pianta" hidden>
+        <button class="btn" type="button" data-pb="3d">🛋️ Arreda in 3D</button>
+        <button class="btn icon" type="button" data-pb="out" aria-label="Allontana">－</button>
+        <button class="btn icon" type="button" data-pb="in" aria-label="Avvicina">＋</button>
+        <button class="btn icon" type="button" data-pb="fit" aria-label="Mostra tutta la casa">⌖</button>
+      </div>
+      <div class="badge" id="badge" hidden></div>
+      <div class="help" id="help"></div>
+    </section>
+    <aside class="panel cat" id="catPanel">
+      <div class="ctabs" id="cTabs" role="tablist" hidden><button type="button" data-ct="build" aria-pressed="true">🧱 Costruisci</button><button type="button" data-ct="lib" aria-pressed="false">🛋️ Libreria</button></div>
+      <div class="build" id="cBuild" hidden></div>
+      <div class="crow"><input class="search" id="cSearch" type="search" placeholder="Cerca nel catalogo…" aria-label="Cerca nel catalogo"><button class="btn icon" id="cImport" type="button" aria-label="Importa modello 3D GLB" title="Importa modello 3D (GLB / glTF)">⬆️</button><button class="btn icon" id="cPhoto" type="button" aria-label="Crea un mobile da una foto" title="Crea un mobile da una foto">📷</button></div>
+      <div class="chips" id="cChips"></div>
+      <div class="items" id="cItems"></div>
+    </aside>
+    <aside class="panel props" id="props" hidden></aside>
+  </div>
+</div>
+
+<input type="file" id="fileGlb" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" hidden>
+<dialog id="dlg"><div class="dh"><h2 id="dlgT"></h2><button class="btn icon ghost" id="dlgX" type="button" aria-label="Chiudi">✕</button></div><div class="db" id="dlgB"></div><div class="df" id="dlgF"></div></dialog>
+<div class="toast" id="toast" hidden></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

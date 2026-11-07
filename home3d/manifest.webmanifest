@@ -1,0 +1,17 @@
+{
+  "name": "HOME 3D DESIGN PM",
+  "short_name": "Home 3D PM",
+  "description": "Progetta case e arreda stanze in 3D",
+  "lang": "it",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f1420",
+  "theme_color": "#2f6df6",
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
