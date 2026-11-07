@@ -23,9 +23,9 @@ Potenzia il tuo telefono: volume fino al 300% per la musica e i video aperti nel
 Sito: https://passilombardi.github.io/potenzapm/
 Apri l'app: https://passilombardi.github.io/potenzapm/app/
 
-## Presidente PM
+## Calciomania PM
 
 Fonda la tua società di calcio con 1.000.000 € e portala dalla Terza Categoria alla Serie A: giocatori, staff, stadio, partite in diretta e gironi online dove le persone vere prendono il posto dei bot.
 
-Sito: https://passilombardi.github.io/presidente/
-Apri l'app: https://passilombardi.github.io/presidente/app/
+Sito: https://passilombardi.github.io/calciomania/
+Apri l'app: https://passilombardi.github.io/calciomania/app/

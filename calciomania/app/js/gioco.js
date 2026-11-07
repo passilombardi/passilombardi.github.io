@@ -34,7 +34,7 @@ function nuovoSponsor(tier){
 }
 function nuovaSocieta(club){
   S = {
-    v: 1, club, soldi: 1000000, stagione: 1, tier: 1,
+    v: 1, club, diff: club.diff == null ? 1 : club.diff, soldi: 1000000, stagione: 1, tier: 1,
     rosa: [], staff: {}, stadio: { tribune: 0, campo: 0, spogl: 0, luci: 0, negozio: 0, giov: 0, maxi: 0, park: 0, usura: 92, cantieri: [] },
     tattica: { mod: '4-4-2', ment: 1, tit: null }, morale: 70, tifosi: 80,
     lega: null, mercato: { lista: [], agg: -99 }, staffMercato: { lista: [], s: 0 }, sponsor: nuovoSponsor(1),
@@ -51,7 +51,7 @@ function mioSlot(){
   return Object.assign({ tipo: 'umano', uid: mioId(), nome: S.club.nome, c1: S.club.c1, c2: S.club.c2, st: S.club.st, pat: S.club.pat, sim: S.club.sim, forza: forzaMia(), campo: S.stadio.campo, visto: Date.now() });
 }
 function nuovaLegaLocale(tier){
-  const d = nuovoGirone(tier, 'Girone ' + 'ABCDEFGH'[ri(0, 7)]);
+  const d = nuovoGirone(tier, 'Girone ' + 'ABCDEFGH'[ri(0, 7)], RND, DIFFICOLTA[S.diff == null ? 2 : S.diff].bot);
   const i = ri(0, d.n - 1);
   d.squadre[i] = Object.assign(d.squadre[i], mioSlot(), statoZero(), { pronto: -1 });
   S.lega = { online: false, gid: null, dati: d, mio: i, giocate: 0, stagione: d.stagione };
@@ -89,7 +89,7 @@ function formazione(){
 function forzaMia(){
   const f = formazione();
   const media = (r) => { const a = f.filter((x) => x.ruolo === r); return a.reduce((s, x) => s + (x.p ? effInRuolo(x.p, r) : 8), 0) / Math.max(1, a.length); };
-  const bonus = livStaff(S, 'all') * 1.8 + livStaff(S, 'vice') * 0.5 + (S.morale - 60) / 8 + S.stadio.spogl * 0.4 - (S.staff.all ? 0 : 6);
+  const bonus = (trucco('super') ? 30 : 0) + livStaff(S, 'all') * 1.8 + livStaff(S, 'vice') * 0.5 + (S.morale - 60) / 8 + S.stadio.spogl * 0.4 - (S.staff.all ? 0 : 6);
   const m = S.tattica.ment;
   const k = (v) => Math.round(v * 10) / 10;
   return { por: k(media('P') + livStaff(S, 'por') * 1.5 + bonus), dif: k(media('D') + bonus + (m === 0 ? 3 : m === 2 ? -3 : 0)), cen: k(media('C') + bonus), att: k(media('A') + bonus + (m === 2 ? 3 : m === 0 ? -3 : 0)) };
@@ -105,8 +105,10 @@ function problemiPerGiocare(){
 }
 
 // ---------- mercato ----------
+const soldiDiff = () => (S.lega && S.lega.online) ? 1 : DIFFICOLTA[S.diff == null ? 2 : S.diff].soldi;
+const trucco = (k) => !!(S.trucchi && S.trucchi[k] && !(S.lega && S.lega.online));
 const scontoDS = () => 1 - livStaff(S, 'ds') * 0.04;
-const prezzoAcquisto = (p) => tondo(p.prezzo * scontoDS());
+const prezzoAcquisto = (p) => trucco('gratis') ? 0 : tondo(p.prezzo * scontoDS());
 const prezzoVendita = (p) => tondo(p.prezzo * (0.7 + livStaff(S, 'ds') * 0.04));
 function genMercato(){
   const t = S.tier, oss = livStaff(S, 'oss'), L = [];
@@ -123,16 +125,19 @@ function genStaffMercato(){
   STAFF.forEach((s) => { for (let l = 1; l <= 5; l++) L.push(nuovoStaff(s.k, l)); });
   S.staffMercato = { lista: L, s: S.stagione };
 }
+function listaCampioni(){ const presi = new Set(S.campioniPresi || []); return CAMPIONI.map((c, k) => campioneDa(k, S.stagione)).filter((p) => !presi.has(p.id) && p.eta <= 38).sort((a, b) => b.val - a.val); }
+const inVendita = (id) => S.mercato.lista.find((x) => x.id === id) || (String(id).startsWith('cmp') ? listaCampioni().find((x) => x.id === id) : null);
 const costoRicerca = () => tondo(Math.max(1500, TIERS[S.tier - 1].sponsor * 0.8));
 function compra(id){
-  const p = S.mercato.lista.find((x) => x.id === id); if (!p) return;
+  const p = inVendita(id); if (!p) return;
   const c = prezzoAcquisto(p);
   if (S.rosa.length >= 28) return avviso('La rosa è piena (28 giocatori): vendi qualcuno prima');
   if (S.soldi < c) return avviso('Non hai abbastanza soldi');
   S.soldi -= c; S.mercato.lista = S.mercato.lista.filter((x) => x !== p);
+  if (p.stella){ S.campioniPresi = (S.campioniPresi || []).concat([p.id]); p.id = p.id + '-' + uid(); }
   p.num = numeroLibero(p.r); p.forma = Math.max(p.forma, 90);
   S.rosa.push(p);
-  notizia(`Colpo di mercato! Arriva ${p.n} ${p.c} (${RUOLI[p.r].toLowerCase()}, ${p.val}) per ${euro(c)}.`, '✍️');
+  notizia(`${p.stella ? '⭐ COLPO DA CAMPIONE! ' : 'Colpo di mercato! '}Arriva ${p.n} ${p.c} (${RUOLI[p.r].toLowerCase()}, ${p.val}) per ${euro(c)}.`, '✍️');
   Suono.cassa(); aggiornaMioSlot(); salva(); disegna(); avviso(`${p.n} ${p.c} è tuo!`);
 }
 function vendi(id){
@@ -152,9 +157,10 @@ function numeroLibero(r){
 }
 function ingaggia(id){
   const s = S.staffMercato.lista.find((x) => x.id === id); if (!s) return;
-  if (S.soldi < s.ingaggio) return avviso('Non hai abbastanza soldi per l’ingaggio');
+  const costo = trucco('gratis') ? 0 : s.ingaggio;
+  if (S.soldi < costo) return avviso('Non hai abbastanza soldi per l’ingaggio');
   const vecchio = S.staff[s.k];
-  S.soldi -= s.ingaggio; S.staff[s.k] = s; S.staffMercato.lista = S.staffMercato.lista.filter((x) => x !== s);
+  S.soldi -= costo; S.staff[s.k] = s; S.staffMercato.lista = S.staffMercato.lista.filter((x) => x !== s);
   const nome = STAFF.find((x) => x.k === s.k).nome;
   notizia(`${nome}: arriva ${s.nome} (${'★'.repeat(s.liv)}).${vecchio ? ' Saluta ' + vecchio.nome + '.' : ''}`, STAFF.find((x) => x.k === s.k).ico);
   Suono.cassa(); aggiornaMioSlot(); salva(); disegna(); avviso(`${s.nome} è il tuo ${nome.toLowerCase()}!`);
@@ -188,10 +194,11 @@ function costruisci(k){
   const s = STADIO_K[k], liv = S.stadio[k] + 1;
   if (liv >= s.costi.length) return;
   if (S.stadio.cantieri.some((c) => c.k === k)) return avviso('Ci sono già i lavori in corso');
-  const c = s.costi[liv];
+  const c = trucco('gratis') ? 0 : s.costi[liv];
   if (S.soldi < c) return avviso('Non hai abbastanza soldi');
   S.soldi -= c;
-  S.stadio.cantieri.push({ k, liv, fine: S.giornate + s.tempi[liv] });
+  S.stadio.cantieri.push({ k, liv, fine: S.giornate + (trucco('gratis') ? 0 : s.tempi[liv]) });
+  if (trucco('gratis')){ S.stadio[k] = liv; S.stadio.cantieri = S.stadio.cantieri.filter((x) => x.k !== k); }
   notizia(`Iniziati i lavori: ${s.nome} → ${s.livelli[liv]} (${s.tempi[liv]} giornat${s.tempi[liv] === 1 ? 'a' : 'e'}).`, '🏗️');
   Suono.cassa(); salva(); disegna();
 }
@@ -287,6 +294,7 @@ function applicaGiornata(ris, r, nomi, n, tier){
   // soldi
   const b = { sponsor: S.sponsor.val, tv: T.tv, biglietti: 0, negozio: 0, stipendi: stipendiGiocatori(), staff: stipendiStaff(), manut: manutenzione(), spettatori: 0 };
   if (casa){ b.spettatori = calcPubblico(); b.biglietti = Math.round(b.spettatori * prezzoBiglietto()); b.negozio = Math.round(b.spettatori * spesaNegozio()); }
+  const mul = soldiDiff(); ['sponsor', 'tv', 'biglietti', 'negozio'].forEach((k) => { b[k] = Math.round(b[k] * mul); });
   b.entrate = b.sponsor + b.tv + b.biglietti + b.negozio; b.uscite = b.stipendi + b.staff + b.manut; b.netto = b.entrate - b.uscite;
   S.soldi += b.netto; S.bilancio = b;
   S.soldiStoria.push(Math.round(S.soldi)); S.soldiStoria = S.soldiStoria.slice(-40);
@@ -333,7 +341,7 @@ function fineStagione(prev){
   const pos = me ? me.pos : prev.n;
   const T = TIERS[prev.tier - 1];
   const sale = pos <= PROMOSSE && prev.tier < TOP, scende = pos > prev.n - RETROCESSE && prev.tier > 1;
-  const premio = tondo(T.premio * (prev.n - pos + 1) / prev.n);
+  const premio = tondo(T.premio * (prev.n - pos + 1) / prev.n * soldiDiff());
   S.soldi += premio;
   const capocannoniere = S.rosa.slice().sort((a, b) => (b.gol || 0) - (a.gol || 0))[0];
   S.storico.unshift({ stagione: S.stagione, tier: prev.tier, pos, n: prev.n, pt: me ? me.pt : 0, v: me ? me.v : 0, n_: me ? me.n : 0, p: me ? me.p : 0, gf: me ? me.gf : 0, gs: me ? me.gs : 0, bomber: capocannoniere && capocannoniere.gol ? nomeG(capocannoniere) + ' (' + capocannoniere.gol + ')' : '', online: L.online });
@@ -460,7 +468,7 @@ function disegna(){
   <header class="top">
     <button class="club" data-a="vai" data-v="casa">${mioStemma(30)}<span><b>${esc(S.club.nome)}</b><small style="--c:${T.colore}">${T.nome}${L.online ? ' · <i class="online-dot"></i> online' : ''}</small></span></button>
     <div class="soldi ${S.soldi < 0 ? 'rosso' : ''}" title="${euro(S.soldi)}">${euroBreve(S.soldi)}</div>
-    <button class="menu-btn" data-a="menu" aria-label="Menu"><span></span><span></span><span></span></button>
+    <button class="menu-btn" data-a="menu" aria-label="Impostazioni"><svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg></button>
   </header>
   <main class="schermo" id="schermo">${({ casa: schermoCasa, rosa: schermoRosa, mercato: schermoMercato, stadio: schermoStadio, classifica: schermoClassifica })[schermo]()}</main>
   <nav class="barra">
@@ -600,10 +608,10 @@ function schermoRosa(){
   <p class="nota centro">Stipendi: ${euro(stipendiGiocatori())} a giornata · ${S.rosa.length}/28 giocatori</p>`;
 }
 function rigaGiocatore(p, tit){
-  return `<button class="gioc" data-a="giocatore" data-id="${p.id}"><span class="num r${p.r}">${p.num || ''}</span><span class="info"><b>${esc(p.n)} ${esc(p.c)}</b><small>${RUOLI[p.r]} · ${p.eta} anni${p.gol ? ' · ⚽ ' + p.gol : ''}${tit ? ' · <em>titolare</em>' : ''}</small><span class="barra-forma"><i style="width:${p.forma}%"></i></span></span>${p.inf > 0 ? `<span class="inf">🚑 ${p.inf}</span>` : ''}${badgeVal(p.val)}</button>`;
+  return `<button class="gioc" data-a="giocatore" data-id="${p.id}"><span class="num r${p.r}">${p.num || ''}</span><span class="info"><b>${p.stella ? '⭐ ' : ''}${esc(p.n)} ${esc(p.c)}</b><small>${RUOLI[p.r]} · ${p.eta} anni${p.gol ? ' · ⚽ ' + p.gol : ''}${tit ? ' · <em>titolare</em>' : ''}</small><span class="barra-forma"><i style="width:${p.forma}%"></i></span></span>${p.inf > 0 ? `<span class="inf">🚑 ${p.inf}</span>` : ''}${badgeVal(p.val)}</button>`;
 }
 function schedaGiocatore(id){
-  const p = S.rosa.find((x) => x.id === id) || S.mercato.lista.find((x) => x.id === id);
+  const p = S.rosa.find((x) => x.id === id) || inVendita(id);
   if (!p) return;
   const mio = S.rosa.includes(p);
   const oss = livStaff(S, 'oss');
@@ -629,7 +637,7 @@ function metti(k, id){
 
 function schermoMercato(){
   const tab = sottoschermo.mercato || 'giocatori';
-  const tabs = `<div class="tabs">${[['giocatori', 'Giocatori'], ['staff', 'Staff'], ['vendi', 'I tuoi']].map(([k, n]) => `<button class="${tab === k ? 'on' : ''}" data-a="sub" data-s="mercato" data-v="${k}">${n}</button>`).join('')}</div>`;
+  const tabs = `<div class="tabs">${[['giocatori', 'Giocatori'], ['campioni', '⭐ Campioni'], ['staff', 'Staff'], ['vendi', 'I tuoi']].map(([k, n]) => `<button class="${tab === k ? 'on' : ''}" data-a="sub" data-s="mercato" data-v="${k}">${n}</button>`).join('')}</div>`;
   if (tab === 'staff'){
     return tabs + STAFF.map((s) => { const c = S.staff[s.k]; const cand = S.staffMercato.lista.filter((x) => x.k === s.k);
       return `<section class="carta staff"><div class="carta-tit"><h3>${s.ico} ${s.nome}${s.obbl ? ' <span class="obbl">obbligatorio</span>' : ''}</h3></div><p class="nota">${s.eff}</p>
@@ -640,31 +648,100 @@ function schermoMercato(){
     return tabs + (S.rosa.length ? `<section class="carta"><p class="nota">Tocca un giocatore per venderlo. Il direttore sportivo ti fa guadagnare di più.</p>${S.rosa.slice().sort((a, b) => b.prezzo - a.prezzo).map((p) => rigaGiocatore(p)).join('')}</section>` : '<section class="carta vuoto"><p>Non hai giocatori da vendere.</p></section>');
   }
   const ruolo = sottoschermo.ruolo || '';
-  const lista = S.mercato.lista.filter((p) => !ruolo || p.r === ruolo);
+  const campioni = tab === 'campioni';
+  const lista = (campioni ? listaCampioni() : S.mercato.lista).filter((p) => !ruolo || p.r === ruolo);
   const oss = livStaff(S, 'oss');
   return tabs + `
-  <section class="carta"><div class="carta-tit"><h3>Giocatori liberi</h3><button class="link" data-a="ricerca">🔎 Nuova ricerca (${euroBreve(costoRicerca())})</button></div>
+  <section class="carta">${campioni ? '<div class="carta-tit"><h3>⭐ Calciatori veri</h3></div><p class="nota">I campioni veri della Serie A e d’Italia. Costano tanto: risparmia e sali di categoria per comprarli! La bravura la decide il gioco.</p>' : `<div class="carta-tit"><h3>Giocatori liberi</h3><button class="link" data-a="ricerca">🔎 Nuova ricerca (${euroBreve(costoRicerca())})</button></div>`}
   <div class="chips">${[['', 'Tutti'], ['P', 'Portieri'], ['D', 'Difensori'], ['C', 'Centrocampisti'], ['A', 'Attaccanti']].map(([k, n]) => `<button class="chip ${ruolo === k ? 'on' : ''}" data-a="ruolo" data-v="${k}">${n}</button>`).join('')}</div>
-  ${S.rosa.length < 11 ? `<button class="btn oro largo" data-a="squadraPronta">⚡ Squadra pronta in un tocco</button>` : ''}
-  <div class="merc">${lista.map((p) => `<div class="merc-r"><button class="gioc" data-a="giocatore" data-id="${p.id}"><span class="num r${p.r}">${p.r}</span><span class="info"><b>${esc(p.n)} ${esc(p.c)}</b><small>${p.eta} anni · ${euroBreve(p.stip)}/giornata${oss >= 1 && p.pot >= p.val + 10 ? ' · <em>💎 talento</em>' : ''}</small></span>${badgeVal(p.val)}</button><button class="btn mini" data-a="compra" data-id="${p.id}" ${S.soldi < prezzoAcquisto(p) ? 'disabled' : ''}>${euroBreve(prezzoAcquisto(p))}</button></div>`).join('') || '<p class="tenue">Nessuno: prova una nuova ricerca.</p>'}</div>
-  <p class="nota">La lista si rinnova da sola ogni 3 giornate. Con un osservatore più bravo trovi giocatori migliori.</p></section>`;
+  ${S.rosa.length < 11 && !campioni ? `<button class="btn oro largo" data-a="squadraPronta">⚡ Squadra pronta in un tocco</button>` : ''}
+  <div class="merc">${lista.map((p) => `<div class="merc-r"><button class="gioc" data-a="giocatore" data-id="${p.id}"><span class="num r${p.r}">${p.stella ? '⭐' : p.r}</span><span class="info"><b>${esc(p.n)} ${esc(p.c)}</b><small>${p.eta} anni · ${euroBreve(p.stip)}/giornata${oss >= 1 && p.pot >= p.val + 10 ? ' · <em>💎 talento</em>' : ''}</small></span>${badgeVal(p.val)}</button><button class="btn mini" data-a="compra" data-id="${p.id}" ${S.soldi < prezzoAcquisto(p) ? 'disabled' : ''}>${euroBreve(prezzoAcquisto(p))}</button></div>`).join('') || '<p class="tenue">Nessuno: prova una nuova ricerca.</p>'}</div>
+  ${campioni ? '' : '<p class="nota">La lista si rinnova da sola ogni 3 giornate. Con un osservatore più bravo trovi giocatori migliori.</p>'}</section>`;
 }
 
 function schermoStadio(){
   const st = S.stadio;
   return `
   <section class="carta stadio-c">
-    <div class="stadio-wrap">${stadioSVG(S)}<div class="stadio-nome">Stadio ${esc(S.club.citta || S.club.nome)}</div></div>
+    <div class="stadio-wrap">${(sottoschermo.stadio || 'pano') === 'pano' ? stadioPanoramaSVG(S) : stadioSVG(S)}<div class="stadio-nome">${esc(nomeStadio(S))}</div></div>
+    <div class="tabs piccole">${[['pano', '🏟️ Panoramica'], ['alto', '🛰️ Dall’alto']].map(([k, n]) => `<button class="${(sottoschermo.stadio || 'pano') === k ? 'on' : ''}" data-a="sub" data-s="stadio" data-v="${k}">${n}</button>`).join('')}</div>
     <div class="stadio-dati"><div><small>Posti</small><b>${postiStadio(S).toLocaleString('it-IT')}</b></div><div><small>Pubblico previsto</small><b>${calcPubblico(false).toLocaleString('it-IT')}</b></div><div><small>Biglietto</small><b>${euro(prezzoBiglietto())}</b></div></div>
     <div class="usura"><div class="usura-t"><span>Stato dello stadio</span><b class="${st.usura < 60 ? 'rosso' : st.usura < 80 ? 'giallo' : 'verde'}">${Math.round(st.usura)}%</b></div><div class="barra-u"><i class="${st.usura < 60 ? 'rosso' : st.usura < 80 ? 'giallo' : ''}" style="width:${st.usura}%"></i></div>
     <button class="btn ${st.usura < 80 ? 'oro' : 'sec'}" data-a="restaura" ${st.usura >= 99 ? 'disabled' : ''}>🧹 Restaura tutto · ${euroBreve(costoRestauro(S))}</button><p class="nota">Ogni partita in casa rovina un po’ il campo. Sotto il 60% vengono meno tifosi.</p></div>
   </section>
+  ${progettoStadio()}
   ${STADIO.map((s) => { const liv = st[s.k], max = s.costi.length - 1, c = st.cantieri.find((x) => x.k === s.k);
     return `<section class="carta miglioria"><div class="mig-top"><span class="mig-ico">${s.ico}</span><div><h3>${s.nome}</h3><p>${s.livelli[liv]}${s.posti ? ' · ' + s.posti[liv].toLocaleString('it-IT') + ' posti' : ''}</p></div><span class="livelli">${Array.from({ length: max }, (_, i) => `<i class="${i < liv ? 'on' : c && i === liv ? 'lavori' : ''}"></i>`).join('')}</span></div>
     <p class="nota">${s.eff}</p>
     ${c ? `<div class="lavori-b">🏗️ Lavori in corso: ${s.livelli[c.liv]} · finiscono fra ${c.fine - S.giornate} giornat${c.fine - S.giornate === 1 ? 'a' : 'e'}</div>`
       : liv < max ? `<button class="btn mig-btn" data-a="costruisci" data-k="${s.k}" ${S.soldi < s.costi[liv + 1] ? 'disabled' : ''}><span>${liv === 0 && !s.posti ? 'Costruisci' : 'Migliora'}: ${s.livelli[liv + 1]}${s.posti ? ' (' + s.posti[liv + 1].toLocaleString('it-IT') + ' posti)' : ''}</span><b>${euroBreve(s.costi[liv + 1])} · ${s.tempi[liv + 1]} g.</b></button>` : '<div class="lavori-b max">⭐ Al massimo!</div>'}</section>`; }).join('')}
   <p class="nota centro">Manutenzione: ${euro(manutenzione())} a giornata</p>`;
+}
+
+function progettoStadio(){
+  const d = designDi(S), aperto = sottoschermo.progetto;
+  const chipCol = (k, val, lista) => `<div class="colori">${lista.map((c) => `<button class="col ${val === c ? 'on' : ''}" style="--c:${c || S.club.c1}" data-a="design" data-k="${k}" data-v="${c}" aria-label="colore">${c ? '' : '<i>🛡️</i>'}</button>`).join('')}</div>`;
+  const tog = (k, nome) => `<button class="chip ${d[k] ? 'on' : ''}" data-a="design" data-k="${k}" data-v="${d[k] ? '0' : '1'}">${nome}</button>`;
+  return `<section class="carta progetto"><button class="carta-tit apri" data-a="apriProgetto"><h3>🎨 Progetta il tuo stadio</h3><span>${aperto ? '▲' : '▼'}</span></button>
+  ${aperto ? `<label class="campo-t">Nome dello stadio<input id="nomeStadio" maxlength="30" placeholder="${esc('Stadio ' + (S.club.citta || S.club.nome))}" value="${esc((S.stadio.design || {}).nome || '')}"></label>
+  <div class="scelta"><span>Colore dei seggiolini</span>${chipCol('sedili', (S.stadio.design || {}).sedili || '', [''].concat(COLORI))}</div>
+  <div class="scelta"><span>Colore delle curve</span>${chipCol('sedili2', (S.stadio.design || {}).sedili2 || '', [''].concat(COLORI))}</div>
+  <div class="scelta"><span>Colore del tetto</span>${chipCol('tetto', d.tetto, ['#e9ecef', '#adb5bd', '#343a40', '#f5c542', '#1971c2', '#c92a2a', '#2b8a3e', S.club.c1])}</div>
+  <div class="scelta"><span>Forma</span><div class="chips">${['Classico', 'Ovale'].map((n, i) => `<button class="chip ${d.forma === i ? 'on' : ''}" data-a="design" data-k="forma" data-v="${i}">${n}</button>`).join('')}</div></div>
+  <div class="scelta"><span>Dettagli</span><div class="chips wrap">${tog('scritta', '🔤 Nome sulla tribuna')}${tog('bandiere', '🚩 Bandiere')}${tog('fumogeni', '💨 Fumogeni dei tifosi')}${tog('notte', '🌙 Di sera')}</div></div>
+  <p class="nota">Più migliori le tribune, le luci e il maxischermo, più il tuo stadio diventa spettacolare.</p>` : '<p class="nota">Scegli il nome, i colori dei seggiolini, il tetto, la forma, le bandiere e i fumogeni.</p>'}</section>`;
+}
+
+// ---------- codice segreto ----------
+function chiediCodice(){
+  if (S.codice) return pannelloSegreto();
+  foglio(`<h2>🔑 Aggiungi codice</h2><p class="tenue">Hai un codice segreto? Scrivilo qui.</p><div class="login-f"><input id="codiceIn" placeholder="Codice" autocomplete="off" autocapitalize="none"><button class="btn" id="codiceOk">Sblocca</button><p class="rosso" id="codiceErr"></p></div>`);
+  const ok = () => { const v = ($('#codiceIn').value || '').trim().toLowerCase(); if (v === 'arcangeli'){ S.codice = true; salva(); Suono.fanfara(); coriandoli(['#f5c542', '#c6ff3d', '#fff'], 120); pannelloSegreto(); } else { $('#codiceErr').textContent = 'Codice sbagliato'; } };
+  $('#codiceOk').onclick = ok; $('#codiceIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') ok(); }); setTimeout(() => $('#codiceIn') && $('#codiceIn').focus(), 100);
+}
+function pannelloSegreto(){
+  const on = S.lega.online;
+  const T = S.trucchi || {};
+  const b = (a, t, cls = 'sec') => `<button class="btn mini ${cls}" data-a="segreto" data-v="${a}" ${on ? 'disabled' : ''}>${t}</button>`;
+  const tg = (k, t) => `<button class="chip ${T[k] ? 'on' : ''}" data-a="segreto" data-v="t-${k}" ${on ? 'disabled' : ''}>${t}</button>`;
+  foglio(`<h2>🪄 Pannello segreto</h2>${on ? '<p class="avviso-in">Il pannello segreto funziona quando giochi da solo, così online è giusto per tutti.</p>' : '<p class="tenue">Puoi cambiare tutto quello che vuoi.</p>'}
+  <div class="segreto">
+  <h3>💶 Soldi</h3><div class="login-f"><input id="sSoldi" type="number" inputmode="numeric" value="${Math.round(S.soldi)}" ${on ? 'disabled' : ''}></div>
+  <div class="riga-btn">${b('soldiImposta', 'Imposta', '')}${b('soldi1', '+1 mln')}${b('soldi10', '+10 mln')}${b('soldi100', '+100 mln')}${b('soldi1000', '+1 miliardo')}</div>
+  <h3>❤️ Tifosi e morale</h3><div class="riga-btn">${b('tifosi', '+10.000 tifosi')}${b('tifosi100', '+100.000 tifosi')}${b('morale', 'Morale al massimo')}</div>
+  <h3>👕 Squadra</h3><div class="riga-btn">${b('forti', 'Tutti +5')}${b('max', 'Tutti a 99')}${b('cura', 'Tutti in forma e guariti')}${b('giovani', 'Tutti 20 anni')}</div>
+  <h3>🏟️ Stadio</h3><div class="riga-btn">${b('lavori', 'Finisci subito i lavori')}${b('stadioMax', 'Stadio al massimo')}${b('nuovo', 'Stadio come nuovo')}</div>
+  <h3>📋 Staff</h3><div class="riga-btn">${b('staff', 'Tutto lo staff a 5 stelle')}</div>
+  <h3>🏆 Campionato</h3><div class="login-f"><select id="sTier" ${on ? 'disabled' : ''}>${TIERS.map((t, i) => `<option value="${i + 1}" ${i + 1 === S.tier ? 'selected' : ''}>${t.nome}</option>`).join('')}</select></div>
+  <div class="riga-btn">${b('tier', 'Vai a questo campionato', '')}${b('fineStagione', 'Salta a fine stagione')}${b('trofeo', '+1 trofeo')}</div>
+  <h3>✨ Trucchi sempre attivi</h3><div class="chips wrap">${tg('gratis', '🆓 Tutto gratis')}${tg('super', '🦸 Super squadra')}</div>
+  <p class="nota">«Tutto gratis»: giocatori, campioni, staff e stadio costano zero e i lavori finiscono subito. «Super squadra»: la tua squadra diventa fortissima.</p>
+  </div><button class="btn largo" data-a="chiudi">Fatto</button>`);
+}
+function segreto(v){
+  if (S.lega.online) return;
+  const fatto = (t) => { aggiornaMioSlot(); salva(); disegna(); avviso(t); };
+  const soldi = { soldi1: 1e6, soldi10: 1e7, soldi100: 1e8, soldi1000: 1e9 };
+  if (v.startsWith('t-')){ const k = v.slice(2); S.trucchi = S.trucchi || {}; S.trucchi[k] = !S.trucchi[k]; fatto(S.trucchi[k] ? 'Trucco attivato!' : 'Trucco spento'); return pannelloSegreto(); }
+  if (soldi[v]){ S.soldi += soldi[v]; S.soldiStoria.push(Math.round(S.soldi)); fatto('+' + euroBreve(soldi[v])); return pannelloSegreto(); }
+  switch (v){
+    case 'soldiImposta': { const n = Math.max(0, Math.min(1e12, Math.round(+($('#sSoldi').value) || 0))); S.soldi = n; S.soldiStoria.push(n); fatto('Soldi: ' + euroBreve(n)); break; }
+    case 'tifosi': S.tifosi += 10000; fatto('+10.000 tifosi'); break;
+    case 'tifosi100': S.tifosi += 100000; fatto('+100.000 tifosi'); break;
+    case 'morale': S.morale = 100; fatto('Morale alle stelle!'); break;
+    case 'forti': S.rosa.forEach((p) => { p.val = Math.min(99, p.val + 5); p.pot = Math.max(p.pot, p.val); p.prezzo = valoreDi(p); }); fatto('Tutti più forti!'); break;
+    case 'max': S.rosa.forEach((p) => { p.val = 99; p.pot = 99; p.prezzo = valoreDi(p); }); fatto('Tutti a 99!'); break;
+    case 'cura': S.rosa.forEach((p) => { p.forma = 100; p.inf = 0; }); fatto('Tutti in forma!'); break;
+    case 'giovani': S.rosa.forEach((p) => { p.eta = 20; p.prezzo = valoreDi(p); }); fatto('Tutti ventenni!'); break;
+    case 'lavori': S.stadio.cantieri.forEach((c) => { S.stadio[c.k] = c.liv; }); S.stadio.cantieri = []; fatto('Lavori finiti!'); break;
+    case 'stadioMax': STADIO.forEach((x) => { S.stadio[x.k] = x.costi.length - 1; }); S.stadio.cantieri = []; S.stadio.usura = 100; fatto('Stadio al massimo!'); break;
+    case 'nuovo': S.stadio.usura = 100; fatto('Stadio come nuovo!'); break;
+    case 'staff': STAFF.forEach((x) => { S.staff[x.k] = Object.assign(nuovoStaff(x.k, 5), { stip: S.staff[x.k] ? S.staff[x.k].stip : STAFF_STIP[5] }); }); fatto('Staff a 5 stelle!'); break;
+    case 'trofeo': S.trofei.push({ stagione: S.stagione, tier: S.tier, nome: 'Campioni ' + TIERS[S.tier - 1].nome }); fatto('+1 trofeo in bacheca!'); break;
+    case 'tier': { const t = +$('#sTier').value; S.tier = t; S.sponsor = nuovoSponsor(t); nuovaLegaLocale(t); genMercato(); genStaffMercato(); notizia(`La ${S.club.nome} ora gioca in ${TIERS[t - 1].nome}!`, '🪄'); fatto('Ora sei in ' + TIERS[t - 1].nome); break; }
+    case 'fineStagione': { chiudiFoglio(true); const st = S.stagione; let k = 0; while (S.stagione === st && k++ < 60){ giocaGiornataDati(S.lega.dati); sincronizza(false); if (S.stagione !== st) break; S.pendenti = S.pendenti.filter((x) => x.tipo === 'stagione'); chiudiFoglio(true); } disegna(); return; }
+  }
+  pannelloSegreto();
 }
 
 // ---------- partita a schermo intero ----------
@@ -679,11 +756,15 @@ function mostraPartita(rep, dopo){
   <div class="campo-wrap"><canvas id="campo"></canvas><div class="golbig" id="golbig"></div></div>
   ${sp ? `<div class="spett">🏟️ ${sp}</div>` : ''}
   <div class="cronaca" id="cronaca"></div>
+  <div class="viste">${[['tv', '📺 Telecamera'], ['alto', '🛰️ Dall’alto'], ['numeri', '🔢 Solo numeri']].map(([k, n]) => `<button data-vista="${k}" class="${(S.opz.vista || 'tv') === k ? 'on' : ''}">${n}</button>`).join('')}</div>
   <div class="mctrl"><span>Velocità</span>${[1, 2, 4].map((x) => `<button data-vel="${x}" class="${x === 2 ? 'on' : ''}">×${x}</button>`).join('')}<button id="salta" class="salta">Salta ⏭</button></div>`;
   document.body.appendChild(v);
   const cron = $('#cronaca', v); let gh = 0, ga = 0, finito = false;
   const evs = eventiPartita(rep);
   const mod = rep.mod || S.tattica.mod;
+  const miei = formazione().map((x) => x.p ? { num: x.p.num || '', nome: x.p.c } : { num: '', nome: '' });
+  const ra = rng('rosa' + rep.avv.nome);
+  const loro = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((n) => ({ num: n, nome: pick(COGNOMI, ra) }));
   Suono.avviaFolla();
   const fine = () => {
     if (finito) return; finito = true; Suono.fermaFolla();
@@ -693,7 +774,7 @@ function mostraPartita(rep, dopo){
     }, 300);
   };
   _partita = new Partita($('#campo', v), {
-    casa: { c1: h.c1, c2: h.c2, mod: rep.casa ? mod : '4-4-2' }, ospiti: { c1: a.c1, c2: a.c2, mod: rep.casa ? '4-4-2' : mod }, eventi: evs, durata: 90 + rep.rec,
+    casa: { c1: h.c1, c2: h.c2, mod: rep.casa ? mod : '4-4-2', giocatori: rep.casa ? miei : loro }, ospiti: { c1: a.c1, c2: a.c2, mod: rep.casa ? '4-4-2' : mod, giocatori: rep.casa ? loro : miei }, eventi: evs, durata: 90 + rep.rec, vista: S.opz.vista || 'tv',
     onEvento: (e, veloce) => {
       if (e.tipo === 'gol'){ if (e.lato === 0) gh++; else ga++; $('#gh', v).textContent = gh; $('#ga', v).textContent = ga;
         if (!veloce){ const g = $('#golbig', v); g.textContent = 'GOL!'; g.style.setProperty('--c', e.lato === 0 ? h.c1 : a.c1); g.classList.remove('via'); void g.offsetWidth; g.classList.add('via');
@@ -710,6 +791,7 @@ function mostraPartita(rep, dopo){
   const tick = () => { if (!_partita || !document.body.contains(v)) return; const m = Math.floor(_partita.min); orologio.textContent = (m > 90 ? '90+' + (m - 90) : m) + '’'; if (!_partita.fine) requestAnimationFrame(tick); else orologio.textContent = 'FINE'; };
   tick();
   v.querySelectorAll('[data-vel]').forEach((b) => b.onclick = () => { _partita.vel = +b.dataset.vel * 1; v.querySelectorAll('[data-vel]').forEach((x) => x.classList.toggle('on', x === b)); });
+  v.querySelectorAll('[data-vista]').forEach((b) => b.onclick = () => { S.opz.vista = b.dataset.vista; _partita.vista = b.dataset.vista; salva(); v.querySelectorAll('[data-vista]').forEach((x) => x.classList.toggle('on', x === b)); if (_partita.fine) _partita.disegna(); });
   $('#salta', v).onclick = () => { _partita.salta(); orologio.textContent = 'FINE'; };
 }
 function calcPubblicoTesto(rep){ return rep.bil && rep.bil.spettatori ? rep.bil.spettatori.toLocaleString('it-IT') + ' spettatori' : ''; }
@@ -744,7 +826,7 @@ function mostraFineStagione(p, dopo){
 function menu(){
   const on = window.Online && Online.loggato();
   const L = S.lega;
-  foglio(`<div class="menu-top">${mioStemma(54)}<div><h2>${esc(S.club.nome)}</h2><p class="tenue">${esc(S.club.citta || '')} · stagione ${S.stagione} · ${TIERS[S.tier - 1].nome}</p></div></div>
+  foglio(`<div class="menu-top">${mioStemma(54)}<div><h2>${esc(S.club.nome)}</h2><p class="tenue">${esc(S.club.citta || '')} · stagione ${S.stagione} · ${TIERS[S.tier - 1].nome} · ${DIFFICOLTA[S.diff == null ? 2 : S.diff].ico} ${DIFFICOLTA[S.diff == null ? 2 : S.diff].nome}</p></div></div>
   <section class="menu-sez online-sez"><h3>🌍 Gioca online</h3>
     ${!on ? `<p>Entra con il tuo account (lo stesso del Gioco della Vita PM): la tua società viene salvata online e puoi entrare nei gironi con altre persone vere. Ogni persona che entra prende il posto di un bot.</p>
       <div class="riga-btn"><button class="btn" data-a="loginGoogle">Entra con Google</button><button class="btn sec" data-a="loginEmail">Entra con email</button></div>`
@@ -754,12 +836,12 @@ function menu(){
       <div class="riga-btn"><button class="link" data-a="logout">Esci dall’account</button></div>`}
     ${window.Online && Online.errore() ? `<p class="rosso">${esc(Online.errore())}</p>` : ''}
   </section>
-  <section class="menu-sez"><button class="riga-menu" data-a="modClub">🎨 Cambia nome, colori e stemma</button>
+  <section class="menu-sez"><button class="riga-menu oro" data-a="codice">${S.codice ? '🪄 Pannello segreto' : '🔑 Aggiungi codice'}</button><button class="riga-menu" data-a="modClub">🎨 Cambia nome, colori e stemma</button>
   <button class="riga-menu" data-a="comeSiGioca">❓ Come si gioca</button>
   <button class="riga-menu" data-a="suono">${S.opz.suono ? '🔊 Suoni attivi' : '🔇 Suoni spenti'}</button>
   <button class="riga-menu" data-a="installa">📲 Metti l’app sul telefono</button>
   <button class="riga-menu rosso" data-a="ricomincia">🗑️ Ricomincia da capo</button></section>
-  <p class="nota centro">Presidente PM · gratis, senza pubblicità · <a href="../">sito</a></p>`);
+  <p class="nota centro">Calciomania PM · gratis, senza pubblicità · <a href="../">sito</a></p>`);
 }
 function comeSiGioca(){
   foglio(`<h2>Come si gioca</h2><div class="guida">
@@ -778,8 +860,8 @@ let bozza = null;
 function schermataIniziale(){
   const c = carica();
   $('#app').innerHTML = `<div class="intro"><div class="intro-luci"></div><div class="intro-c">
-    <div class="intro-logo">${stemmaSVG({ c1: '#0b3d2e', c2: '#f5c542', st: 2, pat: 4, sim: 1 }, 110, 'Presidente PM')}</div>
-    <h1>PRESIDENTE<span>PM</span></h1><p>Fonda la tua squadra di calcio.<br>Dalla Terza Categoria alla Serie A.</p>
+    <div class="intro-logo">${stemmaSVG({ c1: '#0b3d2e', c2: '#f5c542', st: 2, pat: 4, sim: 1 }, 110, 'PM')}</div>
+    <h1>CALCIOMANIA<span>PM</span></h1><p>Fonda la tua squadra di calcio.<br>Dalla Terza Categoria alla Serie A.</p>
     ${c ? `<button class="btn largo oro" data-a="continua">▶ Continua con ${esc(c.club.nome)}</button>` : ''}
     <button class="btn largo ${c ? 'sec' : 'oro'}" data-a="fonda">${c ? 'Fonda una nuova società' : '⚽ Fonda la tua società'}</button>
     <button class="link" data-a="introLogin">Hai già giocato su un altro telefono? Entra nel tuo account</button>
@@ -788,11 +870,12 @@ function schermataIniziale(){
 function fondazione(modifica){
   const r = RND;
   bozza = modifica ? Object.assign({}, S.club) : Object.assign({ nome: '', citta: '' }, stemmaCasuale(r));
-  if (!modifica){ bozza.c1 = '#1e3a8a'; bozza.c2 = '#facc15'; bozza.st = 0; bozza.pat = 1; bozza.sim = 0; }
+  if (!modifica){ bozza.c1 = '#1e3a8a'; bozza.c2 = '#facc15'; bozza.st = 0; bozza.pat = 1; bozza.sim = 0; bozza.diff = 1; }
   const html = () => `<div class="fonda"><h1>${modifica ? 'La tua società' : 'Fonda la tua società'}</h1>
     <div class="anteprima" id="ant">${stemmaSVG(bozza, 120, bozza.nome || 'PM')}<b>${esc(bozza.nome || 'Nome della squadra')}</b></div>
     <label>Nome della squadra<input id="fNome" maxlength="28" placeholder="es. Real Borgoverde" value="${esc(bozza.nome)}"></label>
     <label>Città<input id="fCitta" maxlength="24" placeholder="es. Borgoverde" value="${esc(bozza.citta)}"></label>
+    ${modifica ? '' : `<div class="scelta"><span>Difficoltà</span><div class="diff">${DIFFICOLTA.map((x, i) => `<button class="${bozza.diff === i ? 'on' : ''}" data-a="fopz" data-k="diff" data-v="${i}"><b>${x.ico}</b><span>${x.nome}</span></button>`).join('')}</div><p class="nota">${DIFFICOLTA[bozza.diff].desc}</p></div>`}
     <div class="scelta"><span>Colore 1</span><div class="colori">${COLORI.map((c) => `<button class="col ${bozza.c1 === c ? 'on' : ''}" style="--c:${c}" data-a="fcol" data-k="c1" data-v="${c}" aria-label="colore"></button>`).join('')}</div></div>
     <div class="scelta"><span>Colore 2</span><div class="colori">${COLORI.map((c) => `<button class="col ${bozza.c2 === c ? 'on' : ''}" style="--c:${c}" data-a="fcol" data-k="c2" data-v="${c}" aria-label="colore"></button>`).join('')}</div></div>
     <div class="scelta"><span>Forma</span><div class="opz">${[0, 1, 2, 3].map((i) => `<button class="${bozza.st === i ? 'on' : ''}" data-a="fopz" data-k="st" data-v="${i}">${stemmaSVG(Object.assign({}, bozza, { st: i, sim: 6 }), 30, ' ')}</button>`).join('')}</div></div>
@@ -817,6 +900,7 @@ function avviaContoAllaRovescia(){
   f(); _contoT = setInterval(f, 15000);
 }
 
+document.addEventListener('change', (e) => { if (e.target && e.target.id === 'nomeStadio' && S){ S.stadio.design = Object.assign({}, S.stadio.design || {}, { nome: e.target.value.trim().slice(0, 30) }); salva(); disegna(); } });
 // ---------- tocchi ----------
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-a]'); if (!b || b.disabled) return;
@@ -844,9 +928,13 @@ document.addEventListener('click', (e) => {
     case 'slot': sceltaSlot(+b.dataset.k); break;
     case 'metti': metti(+b.dataset.k, b.dataset.id); break;
     case 'rivedi': if (S.ultima){ const rep = S.ultima; chiudiFoglio(true); mostraPartita(rep, () => { disegna(); mostraPendenti(); }); } break;
+    case 'codice': chiediCodice(); break;
+    case 'segreto': segreto(v); break;
+    case 'apriProgetto': sottoschermo.progetto = !sottoschermo.progetto; disegna(); break;
+    case 'design': { S.stadio.design = Object.assign({}, S.stadio.design || {}); const k = b.dataset.k; S.stadio.design[k] = ['forma'].includes(k) ? +v : ['scritta', 'bandiere', 'fumogeni', 'notte'].includes(k) ? v === '1' : v; salva(); disegna(); break; }
     case 'suono': S.opz.suono = !S.opz.suono; Suono.on = S.opz.suono; salva(); menu(); break;
     case 'comeSiGioca': comeSiGioca(); break;
-    case 'installa': foglio(`<h2>Metti l’app sul telefono</h2><div class="guida"><p><b>Android (Chrome):</b> tocca i tre puntini in alto a destra e poi «Installa app» o «Aggiungi a schermata Home».</p><p><b>iPhone (Safari):</b> tocca il quadrato con la freccia in basso e poi «Aggiungi alla schermata Home».</p><p>Così Presidente PM si apre come una vera app, a schermo intero.</p></div><button class="btn largo" data-a="chiudi">Ok</button>`); break;
+    case 'installa': foglio(`<h2>Metti l’app sul telefono</h2><div class="guida"><p><b>Android (Chrome):</b> tocca i tre puntini in alto a destra e poi «Installa app» o «Aggiungi a schermata Home».</p><p><b>iPhone (Safari):</b> tocca il quadrato con la freccia in basso e poi «Aggiungi alla schermata Home».</p><p>Così Calciomania PM si apre come una vera app, a schermo intero.</p></div><button class="btn largo" data-a="chiudi">Ok</button>`); break;
     case 'ricomincia': if (confirm('Vuoi cancellare la tua società e ricominciare da capo?')){ if (S.lega.online && window.Online) Online.esci().catch(() => {}); localStorage.removeItem(CHIAVE); S = null; chiudiFoglio(true); schermataIniziale(); } break;
     case 'modClub': chiudiFoglio(true); fondazione(true); break;
     case 'continua': S = carica(); migra(); Suono.on = S.opz.suono; schermo = 'casa'; disegna(); if (S.lega.online && window.Online) Online.riprendi(); mostraPendenti(); break;

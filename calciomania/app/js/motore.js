@@ -39,6 +39,14 @@ const TIERS = [
 const TOP = TIERS.length; // livello 1..9
 const tierMedia = (t) => 26 + (t - 1) * 6.5; // bravura media dei giocatori in quel campionato
 const SQUADRE_GIRONE = 12;
+// livelli di difficoltà: quanto sono forti i bot e quanti soldi entrano
+const DIFFICOLTA = [
+  { nome: 'Principiante', ico: '🐣', bot: -8, soldi: 1.4, desc: 'Bot deboli e tanti soldi: per imparare' },
+  { nome: 'Normale', ico: '🙂', bot: -4, soldi: 1.15, desc: 'Facile, ma bisogna pensarci un po’' },
+  { nome: 'Medio', ico: '⚽', bot: 0, soldi: 1, desc: 'Il gioco giusto' },
+  { nome: 'Forte', ico: '💪', bot: 4, soldi: 0.88, desc: 'Bot più forti e meno incassi' },
+  { nome: 'Estremo', ico: '🔥', bot: 8, soldi: 0.75, desc: 'Solo per veri presidenti' }
+];
 const PROMOSSE = 2, RETROCESSE = 2;
 
 // ---------- nomi inventati ----------
@@ -180,18 +188,18 @@ function simPartita(r, fH, fA, bonusCasa = 2.5){
 }
 
 // ---------- girone ----------
-function forzaBot(tier, r){
-  const base = tierMedia(tier) + (r() - 0.5) * 13;
+function forzaBot(tier, r, off = 0){
+  const base = tierMedia(tier) + off + (r() - 0.5) * 13;
   return { por: Math.round(base + gauss(r) * 3), dif: Math.round(base + gauss(r) * 3), cen: Math.round(base + gauss(r) * 3), att: Math.round(base + gauss(r) * 3) };
 }
-function nuovoBot(tier, r = RND){
-  return Object.assign({ tipo: 'bot', uid: '', nome: nomeClub(tier, r), forza: forzaBot(tier, r), campo: Math.min(4, Math.floor(tier / 2.5)), pronto: -1 }, stemmaCasuale(r), statoZero());
+function nuovoBot(tier, r = RND, off = 0){
+  return Object.assign({ tipo: 'bot', uid: '', nome: nomeClub(tier, r), forza: forzaBot(tier, r, off), campo: Math.min(4, Math.floor(tier / 2.5)), pronto: -1 }, stemmaCasuale(r), statoZero());
 }
 const statoZero = () => ({ pt: 0, g: 0, v: 0, n: 0, p: 0, gf: 0, gs: 0, f: '' });
-function nuovoGirone(tier, nomeGirone, r = RND){
+function nuovoGirone(tier, nomeGirone, r = RND, off = 0){
   const squadre = [];
-  for (let i = 0; i < SQUADRE_GIRONE; i++) squadre.push(nuovoBot(tier, r));
-  return { nome: nomeGirone || 'Girone A', tier, n: SQUADRE_GIRONE, stagione: 1, giornata: 0, squadre, ris: {}, scad: 0, prev: null, attesa: [], seed: uid() };
+  for (let i = 0; i < SQUADRE_GIRONE; i++) squadre.push(nuovoBot(tier, r, off));
+  return { off, nome: nomeGirone || 'Girone A', tier, n: SQUADRE_GIRONE, stagione: 1, giornata: 0, squadre, ris: {}, scad: 0, prev: null, attesa: [], seed: uid() };
 }
 const umani = (d) => d.squadre.filter((s) => s.tipo === 'umano');
 function ordina(squadre){
@@ -233,12 +241,42 @@ function chiudiStagioneDati(d){
   tab.forEach((t) => {
     const s = d.squadre[t.i];
     const sale = t.pos <= PROMOSSE && d.tier < TOP, scende = t.pos > d.n - RETROCESSE && d.tier > 1;
-    if (s.tipo === 'umano' && (sale || scende)) d.squadre[t.i] = nuovoBot(d.tier, r);
+    if (s.tipo === 'umano' && (sale || scende)) d.squadre[t.i] = nuovoBot(d.tier, r, d.off || 0);
   });
   (d.attesa || []).forEach((w) => d.squadre.push(Object.assign({}, w, { tipo: 'umano', pronto: -1 })));
   d.attesa = [];
-  if (d.squadre.length % 2) d.squadre.push(nuovoBot(d.tier, r));
+  if (d.squadre.length % 2) d.squadre.push(nuovoBot(d.tier, r, d.off || 0));
   d.n = d.squadre.length;
-  d.squadre.forEach((s) => { Object.assign(s, statoZero()); if (s.tipo === 'bot'){ s.forza = forzaBot(d.tier, r); } s.pronto = -1; });
+  d.squadre.forEach((s) => { Object.assign(s, statoZero()); if (s.tipo === 'bot'){ s.forza = forzaBot(d.tier, r, d.off || 0); } s.pronto = -1; });
   d.stagione++; d.giornata = 0; d.ris = {};
+}
+
+// ---------- calciatori veri (nomi veri, bravura e prezzi decisi dal gioco) ----------
+// [nome, cognome, ruolo, anno di nascita, bravura]
+const CAMPIONI = [
+  ['Mike','Maignan','P',1995,87],['Yann','Sommer','P',1988,84],['Gianluigi','Donnarumma','P',1999,88],['Guglielmo','Vicario','P',1996,83],['Michele','Di Gregorio','P',1997,82],
+  ['Alex','Meret','P',1997,81],['Mile','Svilar','P',1999,83],['Marco','Carnesecchi','P',2000,82],['David','de Gea','P',1990,82],['Elia','Caprile','P',2001,77],
+  ['Alessandro','Bastoni','D',1999,87],['Alessandro','Buongiorno','D',1999,83],['Riccardo','Calafiori','D',2002,82],['Federico','Dimarco','D',1997,85],['Giovanni','Di Lorenzo','D',1993,83],
+  ['Gleison','Bremer','D',1997,85],['Francesco','Acerbi','D',1988,80],['Benjamin','Pavard','D',1996,82],['Denzel','Dumfries','D',1996,83],['Fikayo','Tomori','D',1997,81],
+  ['Amir','Rrahmani','D',1994,81],['Andrea','Cambiaso','D',2000,82],['Pierre','Kalulu','D',2000,80],['Giorgio','Scalvini','D',2003,80],['Destiny','Udogie','D',2002,81],
+  ['Gianluca','Mancini','D',1996,80],['Evan','Ndicka','D',1999,80],['Isak','Hien','D',1999,79],['Matteo','Gabbia','D',1999,78],['Mattia','Bellanova','D',2000,77],
+  ['Nicolò','Barella','C',1997,87],['Hakan','Çalhanoğlu','C',1994,85],['Scott','McTominay','C',1996,86],['Henrikh','Mkhitaryan','C',1989,82],['Stanislav','Lobotka','C',1994,84],
+  ['Manuel','Locatelli','C',1998,82],['Teun','Koopmeiners','C',1998,82],['Khéphren','Thuram','C',2001,82],['Luka','Modrić','C',1985,83],['Youssouf','Fofana','C',1999,81],
+  ['André-Frank','Zambo Anguissa','C',1995,83],['Kevin','De Bruyne','C',1991,86],['Davide','Frattesi','C',1999,81],['Samuele','Ricci','C',2001,79],['Nico','Paz','C',2004,81],
+  ['Lorenzo','Pellegrini','C',1996,79],['Bryan','Cristante','C',1995,78],['Ederson','dos Santos','C',1999,82],['Marten','de Roon','C',1991,79],['Adrien','Rabiot','C',1995,83],
+  ['Sandro','Tonali','C',2000,84],['Ruben','Loftus-Cheek','C',1996,79],['Piotr','Zieliński','C',1994,81],
+  ['Lautaro','Martínez','A',1997,89],['Marcus','Thuram','A',1997,85],['Dušan','Vlahović','A',2000,83],['Jonathan','David','A',2000,83],['Rafael','Leão','A',1999,85],
+  ['Christian','Pulisic','A',1998,84],['Ademola','Lookman','A',1997,84],['Romelu','Lukaku','A',1993,82],['Rasmus','Højlund','A',2003,81],['Moise','Kean','A',2000,83],
+  ['Kenan','Yıldız','A',2005,83],['Paulo','Dybala','A',1993,82],['Artem','Dovbyk','A',1997,80],['Nick','Woltemade','A',2002,81],['Daniel','Maldini','A',2001,77],
+  ['Gianluca','Scamacca','A',1999,80],['Matías','Soulé','A',2003,80],['Riccardo','Orsolini','A',1997,80],['Federico','Chiesa','A',1997,80],['Giacomo','Raspadori','A',2000,79],
+  ['Francisco','Conceição','A',2002,81],['Charles','De Ketelaere','A',2001,82],['Albert','Gudmundsson','A',1997,80],['Santiago','Giménez','A',2001,80],['Mattia','Zaccagni','A',1995,80],
+  ['Valentín','Castellanos','A',1999,79],['Lorenzo','Lucca','A',2000,78],['Nikola','Krstović','A',2000,79],['Santiago','Castro','A',2004,77]
+];
+function campioneDa(k, stagione){
+  const c = CAMPIONI[k]; const eta = 2026 - c[3] + (stagione - 1);
+  const val = c[4] - Math.max(0, eta - 32) * 2;
+  const pot = eta <= 23 ? Math.min(95, val + (24 - eta) * 2) : val;
+  const p = { id: 'cmp' + k, n: c[0], c: c[1], r: c[2], eta, val, pot, forma: 100, inf: 0, gol: 0, pres: 0, num: 0, stella: true };
+  p.prezzo = valoreDi(p); p.stip = stipDi(p);
+  return p;
 }

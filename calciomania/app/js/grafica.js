@@ -62,7 +62,7 @@ function stemmaSVG(s, size = 48, nome = ''){
 
 // ---------- stadio visto dall'alto ----------
 function stadioSVG(S){
-  const st = S.stadio, c1 = S.club.c1, c2 = S.club.c2;
+  const st = S.stadio, dz = designDi(S), c1 = dz.s1, c2 = dz.s2;
   const W = 400, H = 300, px = 120, py = 100, pw = 160, ph = 100;
   const T = st.tribune;
   let o = `<svg viewBox="0 0 ${W} ${H}" class="stadio-svg" role="img" aria-label="Il tuo stadio"><defs>
@@ -228,6 +228,10 @@ class Partita {
     this.ev = info.eventi.slice().sort((a, b) => a.min - b.min); this.k = 0; this.durata = info.durata || 93;
     this.palla = { x: 0.5, y: 0.5, tx: 0.5, ty: 0.5 }; this.poss = 0; this.cambio = 0; this.script = null; this.flash = 0;
     this.sq = [this.formazione(info.casa.mod, 0), this.formazione(info.ospiti.mod, 1)];
+    this.sq.forEach((sq, lato) => { const g = (lato ? info.ospiti : info.casa).giocatori || []; sq.forEach((p, i) => { const x = g[i] || {}; p.num = x.num || (i + 1); p.nome = x.nome || ''; const h = hashStr((x.nome || '') + lato + i); p.pelle = PELLI[h % PELLI.length]; p.capelli = CAPELLI[(h >> 4) % CAPELLI.length]; p.taglio = (h >> 8) % 4; p.dir = lato ? -1 : 1; }); });
+    this.folla = Array.from({ length: 260 }, (_, k) => ({ x: Math.random(), y: Math.random(), c: Math.random() < 0.5 ? info.casa.c1 : (Math.random() < 0.5 ? info.casa.c2 : info.ospiti.c1), f: Math.random() * 6 }));
+    this.palla.z = 0;
+    this.vista = info.vista || 'tv';
     this.resize(); this._r = () => this.resize(); addEventListener('resize', this._r);
     this.t = performance.now(); this._f = (t) => this.loop(t); requestAnimationFrame(this._f);
   }
@@ -279,6 +283,7 @@ class Partita {
       else { this.palla.tx = s.lato === 0 ? 0.95 : 0.05; this.palla.ty = 0.5; }
       if (s.t > (s.tipo === 'gol' ? 1.8 : 0.6)){ this.script = null; this.palla.x = this.palla.tx = 0.5; this.palla.y = this.palla.ty = 0.5; if (s.tipo !== 'gol'){ this.palla.x = s.lato === 0 ? 0.92 : 0.08; } this.poss = s.tipo === 'gol' ? 1 - s.lato : 1 - s.lato; }
     }
+    this.cam = (this.cam == null ? 0.5 : this.cam) + (clamp(this.palla.x, 0.28, 0.72) - (this.cam == null ? 0.5 : this.cam)) * Math.min(1, dt * 1.6);
     const sp = this.script ? 6 : 3;
     this.palla.x += (this.palla.tx - this.palla.x) * Math.min(1, dt * sp);
     this.palla.y += (this.palla.ty - this.palla.y) * Math.min(1, dt * sp);
@@ -287,18 +292,81 @@ class Partita {
       const att = this.poss === lato;
       const spinta = (lato === 0 ? 1 : -1) * (att ? 0.1 : -0.04);
       let tx = p.bx + spinta + (this.palla.x - 0.5) * 0.35, ty = p.by + (this.palla.y - p.by) * (i === 0 ? 0.25 : 0.32);
+      if (i > 0){ tx += Math.cos(this.min * 0.7 + i * 2.3 + lato) * 0.035; ty += Math.sin(this.min * 0.9 + i * 1.7 + lato * 3) * 0.06; }
       if (i === 0) tx = p.bx + (this.palla.x - (lato ? 1 : 0)) * 0.06;
+      const ox = p.x, oy = p.y;
       p.x += (clamp(tx, 0.03, 0.97) - p.x) * Math.min(1, dt * 1.6); p.y += (clamp(ty, 0.04, 0.96) - p.y) * Math.min(1, dt * 1.6);
+      const v = Math.hypot(p.x - ox, p.y - oy) / Math.max(dt, 0.001);
+      p.v = (p.v || 0) * 0.85 + v * 0.15; p.fase = (p.fase || i) + dt * (4 + p.v * 60); if (Math.abs(p.x - ox) > 0.0004) p.dir = p.x > ox ? 1 : -1;
     }));
     if (this.flash > 0) this.flash -= dt * 0.8;
     this.disegna();
     requestAnimationFrame(this._f);
   }
+  // campo in prospettiva: x lungo il campo (0..1), y in profondità (0 lontano, 1 vicino)
+  proietta(x, y){
+    const W = this.W, H = this.H, top = H * 0.22, bot = H * 0.95;
+    const w = W * (0.66 + 0.3 * y) / 0.56;
+    return { x: W / 2 + (x - (this.cam == null ? 0.5 : this.cam)) * w, y: top + (bot - top) * y, k: (0.62 + 0.42 * y) * 1.55 };
+  }
   disegna(){
+    if (this.vista === 'alto' || this.vista === 'numeri') return this.disegnaAlto(this.vista === 'numeri');
+    const c = this.x, W = this.W, H = this.H; if (!W) return;
+    const P = (x, y) => this.proietta(x, y);
+    const t = performance.now() / 1000;
+    // cielo di notte e tribune piene
+    const cielo = c.createLinearGradient(0, 0, 0, H * 0.25); cielo.addColorStop(0, '#050b1a'); cielo.addColorStop(1, '#13233f');
+    c.fillStyle = cielo; c.fillRect(0, 0, W, H);
+    c.fillStyle = '#1b2433'; c.fillRect(0, H * 0.06, W, H * 0.16);
+    this.folla.forEach((f) => { const px = f.x * W, py = H * 0.07 + f.y * H * 0.14; const sal = this.flash > 0 ? Math.abs(Math.sin(t * 12 + f.f)) * 3 : Math.abs(Math.sin(t * 2 + f.f)) * 0.8;
+      c.fillStyle = f.c; c.globalAlpha = 0.85; c.fillRect(px, py - sal, 3, 3); c.globalAlpha = 1; });
+    for (let k = 0; k < 4; k++){ const fx = W * (0.12 + k * 0.25); const g = c.createRadialGradient(fx, H * 0.03, 0, fx, H * 0.03, W * 0.18); g.addColorStop(0, 'rgba(255,250,220,.55)'); g.addColorStop(1, 'rgba(255,250,220,0)'); c.fillStyle = g; c.fillRect(fx - W * 0.2, 0, W * 0.4, H * 0.3); }
+    c.fillStyle = '#0c3b1f'; c.fillRect(0, H * 0.205, W, H);
+    // erba a strisce
+    const quad = (x0, y0, x1, y1) => { const a = P(x0, y0), b = P(x1, y0), d = P(x0, y1), e = P(x1, y1); c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.lineTo(e.x, e.y); c.lineTo(d.x, d.y); c.closePath(); };
+    for (let i = 0; i < 14; i++){ quad(-0.04 + i * 1.08 / 14, -0.06, -0.04 + (i + 1) * 1.08 / 14, 1.04); c.fillStyle = i % 2 ? '#2f9e44' : '#3cb553'; c.fill(); }
+    const vign = c.createLinearGradient(0, H * 0.2, 0, H); vign.addColorStop(0, 'rgba(0,0,0,.28)'); vign.addColorStop(0.5, 'rgba(0,0,0,0)'); vign.addColorStop(1, 'rgba(0,0,0,.15)'); c.fillStyle = vign; c.fillRect(0, H * 0.2, W, H);
+    // linee
+    c.strokeStyle = 'rgba(255,255,255,.88)'; c.lineCap = 'round';
+    const linea = (pts) => { c.beginPath(); pts.forEach(([x, y], k) => { const q = P(x, y); c.lineWidth = 1.2 + q.k * 1.2; k ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y); }); c.stroke(); };
+    linea([[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]); linea([[0.5, 0], [0.5, 1]]);
+    const cerchio = []; for (let a = 0; a <= 40; a++){ const an = a / 40 * Math.PI * 2; cerchio.push([0.5 + Math.cos(an) * 0.085, 0.5 + Math.sin(an) * 0.14]); } linea(cerchio);
+    [[0, 1], [1, -1]].forEach(([x0, d]) => { linea([[x0, 0.22], [x0 + d * 0.16, 0.22], [x0 + d * 0.16, 0.78], [x0, 0.78]]); linea([[x0, 0.37], [x0 + d * 0.055, 0.37], [x0 + d * 0.055, 0.63], [x0, 0.63]]); });
+    // porte con la rete
+    const porta = (x0, d) => { const a = P(x0, 0.43), b = P(x0, 0.57), h1 = 26 * a.k * (H / 300), h2 = 26 * b.k * (H / 300), dx = d * -10 * a.k;
+      c.fillStyle = 'rgba(255,255,255,.18)'; c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(a.x + dx, a.y - h1 * 0.8); c.lineTo(b.x + dx, b.y - h2 * 0.8); c.lineTo(b.x, b.y); c.closePath(); c.fill();
+      c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 0.7; for (let k = 1; k < 6; k++){ const f = k / 6; c.beginPath(); c.moveTo(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f - (h1 + (h2 - h1) * f)); c.lineTo(a.x + (b.x - a.x) * f + dx, a.y + (b.y - a.y) * f - (h1 + (h2 - h1) * f) * 0.8); c.stroke(); }
+      c.strokeStyle = '#fff'; c.lineWidth = 2.5 * a.k; c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(a.x, a.y - h1); c.lineTo(b.x, b.y - h2); c.lineTo(b.x, b.y); c.stroke(); };
+    porta(0, 1); porta(1, -1);
+    // giocatori e palla, dal più lontano al più vicino
+    const col = [this.info.casa, this.info.ospiti];
+    const tutti = [];
+    this.sq.forEach((sq, lato) => sq.forEach((p, i) => tutti.push({ p, lato, i })));
+    let vicino = null, dmin = 9;
+    tutti.forEach((o) => { const d = Math.hypot(o.p.x - this.palla.x, (o.p.y - this.palla.y) * 0.6); if (d < dmin){ dmin = d; vicino = o; } });
+    const z = this.script ? Math.sin(Math.min(1, this.script.t / 0.7) * Math.PI) * 0.6 : 0;
+    tutti.push({ palla: true, p: { y: this.palla.y + 0.001 } });
+    tutti.sort((a, b) => a.p.y - b.p.y);
+    const base = H / 300;
+    tutti.forEach((o) => {
+      if (o.palla){
+        const q = P(this.palla.x, this.palla.y), r = Math.max(2.5, 4.2 * q.k * base);
+        c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(q.x, q.y, r * 1.1, r * 0.45, 0, 0, 7); c.fill();
+        const by = q.y - r - z * 40 * base * q.k;
+        c.fillStyle = '#fff'; c.beginPath(); c.arc(q.x, by, r, 0, 7); c.fill(); c.strokeStyle = '#222'; c.lineWidth = 0.8; c.stroke();
+        c.fillStyle = '#222'; c.beginPath(); c.arc(q.x + Math.cos(t * 9) * r * 0.35, by + Math.sin(t * 9) * r * 0.35, r * 0.38, 0, 7); c.fill();
+        return;
+      }
+      this.omino(o.p, col[o.lato], o.i === 0, o === vicino, base);
+    });
+    if (this.flash > 0){ c.fillStyle = `rgba(255,255,255,${this.flash * 0.3})`; c.fillRect(0, 0, W, H); }
+  }
+  // vista dall'alto: campo intero, giocatori visti da sopra (testa, spalle, numero) o solo numeri
+  disegnaAlto(soloNumeri){
     const x = this.x, W = this.W, H = this.H; if (!W) return;
-    const m = 12, fw = W - 2 * m, fh = H - 2 * m;
+    const m = 14, fw = W - 2 * m, fh = H - 2 * m;
+    x.fillStyle = '#1e7b34'; x.fillRect(0, 0, W, H);
     for (let i = 0; i < 12; i++){ x.fillStyle = i % 2 ? '#2f9e44' : '#37b24d'; x.fillRect(m + i * fw / 12, m, fw / 12 + 1, fh); }
-    x.fillStyle = '#1e7b34'; x.fillRect(0, 0, W, m); x.fillRect(0, H - m, W, m); x.fillRect(0, 0, m, H); x.fillRect(W - m, 0, m, H);
     x.strokeStyle = 'rgba(255,255,255,.85)'; x.lineWidth = 1.6;
     x.strokeRect(m, m, fw, fh); x.beginPath(); x.moveTo(W / 2, m); x.lineTo(W / 2, H - m); x.stroke();
     x.beginPath(); x.arc(W / 2, H / 2, fh * 0.15, 0, 7); x.stroke();
@@ -306,18 +374,80 @@ class Partita {
     x.strokeRect(m, H / 2 - ah / 4, aw / 2.6, ah / 2); x.strokeRect(W - m - aw / 2.6, H / 2 - ah / 4, aw / 2.6, ah / 2);
     x.fillStyle = '#fff'; x.fillRect(m - 5, H / 2 - fh * 0.08, 5, fh * 0.16); x.fillRect(W - m, H / 2 - fh * 0.08, 5, fh * 0.16);
     const col = [this.info.casa, this.info.ospiti];
-    const rr = Math.max(5, Math.min(9, W / 60));
+    const rr = Math.max(6, Math.min(11, W / 50));
+    let vicino = null, dmin = 9;
+    this.sq.forEach((sq, lato) => sq.forEach((p) => { const d = Math.hypot(p.x - this.palla.x, p.y - this.palla.y); if (d < dmin){ dmin = d; vicino = p; } }));
     this.sq.forEach((sq, lato) => sq.forEach((p, i) => {
-      const px = m + p.x * fw, py = m + p.y * fh;
-      x.beginPath(); x.ellipse(px, py + rr * 0.9, rr * 0.9, rr * 0.35, 0, 0, 7); x.fillStyle = 'rgba(0,0,0,.25)'; x.fill();
-      x.beginPath(); x.arc(px, py, rr, 0, 7); x.fillStyle = i === 0 ? '#fcc419' : col[lato].c1; x.fill();
-      x.lineWidth = 2; x.strokeStyle = i === 0 ? '#111' : col[lato].c2; x.stroke();
+      const px = m + p.x * fw, py = m + p.y * fh, gk = i === 0, maglia = gk ? '#fcc419' : col[lato].c1, bordo = gk ? '#111' : col[lato].c2;
+      x.beginPath(); x.ellipse(px + 2, py + 3, rr, rr * 0.8, 0, 0, 7); x.fillStyle = 'rgba(0,0,0,.25)'; x.fill();
+      if (soloNumeri){
+        x.beginPath(); x.arc(px, py, rr, 0, 7); x.fillStyle = maglia; x.fill(); x.lineWidth = 2; x.strokeStyle = bordo; x.stroke();
+      } else {
+        // spalle e braccia che si muovono, poi la testa vista da sopra
+        const sw = Math.sin(p.fase || 0) * rr * 0.35 * Math.min(1, (p.v || 0) * 25 + 0.15);
+        x.fillStyle = gk ? '#f8f9fa' : p.pelle; x.beginPath(); x.arc(px + sw, py - rr * 0.95, rr * 0.28, 0, 7); x.arc(px - sw, py + rr * 0.95, rr * 0.28, 0, 7); x.fill();
+        x.beginPath(); x.ellipse(px, py, rr * 0.62, rr * 1.0, 0, 0, 7); x.fillStyle = maglia; x.fill(); x.lineWidth = 1.6; x.strokeStyle = bordo; x.stroke();
+        x.beginPath(); x.arc(px + (p.dir || 1) * rr * 0.12, py, rr * 0.48, 0, 7); x.fillStyle = p.capelli; x.fill();
+      }
+      x.font = `800 ${Math.round(rr * (soloNumeri ? 1.15 : 0.85))}px "Barlow Condensed",Arial Narrow,sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+      const ty = soloNumeri ? py + 1 : py - rr * 1.55;
+      x.lineWidth = 3; x.strokeStyle = 'rgba(0,0,0,.6)'; x.strokeText(p.num, px, ty); x.fillStyle = soloNumeri ? (gk ? '#111' : testoSu(maglia)) : '#fff';
+      if (soloNumeri && !gk) { x.lineWidth = 0; } x.fillText(p.num, px, ty);
+      if (p === vicino && p.nome && !soloNumeri){ x.font = `700 11px Barlow,system-ui,sans-serif`; const tw = x.measureText(p.nome).width + 8; x.fillStyle = 'rgba(0,0,0,.7)'; x.fillRect(px - tw / 2, py + rr * 1.3, tw, 15); x.fillStyle = '#fff'; x.fillText(p.nome, px, py + rr * 1.3 + 8); }
     }));
-    const bx = m + this.palla.x * fw, by = m + this.palla.y * fh;
-    x.beginPath(); x.arc(bx, by, rr * 0.55, 0, 7); x.fillStyle = '#fff'; x.fill(); x.lineWidth = 1; x.strokeStyle = '#111'; x.stroke();
+    const bx = m + this.palla.x * fw, by = m + this.palla.y * fh, z = this.script ? Math.sin(Math.min(1, this.script.t / 0.7) * Math.PI) : 0;
+    x.beginPath(); x.ellipse(bx + 2 + z * 4, by + 2 + z * 4, rr * 0.5, rr * 0.4, 0, 0, 7); x.fillStyle = 'rgba(0,0,0,.3)'; x.fill();
+    x.beginPath(); x.arc(bx, by, rr * (0.5 + z * 0.25), 0, 7); x.fillStyle = '#fff'; x.fill(); x.lineWidth = 1; x.strokeStyle = '#111'; x.stroke();
     if (this.flash > 0){ x.fillStyle = `rgba(255,255,255,${this.flash * 0.35})`; x.fillRect(0, 0, W, H); }
   }
+  // un giocatore: ombra, gambe che corrono, maglia con il numero, braccia, faccia con i capelli
+  omino(p, col, portiere, conPalla, base){
+    const c = this.x, q = this.proietta(p.x, p.y), s = q.k * base * 1.08;
+    const x = q.x, y = q.y, dir = p.dir || 1;
+    const corsa = Math.min(1, (p.v || 0) * 25 + 0.15), ang = Math.sin(p.fase || 0) * 0.65 * corsa;
+    const maglia = portiere ? '#fcc419' : col.c1, bordo = portiere ? '#212529' : col.c2;
+    const pantaloni = portiere ? '#212529' : (luminosita(col.c2) > 0.85 ? '#f1f3f5' : col.c2);
+    c.fillStyle = 'rgba(0,0,0,.32)'; c.beginPath(); c.ellipse(x, y, 8 * s, 2.8 * s, 0, 0, 7); c.fill();
+    // gambe
+    const anca = y - 13 * s;
+    [ang, -ang].forEach((a, k) => { const fx = x + Math.sin(a) * 8 * s * dir + (k ? 1.5 : -1.5) * s, fy = y - Math.cos(a) * 1.2 * s;
+      c.strokeStyle = maglia === '#fcc419' ? '#343a40' : col.c1; c.lineWidth = 3.2 * s; c.lineCap = 'round'; c.beginPath(); c.moveTo(x + (k ? 1.5 : -1.5) * s, anca); c.lineTo(fx, fy - 1 * s); c.stroke();
+      c.fillStyle = '#111'; c.beginPath(); c.ellipse(fx + dir * 1.3 * s, fy, 2.4 * s, 1.3 * s, 0, 0, 7); c.fill(); });
+    // pantaloncini
+    c.fillStyle = pantaloni; c.beginPath(); c.roundRect ? c.roundRect(x - 5.2 * s, anca - 4.5 * s, 10.4 * s, 6 * s, 1.5 * s) : c.rect(x - 5.2 * s, anca - 4.5 * s, 10.4 * s, 6 * s); c.fill();
+    // braccia
+    [-ang, ang].forEach((a, k) => { const sx = x + (k ? 5.5 : -5.5) * s, sy = anca - 13 * s;
+      c.strokeStyle = maglia; c.lineWidth = 2.8 * s; c.beginPath(); c.moveTo(sx, sy); const ex = sx + Math.sin(a) * 6 * s * dir, ey = sy + Math.cos(a) * 8 * s; c.lineTo(ex, ey); c.stroke();
+      c.fillStyle = portiere ? '#f8f9fa' : p.pelle; c.beginPath(); c.arc(ex, ey, 1.7 * s, 0, 7); c.fill(); });
+    // maglia
+    const mx = x - 6 * s, my = anca - 15 * s, mw = 12 * s, mh = 12.5 * s;
+    c.fillStyle = maglia; c.beginPath(); c.roundRect ? c.roundRect(mx, my, mw, mh, 3 * s) : c.rect(mx, my, mw, mh); c.fill();
+    c.fillStyle = bordo; c.fillRect(mx, my + mh - 1.6 * s, mw, 1.6 * s); c.fillRect(x - 2.2 * s, my - 0.6 * s, 4.4 * s, 1.6 * s);
+    if (s > 0.55){ c.font = `800 ${Math.round(7.5 * s)}px "Barlow Condensed",Arial Narrow,sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.lineWidth = 2 * s; c.strokeStyle = 'rgba(0,0,0,.55)'; c.strokeText(p.num, x, my + mh * 0.5); c.fillStyle = portiere ? '#111' : testoSu(maglia); c.fillText(p.num, x, my + mh * 0.5); }
+    // testa e faccia
+    const hx = x + dir * 0.6 * s, hy = my - 4.6 * s, r = 4.4 * s;
+    c.fillStyle = p.pelle; c.beginPath(); c.arc(hx, hy, r, 0, 7); c.fill();
+    c.fillStyle = p.capelli; c.beginPath();
+    if (p.taglio === 0) c.arc(hx, hy - r * 0.15, r * 1.02, Math.PI * 1.05, Math.PI * 1.95);
+    else if (p.taglio === 1){ c.arc(hx, hy, r * 1.05, Math.PI, Math.PI * 2); c.lineTo(hx + r, hy - r * 0.1); }
+    else if (p.taglio === 2){ c.arc(hx, hy - r * 0.3, r * 0.95, Math.PI * 0.95, Math.PI * 2.05); }
+    else { c.ellipse(hx, hy - r * 0.55, r * 0.9, r * 0.6, 0, Math.PI, Math.PI * 2); }
+    c.fill();
+    if (s > 0.5){ c.fillStyle = '#1a1a1a'; c.beginPath(); c.arc(hx + dir * r * 0.38, hy + r * 0.05, Math.max(0.6, r * 0.13), 0, 7); c.arc(hx + dir * r * 0.0, hy + r * 0.05, Math.max(0.6, r * 0.13), 0, 7); c.fill();
+      c.strokeStyle = 'rgba(120,40,30,.8)'; c.lineWidth = Math.max(0.6, r * 0.12); c.beginPath(); c.arc(hx + dir * r * 0.2, hy + r * 0.38, r * 0.22, 0.2, Math.PI - 0.2); c.stroke(); }
+    // nome di chi ha la palla
+    if (conPalla && p.nome){
+      c.font = `700 ${Math.round(Math.max(10, 9 * s))}px Barlow,system-ui,sans-serif`; c.textAlign = 'center'; c.textBaseline = 'bottom';
+      const tw = c.measureText(p.nome).width + 10; c.fillStyle = 'rgba(0,0,0,.7)'; c.beginPath(); c.roundRect ? c.roundRect(hx - tw / 2, hy - r - 18 * s, tw, 13 * s + 2, 4) : c.rect(hx - tw / 2, hy - r - 18 * s, tw, 13 * s + 2); c.fill();
+      c.fillStyle = '#fff'; c.fillText(p.nome, hx, hy - r - 4 * s + 1);
+      c.fillStyle = col.c1; c.beginPath(); c.moveTo(hx - 3, hy - r - 4 * s); c.lineTo(hx + 3, hy - r - 4 * s); c.lineTo(hx, hy - r - 1); c.fill();
+    }
+  }
 }
+
+const PELLI = ['#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#ffdbac', '#a8693f', '#5c3a21', '#f5d0a9'];
+const CAPELLI = ['#2b1b0e', '#4a2c18', '#a0522d', '#d9b45a', '#111111', '#7a4b2a', '#1c1c1c', '#c9a227'];
 
 // ---------- icone della barra in basso ----------
 const ICONE = {
@@ -327,3 +457,101 @@ const ICONE = {
   stadio: '<svg viewBox="0 0 24 24"><path d="M12 5C6 5 2 6.8 2 9v7c0 2.2 4 4 10 4s10-1.8 10-4V9c0-2.2-4-4-10-4zm0 2c4.8 0 7.8 1.3 8 2-.2.7-3.2 2-8 2s-7.8-1.3-8-2c.2-.7 3.2-2 8-2zm-6 4.6c1.1.4 2.4.6 3.7.8v5.5c-1.4-.2-2.7-.5-3.7-.9zm8.3.8c1.3-.2 2.6-.4 3.7-.8v5.4c-1 .4-2.3.7-3.7.9z"/></svg>',
   classifica: '<svg viewBox="0 0 24 24"><path d="M4 20V10h4v10zm6 0V4h4v16zm6 0v-7h4v7z"/></svg>'
 };
+
+// ---------- stadio: il tuo progetto ----------
+function designDi(S){
+  const d = Object.assign({ nome: '', sedili: '', sedili2: '', tetto: '#e9ecef', forma: 0, scritta: true, bandiere: true, notte: true, fumogeni: false }, S.stadio.design || {});
+  d.s1 = d.sedili || S.club.c1; d.s2 = d.sedili2 || S.club.c2;
+  return d;
+}
+const nomeStadio = (S) => (S.stadio.design && S.stadio.design.nome) || ('Stadio ' + (S.club.citta || S.club.nome));
+
+// ---------- stadio: vista panoramica, come dalla tribuna ----------
+function stadioPanoramaSVG(S){
+  const st = S.stadio, d = designDi(S), T = st.tribune, c1 = S.club.c1, c2 = S.club.c2;
+  const W = 400, H = 250, r = rng('pano' + S.club.nome + T);
+  const P = (x, y) => [200 + (x - 0.5) * 2 * (118 + 110 * y), 128 + 114 * y];
+  const pts = (a) => a.map(([x, y]) => P(x, y).map((v) => v.toFixed(1)).join(',')).join(' ');
+  const h = [0, 14, 22, 30, 38, 48, 58, 66, 74, 84][T];
+  const occ = Math.min(1, calcPubblico(false) / postiStadio(S));
+  let o = `<svg viewBox="0 0 ${W} ${H}" class="stadio-svg" role="img" aria-label="Il tuo stadio visto dalla tribuna"><defs>
+  <linearGradient id="pcielo" x1="0" y1="0" x2="0" y2="1">${d.notte ? '<stop offset="0" stop-color="#050b1f"/><stop offset="1" stop-color="#1e3a5f"/>' : '<stop offset="0" stop-color="#4dabf7"/><stop offset="1" stop-color="#d0ebff"/>'}</linearGradient>
+  <pattern id="psed" width="5" height="5" patternUnits="userSpaceOnUse"><rect width="5" height="5" fill="${d.s1}"/><rect y="3.4" width="5" height="1.6" fill="#000" fill-opacity=".28"/></pattern>
+  <pattern id="psed2" width="5" height="5" patternUnits="userSpaceOnUse"><rect width="5" height="5" fill="${d.s2}"/><rect y="3.4" width="5" height="1.6" fill="#000" fill-opacity=".28"/></pattern>
+  <linearGradient id="pgrass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b8a3e"/><stop offset="1" stop-color="#51cf66"/></linearGradient>
+  <radialGradient id="pfaro" r=".5"><stop offset="0" stop-color="#fffbe6" stop-opacity=".95"/><stop offset="1" stop-color="#fffbe6" stop-opacity="0"/></radialGradient>
+  <linearGradient id="ptetto" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${d.tetto}"/><stop offset="1" stop-color="#000" stop-opacity=".35"/></linearGradient>
+  </defs>`;
+  o += `<rect width="${W}" height="${H}" fill="url(#pcielo)"/>`;
+  if (d.notte) for (let i = 0; i < 40; i++) o += `<circle cx="${(r() * W).toFixed(1)}" cy="${(r() * 60).toFixed(1)}" r="${(r() * 0.9 + 0.3).toFixed(1)}" fill="#fff" opacity="${(0.3 + r() * 0.6).toFixed(2)}"/>`;
+  else o += `<circle cx="340" cy="28" r="14" fill="#fff3bf"/>`;
+  // città e colline in fondo
+  let skyline = 'M0 120 '; for (let x = 0; x <= W; x += 16){ const hh = 60 + r() * 50; skyline += `L${x} ${120 - hh * 0.5} L${x + 12} ${120 - hh * 0.5} `; } skyline += `L${W} 120 Z`;
+  o += `<path d="${skyline}" fill="${d.notte ? '#0b1526' : '#91a7ff'}" opacity=".9"/>`;
+  if (d.notte) for (let i = 0; i < 50; i++) o += `<rect x="${(r() * W).toFixed(0)}" y="${(70 + r() * 45).toFixed(0)}" width="1.6" height="1.6" fill="#ffe066" opacity=".7"/>`;
+  o += `<path d="M0 128 Q100 108 200 116 T400 124 V130 H0Z" fill="${d.notte ? '#10301f' : '#69db7c'}"/>`;
+  if (T === 0) for (let i = 0; i < 9; i++){ const x = 20 + i * 45 + r() * 10; o += `<rect x="${x - 1}" y="104" width="3" height="20" fill="#5c3d2e"/><circle cx="${x}" cy="100" r="${9 + r() * 4}" fill="${d.notte ? '#1b4332' : '#2f9e44'}"/>`; }
+  // torri faro dietro
+  if (st.luci > 0){
+    [[28, 1], [372, -1]].forEach(([x, s]) => {
+      const top = 128 - h - 52 - st.luci * 8;
+      o += `<line x1="${x}" y1="128" x2="${x}" y2="${top}" stroke="#495057" stroke-width="${st.luci >= 2 ? 3 : 2}"/>`;
+      if (d.notte || st.luci >= 2) o += `<circle cx="${x}" cy="${top}" r="${30 + st.luci * 12}" fill="url(#pfaro)" opacity="${0.4 + st.luci * 0.15}"/>`;
+      o += `<rect x="${x - 9}" y="${top - 6}" width="18" height="10" rx="1.5" fill="#212529"/>`;
+      for (let k = 0; k < 6; k++) o += `<rect x="${x - 7.5 + (k % 3) * 5}" y="${top - 4.5 + Math.floor(k / 3) * 4.5}" width="4" height="3.4" fill="#fff9db"/>`;
+    });
+  }
+  // tribuna di fronte
+  if (T > 0){
+    const xl = 76, xr = 324, y0 = 128, ext = h * 0.55;
+    const curva = d.forma === 1 ? ` Q200 ${y0 - h - 22}` : '';
+    const top = d.forma === 1 ? `M${xl - ext} ${y0 - h}${curva} ${xr + ext} ${y0 - h}` : `M${xl - ext} ${y0 - h} L${xr + ext} ${y0 - h}`;
+    o += `<path d="${top} L${xr} ${y0} L${xl} ${y0} Z" fill="url(#psed)"/>`;
+    if (T >= 5) o += `<path d="M${xl - ext * 0.45} ${y0 - h * 0.45} L${xr + ext * 0.45} ${y0 - h * 0.45}" stroke="#000" stroke-opacity=".35" stroke-width="3"/><path d="M${xl - ext * 0.45} ${y0 - h * 0.45 - 2} L${xr + ext * 0.45} ${y0 - h * 0.45 - 2}" stroke="${d.s2}" stroke-width="1.6"/>`;
+    // pubblico
+    const n = Math.round(occ * (40 + T * 45));
+    for (let i = 0; i < n; i++){ const fy = r(), yy = y0 - 3 - fy * (h - 6), sp = (xr - xl) / 2 + ext * fy; const xx = 200 + (r() * 2 - 1) * sp * 0.98;
+      o += `<rect x="${xx.toFixed(1)}" y="${yy.toFixed(1)}" width="2" height="2.2" fill="${pick([c1, c2, '#fff', c1, '#ffd8a8'], r)}"/>`; }
+    if (d.scritta && h >= 22){ const fs = Math.min(h * 0.42, 30); o += `<text x="200" y="${y0 - h * 0.55 + fs * 0.35}" text-anchor="middle" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="800" font-size="${fs.toFixed(1)}" fill="${d.s2}" fill-opacity=".92" textLength="${Math.min(230, (xr - xl) * 0.9)}" lengthAdjust="spacingAndGlyphs">${esc(S.club.nome.toUpperCase())}</text>`; }
+    // tetto
+    if (T >= 2){ const th = 5 + T * 1.3;
+      o += d.forma === 1 ? `<path d="M${xl - ext - 6} ${y0 - h - 2} Q200 ${y0 - h - 26} ${xr + ext + 6} ${y0 - h - 2} L${xr + ext + 6} ${y0 - h - 2 - th} Q200 ${y0 - h - 26 - th} ${xl - ext - 6} ${y0 - h - 2 - th} Z" fill="url(#ptetto)"/>`
+        : `<rect x="${xl - ext - 6}" y="${y0 - h - th - 1}" width="${xr - xl + 2 * ext + 12}" height="${th}" fill="url(#ptetto)"/>`;
+      if (st.luci >= 3) o += `<path d="M${xl - ext - 6} ${y0 - h - 1} ${d.forma === 1 ? `Q200 ${y0 - h - 25}` : 'L200 ' + (y0 - h - 1)} ${xr + ext + 6} ${y0 - h - 1}" stroke="${c1}" stroke-width="2.2" fill="none"><animate attributeName="stroke-opacity" values="1;.3;1" dur="1.6s" repeatCount="indefinite"/></path>`;
+      if (d.bandiere) for (let k = 0; k < 7; k++){ const fx = xl - ext + k * (xr - xl + 2 * ext) / 6, fyy = d.forma === 1 ? (y0 - h - th - 2 - Math.sin(k / 6 * Math.PI) * 13) : (y0 - h - th - 1);
+        o += `<line x1="${fx}" y1="${fyy}" x2="${fx}" y2="${fyy - 12}" stroke="#ced4da" stroke-width="1"/><path d="M${fx} ${fyy - 12} l9 2.5 -9 2.5Z" fill="${k % 2 ? c2 : c1}"><animateTransform attributeName="transform" type="skewY" values="0;8;0;-6;0" dur="${1.4 + k * 0.1}s" repeatCount="indefinite" additive="sum"/></path>`; }
+    }
+    // maxischermo
+    if (st.maxi > 0){ const mw = st.maxi === 2 ? 64 : 42, mh = st.maxi === 2 ? 26 : 16, my = y0 - h - (T >= 2 ? 12 + T * 1.3 : 4) - mh - (d.forma === 1 ? 14 : 2);
+      o += `<rect x="${200 - mw / 2 - 2}" y="${my - 2}" width="${mw + 4}" height="${mh + 4}" rx="2" fill="#111"/><rect x="${200 - mw / 2}" y="${my}" width="${mw}" height="${mh}" fill="${c1}"/><text x="200" y="${my + mh * 0.68}" text-anchor="middle" font-family="Barlow Condensed" font-weight="800" font-size="${mh * 0.55}" fill="${testoSu(c1)}">${st.maxi === 2 ? '⚽ ' + iniziali(S.club.nome) + ' ⚽' : iniziali(S.club.nome)}</text><line x1="200" y1="${my + mh + 2}" x2="200" y2="${y0 - h - 4}" stroke="#495057" stroke-width="2"/>`; }
+  }
+  // tribune laterali
+  if (T >= 4){
+    const hs = h * 0.9;
+    [[1, 'psed2'], [-1, 'psed2']].forEach(([s, pat]) => {
+      const A = s > 0 ? [76, 128] : [324, 128], B = s > 0 ? [8, 242] : [392, 242];
+      const C = [B[0] - s * hs * 1.1, B[1] - hs * 0.55], D = [A[0] - s * hs * 0.6, A[1] - hs];
+      o += `<polygon points="${[A, B, C, D].map((p) => p.map((v) => v.toFixed(1)).join(',')).join(' ')}" fill="url(#${pat})"/>`;
+      o += `<polygon points="${[A, B, C, D].map((p) => p.map((v) => v.toFixed(1)).join(',')).join(' ')}" fill="#000" opacity=".18"/>`;
+      if (T >= 6){ o += `<line x1="${D[0]}" y1="${D[1]}" x2="${C[0]}" y2="${C[1]}" stroke="url(#ptetto)" stroke-width="${6 + T}"/>`; }
+      const n = Math.round(occ * 30 * T); for (let i = 0; i < n; i++){ const a = r(), b = r(); const x = A[0] + (B[0] - A[0]) * a + (D[0] - A[0]) * b * 0.9, y = A[1] + (B[1] - A[1]) * a + (D[1] - A[1]) * b * 0.9 + (C[1] - B[1] - (D[1] - A[1])) * a * b * 0.9; o += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="2.2" height="2.4" fill="${pick([c1, c2, '#fff', '#ffd8a8'], r)}"/>`; }
+    });
+  }
+  // campo
+  const usura = st.usura;
+  const colErba = st.campo === 0 ? ['#a9784a', '#b98a5a'] : st.campo === 1 ? ['#37b24d', '#40c057'] : ['#2f9e44', '#40c057'];
+  for (let i = 0; i < 14; i++){ const x0 = -0.03 + i * 1.06 / 14, x1 = x0 + 1.06 / 14; o += `<polygon points="${pts([[x0, -0.02], [x1, -0.02], [x1, 1.06], [x0, 1.06]])}" fill="${colErba[i % 2]}"/>`; }
+  if (st.campo > 0 && usura < 75) for (let i = 0; i < (80 - usura) / 3; i++){ const [x, y] = P(r(), r()); o += `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(4 + r() * 6).toFixed(1)}" ry="${(1.5 + r() * 2).toFixed(1)}" fill="#8d6e4f" opacity=".7"/>`; }
+  const L = 'fill="none" stroke="#fff" stroke-opacity=".9" stroke-width="1.3"';
+  o += `<polygon points="${pts([[0, 0], [1, 0], [1, 1], [0, 1]])}" ${L}/><polyline points="${pts([[0.5, 0], [0.5, 1]])}" ${L}/>`;
+  const cer = []; for (let a = 0; a <= 36; a++){ const an = a / 36 * Math.PI * 2; cer.push([0.5 + Math.cos(an) * 0.08, 0.5 + Math.sin(an) * 0.15]); } o += `<polyline points="${pts(cer)}" ${L}/>`;
+  o += `<polyline points="${pts([[0, 0.22], [0.15, 0.22], [0.15, 0.78], [0, 0.78]])}" ${L}/><polyline points="${pts([[1, 0.22], [0.85, 0.22], [0.85, 0.78], [1, 0.78]])}" ${L}/>`;
+  [[0, 1], [1, -1]].forEach(([gx]) => { const [ax, ay] = P(gx, 0.44), [bx, by] = P(gx, 0.56); o += `<path d="M${ax} ${ay} V${ay - 10} L${bx} ${by - 13} V${by}" fill="rgba(255,255,255,.15)" stroke="#fff" stroke-width="1.8"/>`; });
+  if (st.campo >= 4) o += `<polygon points="${pts([[0, 0], [1, 0], [1, 1], [0, 1]])}" fill="none" stroke="#ffa94d" stroke-opacity=".45" stroke-width="2"/>`;
+  // recinzione o tribuna vicina (le teste dei tifosi davanti)
+  if (T === 0) o += `<polyline points="${pts([[-0.02, 1.04], [1.02, 1.04]])}" fill="none" stroke="#adb5bd" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+  if (T >= 3){ o += `<rect x="0" y="236" width="${W}" height="14" fill="#212529"/>`; for (let i = 0; i < 70; i++){ const x = i * 5.8 + r() * 3; o += `<circle cx="${x.toFixed(1)}" cy="${(241 + r() * 3).toFixed(1)}" r="${(3 + r()).toFixed(1)}" fill="${pick(['#2b1b0e', '#4a2c18', '#111', '#a0522d', '#d9b45a'], r)}"/>`; } if (d.fumogeni) for (let k = 0; k < 4; k++){ const x = 40 + k * 100; o += `<circle cx="${x}" cy="232" r="14" fill="${k % 2 ? c2 : c1}" opacity=".35"><animate attributeName="r" values="10;22;10" dur="${2 + k * 0.3}s" repeatCount="indefinite"/><animate attributeName="cy" values="236;214;236" dur="${2 + k * 0.3}s" repeatCount="indefinite"/></circle>`; } }
+  if (d.fumogeni && T >= 1 && T < 3) o += `<circle cx="200" cy="${128 - h / 2}" r="10" fill="${c1}" opacity=".35"><animate attributeName="r" values="8;16;8" dur="2s" repeatCount="indefinite"/></circle>`;
+  o += `</svg>`;
+  return o;
+}

@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#07130e">
-<meta name="description" content="Presidente PM: fonda la tua società di calcio e portala dalla Terza Categoria alla Serie A. Giocatori, staff, stadio e gironi online.">
-<title>Presidente PM</title>
+<meta name="description" content="Calciomania PM: fonda la tua società di calcio e portala dalla Terza Categoria alla Serie A. Giocatori, staff, stadio e gironi online.">
+<title>Calciomania PM</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -46,7 +46,14 @@ a{color:var(--oro)}
 .soldi{font:800 18px var(--f-tit);color:var(--oro);background:rgba(245,197,66,.1);border:1px solid rgba(245,197,66,.3);padding:4px 11px;border-radius:999px;white-space:nowrap}
 .soldi.rosso{color:var(--rosso);border-color:rgba(255,107,107,.4);background:rgba(255,107,107,.1)}
 .menu-btn{width:40px;height:40px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:rgba(255,255,255,.05)}
-.menu-btn span{display:block;width:18px;height:2px;border-radius:2px;background:var(--testo)}
+.menu-btn svg{width:24px;height:24px;fill:var(--testo);transition:transform .4s}.menu-btn:active svg{transform:rotate(90deg)}
+.riga-menu.oro{color:var(--oro)}
+.tabs.piccole{margin-top:10px}.tabs.piccole button{padding:7px 4px;font-size:14px}
+.apri{width:100%;text-align:left}.apri span{color:var(--tenue)}
+.progetto .scelta{margin-top:12px}.progetto .col{width:30px;height:30px;display:grid;place-items:center}.progetto .col i{font-style:normal;font-size:14px}
+.campo-t{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:14px;color:var(--tenue);margin-top:8px}.campo-t input,.login-f select{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--linea);background:rgba(0,0,0,.35);color:var(--testo);font-size:16px}
+.chips.wrap{flex-wrap:wrap;overflow:visible}
+.segreto h3{margin-top:18px}.segreto .riga-btn{margin-top:8px}.segreto .riga-btn .btn{flex:0 1 auto}
 
 .schermo{padding:14px var(--dx) calc(96px + env(safe-area-inset-bottom,0px)) var(--sx);display:flex;flex-direction:column;gap:14px}
 
@@ -249,7 +256,7 @@ tr.retro .pos{background:var(--rosso);color:#3a0000}
 .stadio-c{padding:10px}
 .stadio-wrap{position:relative;border-radius:14px;overflow:hidden;background:#1f3b2b}
 .stadio-svg{display:block;width:100%;height:auto}
-.stadio-nome{position:absolute;left:10px;top:8px;font:800 16px var(--f-tit);background:rgba(0,0,0,.55);padding:2px 10px;border-radius:8px;letter-spacing:.04em;text-transform:uppercase}
+.stadio-nome{position:absolute;left:10px;bottom:8px;font:800 14px var(--f-tit);background:rgba(0,0,0,.55);padding:2px 10px;border-radius:8px;letter-spacing:.04em;text-transform:uppercase}
 .stadio-dati{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
 .stadio-dati>div{background:rgba(255,255,255,.05);border-radius:12px;padding:8px;text-align:center;display:flex;flex-direction:column}
 .stadio-dati small{color:var(--tenue);font-size:12px}
@@ -324,11 +331,12 @@ tr.retro .pos{background:var(--rosso);color:#3a0000}
 .score>div{font:800 44px/1 var(--f-tit);display:flex;gap:6px;align-items:center;justify-content:center;min-width:110px}
 .score i{font-style:normal;color:var(--tenue);font-size:30px}
 .score small{display:inline-block;margin-top:4px;background:var(--lime);color:#0b2a05;font:800 14px var(--f-tit);padding:1px 10px;border-radius:6px}
-.campo-wrap{position:relative;flex:0 0 auto;aspect-ratio:16/10;max-height:44vh;border-radius:14px;overflow:hidden;box-shadow:0 14px 30px rgba(0,0,0,.6)}
+.campo-wrap{position:relative;flex:0 0 auto;aspect-ratio:16/11;max-height:48vh;border-radius:14px;overflow:hidden;box-shadow:0 14px 30px rgba(0,0,0,.6)}
 .campo-wrap canvas{width:100%;height:100%;display:block}
 .golbig{position:absolute;inset:0;display:grid;place-items:center;font:800 min(26vw,150px) var(--f-tit);color:#fff;-webkit-text-stroke:4px var(--c,#000);text-shadow:0 0 30px var(--c,#000),0 8px 0 rgba(0,0,0,.4);opacity:0;pointer-events:none;letter-spacing:.04em}
 .golbig.via{animation:gol 1.9s ease-out}
 @keyframes gol{0%{opacity:0;transform:scale(.3) rotate(-8deg)}15%{opacity:1;transform:scale(1.15) rotate(2deg)}25%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(1.3)}}
+.viste{display:flex;gap:6px}.viste button{flex:1;padding:8px 4px;border-radius:10px;background:rgba(255,255,255,.07);font-weight:700;font-size:13.5px;color:var(--tenue)}.viste button.on{background:#fff;color:#111}
 .spett{text-align:center;font-size:13px;color:var(--tenue)}
 .cronaca{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:6px;mask-image:linear-gradient(180deg,#000 75%,transparent)}
 .cr{display:flex;gap:10px;align-items:flex-start;background:rgba(255,255,255,.04);border-radius:12px;padding:8px 10px;font-size:14.5px;animation:entra .35s ease-out}
@@ -364,6 +372,7 @@ tr.retro .pos{background:var(--rosso);color:#3a0000}
 .colori{display:flex;flex-wrap:wrap;gap:7px}
 .col{width:34px;height:34px;border-radius:50%;background:var(--c);border:2px solid rgba(255,255,255,.25)}
 .col.on{outline:3px solid var(--lime);outline-offset:2px}
+.diff{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}.diff button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 2px;border-radius:12px;background:rgba(255,255,255,.05);border:2px solid transparent;font-size:12px;font-weight:700}.diff button b{font-size:22px}.diff button.on{border-color:var(--lime);background:rgba(198,255,61,.1)}
 .opz{display:flex;flex-wrap:wrap;gap:8px}
 .opz button{padding:6px;border-radius:12px;background:rgba(255,255,255,.05);border:2px solid transparent}
 .opz button.on{border-color:var(--lime);background:rgba(198,255,61,.1)}
@@ -371,7 +380,7 @@ tr.retro .pos{background:var(--rosso);color:#3a0000}
 </head>
 <body>
 <div id="app"></div>
-<noscript>Per giocare a Presidente PM serve JavaScript attivo.</noscript>
+<noscript>Per giocare a Calciomania PM serve JavaScript attivo.</noscript>
 <script src="js/motore.js"></script>
 <script src="js/grafica.js"></script>
 <script src="js/gioco.js"></script>

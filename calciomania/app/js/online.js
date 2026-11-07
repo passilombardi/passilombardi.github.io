@@ -68,7 +68,7 @@ window.Online = (function(){
   O.salvaCloud = function(stato){
     if (!user) return; clearTimeout(saveT);
     saveT = setTimeout(() => {
-      D.collection(SAVE).doc(user.uid).set({ app: 'Presidente PM', nome: O.nome(), email: user.email || '', club: stato.club.nome, categoria: TIERS[stato.tier - 1].nome, stagione: stato.stagione, dati: JSON.stringify(stato), aggMs: stato.agg || Date.now(), agg: firebase.firestore.FieldValue.serverTimestamp() })
+      D.collection(SAVE).doc(user.uid).set({ app: 'Calciomania PM', nome: O.nome(), email: user.email || '', club: stato.club.nome, categoria: TIERS[stato.tier - 1].nome, stagione: stato.stagione, dati: JSON.stringify(stato), aggMs: stato.agg || Date.now(), agg: firebase.firestore.FieldValue.serverTimestamp() })
         .then(() => { err = ''; }).catch((e) => { err = testoErr(e); });
     }, 3000);
   };

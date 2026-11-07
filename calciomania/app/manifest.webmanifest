@@ -1,8 +1,8 @@
 {
-  "name": "Presidente PM",
-  "short_name": "Presidente PM",
+  "name": "Calciomania PM",
+  "short_name": "Calciomania PM",
   "description": "Fonda la tua società di calcio e portala dalla Terza Categoria alla Serie A.",
-  "id": "/presidente/app/",
+  "id": "/calciomania/app/",
   "lang": "it",
   "start_url": "./",
   "scope": "./",
