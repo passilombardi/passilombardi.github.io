@@ -1,0 +1,22 @@
+HOME 3D DESIGN PM - versione 1.1
+
+Come installarla sul tuo sito o telefono
+1. Copia tutta la cartella "home-3d-design" così com'è (non spostare i file nelle sottocartelle).
+   index.html             pagina principale dell'app
+   manifest.webmanifest   la rende installabile su Android ("Aggiungi a schermata Home")
+   sw.js                  la fa funzionare anche senza internet
+   css/style.css          grafica
+   js/app.js              motore 3D, comandi e salvataggio
+   js/catalog.js          i 105 mobili 3D
+   js/materials.js        legni, tessuti, marmi, metalli, vetro, pavimenti, pareti
+   js/presets.js          le 12 stanze già arredate
+   js/three.module.min.js e js/addons/   Three.js (motore 3D)
+   icons/                 icone dell'app
+2. Mettila online su un sito con https (per esempio GitHub Pages) e apri index.html.
+   Non funziona aprendo index.html con doppio clic dal computer: serve un indirizzo web.
+3. Su Android apri il sito con Chrome, menu ⋮ > "Installa app".
+
+Novità 1.1: pianta 2D della casa con vista 3D dalla telecamera in tempo reale, piantina da caricare e ricalcare, mobili creati da una foto.
+
+Tutto quello che crei viene salvato sul dispositivo (localStorage + IndexedDB per i modelli GLB importati).
+Da Impostazioni puoi esportare un backup e ricaricarlo.
