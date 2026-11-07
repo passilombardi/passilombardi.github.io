@@ -15,3 +15,10 @@ Apri l'app: https://passilombardi.github.io/creaapp/
 Progetta la casa in 3D: pianta, muri, telecamera e oltre 100 mobili.
 
 Apri l'app: https://passilombardi.github.io/home3d/
+
+## Potenza PM
+
+Potenzia il tuo telefono: volume fino al 300% per la musica e i video aperti nell'app, torcia, luce schermo, modo notte, batteria, bussola, livella, lente e altri strumenti.
+
+Sito: https://passilombardi.github.io/potenzapm/
+Apri l'app: https://passilombardi.github.io/potenzapm/app/

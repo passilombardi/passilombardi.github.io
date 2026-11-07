@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1c1c1c">
+<meta name="description" content="Potenza PM: l'app gratis che potenzia il tuo telefono. Volume fino al 300% per la tua musica, torcia, luce schermo, modo notte, batteria, bussola e tanto altro.">
+<title>Potenza PM</title>
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;800&display=swap">
+<style>
+/* Layout: in alto icona grande, nome e pulsante «Apri l'app»; poi a cosa serve, la griglia delle cose che fa, la verità sul volume, come installarla. */
+:root{--fondo:#121110;--nero:#1c1c1c;--scheda:#211f1c;--linea:#3a362f;--oro:#d4a017;--oro2:#f0c75e;--crema:#f6f3ea;--tenue:#a59f90;--f:'Sora',system-ui,-apple-system,'Segoe UI',sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--fondo);color:var(--crema);font:17px/1.55 var(--f)}
+.wrap{max-width:980px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.hero{background:radial-gradient(ellipse at 50% 0%,#3a2c0b 0%,#1c1c1c 55%,var(--fondo) 100%);padding:56px 0 48px;text-align:center;border-bottom:1px solid var(--linea)}
+.hero img{width:136px;height:136px;border-radius:32px;box-shadow:0 0 60px #d4a01755,0 10px 30px #0008}
+h1{font:800 clamp(2.3rem,7vw,3.6rem)/1.05 var(--f);margin:22px 0 8px;letter-spacing:-.03em}
+h1 span{color:var(--oro)}
+.sotto{font-size:1.15rem;color:#d9d4c7;max-width:34ch;margin:0 auto 26px;text-wrap:balance}
+.apri{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(180deg,var(--oro2),var(--oro));color:#1c1c1c;font:800 1.15rem var(--f);text-decoration:none;padding:16px 34px;border-radius:999px;box-shadow:0 8px 30px #d4a01755}
+.apri:hover{filter:brightness(1.06)}
+.apri:focus-visible{outline:3px solid var(--crema);outline-offset:3px}
+.piccolo{display:block;margin-top:12px;color:var(--tenue);font-size:.88rem}
+section{padding:44px 0 8px}
+h2{font:800 1.7rem/1.2 var(--f);margin:0 0 6px;letter-spacing:-.02em}
+h2+p{color:var(--tenue);margin:0 0 20px;max-width:62ch}
+.griglia{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.c{background:var(--scheda);border:1px solid var(--linea);border-radius:18px;padding:16px}
+.c .ic{font-size:26px;width:50px;height:50px;border-radius:50%;display:grid;place-items:center;background:#17150f;border:1px solid #5a4613;margin-bottom:10px}
+.c b{display:block;font-weight:800;font-size:1.05rem;margin-bottom:3px}
+.c p{margin:0;color:var(--tenue);font-size:.93rem}
+.c.top{border-color:#7a5d16;background:linear-gradient(135deg,#2a2210,var(--scheda))}
+.verita{background:linear-gradient(135deg,#2a2210,#1c1c1c);border:1px solid #5a4613;border-radius:20px;padding:20px 22px}
+.verita b{color:var(--oro2)}
+.verita p{margin:0 0 8px}
+.passi{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.passi ol{margin:6px 0 0;padding-left:20px;color:#d9d4c7}
+.fine{text-align:center;padding:48px 0 60px}
+footer{color:var(--tenue);font-size:.85rem;text-align:center;border-top:1px solid var(--linea);padding:20px 0 calc(24px + env(safe-area-inset-bottom,0px))}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <img src="icon-512.png" alt="Icona di Potenza PM: una stella d'oro su sfondo nero">
+    <h1>Potenza <span>PM</span></h1>
+    <p class="sotto">L'app che dà più potenza al tuo telefono. Gratis, senza pubblicità, funziona anche senza internet.</p>
+    <a class="apri" href="app/">⚡ Apri l'app</a>
+    <span class="piccolo">Poi puoi installarla sul telefono come una vera app</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <section>
+    <h2>A cosa serve</h2>
+    <p>Potenza PM mette in un posto solo tanti strumenti utili: fa suonare più forte la tua musica e i tuoi video, trasforma il telefono in una torcia o in una lampada, lo rende più scuro di notte, e ti dice com'è messa la batteria e quanto va veloce internet.</p>
+  </section>
+
+  <section>
+    <h2>Le cose che fa</h2>
+    <p>Sedici strumenti, tutti veri e tutti in italiano semplice.</p>
+    <div class="griglia">
+      <div class="c top"><div class="ic">🔊</div><b>Volume potenziato</b><p>Le canzoni e i video che apri nell'app suonano fino al 300%, con bassi, alti e protezione contro il gracchio.</p></div>
+      <div class="c"><div class="ic">👂</div><b>Orecchio potenziato</b><p>Con le cuffie senti più forte chi parla vicino a te o la TV.</p></div>
+      <div class="c"><div class="ic">💧</div><b>Pulisci altoparlante</b><p>Un suono speciale butta fuori acqua e polvere. Prova anche la cassa destra e sinistra.</p></div>
+      <div class="c"><div class="ic">🌙</div><b>Suoni per dormire</b><p>Rumore bianco, pioggia, onde del mare, con lo spegnimento a tempo.</p></div>
+      <div class="c"><div class="ic">📈</div><b>Misura il rumore</b><p>Quanti decibel ci sono nella stanza? Te lo dice subito.</p></div>
+      <div class="c"><div class="ic">🔦</div><b>Torcia</b><p>Accende il flash, anche lampeggiante e SOS.</p></div>
+      <div class="c"><div class="ic">💡</div><b>Luce schermo</b><p>Lo schermo diventa una lampada colorata, anche festa arcobaleno.</p></div>
+      <div class="c"><div class="ic">🌑</div><b>Più scuro</b><p>Scurisce l'app oltre il minimo, luce notte rossa e lettura al buio.</p></div>
+      <div class="c"><div class="ic">☀️</div><b>Schermo acceso</b><p>Lo schermo non si spegne mentre leggi una ricetta o guardi la mappa.</p></div>
+      <div class="c"><div class="ic">📐</div><b>Livella</b><p>Per appendere i quadri dritti. Vibra quando è perfetto.</p></div>
+      <div class="c"><div class="ic">🧭</div><b>Bussola</b><p>Dov'è il nord? Gradi e direzione.</p></div>
+      <div class="c"><div class="ic">🔍</div><b>Lente</b><p>Ingrandisce le scritte piccole, con la luce e il fermo immagine.</p></div>
+      <div class="c"><div class="ic">🪞</div><b>Specchio</b><p>Con una cornice di luce intorno, come in camerino.</p></div>
+      <div class="c"><div class="ic">🔋</div><b>Batteria</b><p>Carica, tempo che resta e consigli per farla durare.</p></div>
+      <div class="c"><div class="ic">📱</div><b>Il mio telefono</b><p>Schermo, memoria, sistema e prova della velocità di internet.</p></div>
+      <div class="c"><div class="ic">📳</div><b>Vibrazione</b><p>Prova la vibrazione in tanti modi, e un piccolo massaggio.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="verita">
+      <p><b>Detto chiaro:</b> nessuna app presa da internet può alzare il volume di tutto il telefono oltre il massimo, o la luminosità oltre il massimo. Quelle le comanda solo il telefono, e chi lo promette non dice la verità.</p>
+      <p style="margin:0">Potenza PM fa solo cose vere: il 300% vale per la musica e i video che apri dentro l'app. Nella sezione <b>Aiuto</b> trovi anche i trucchi per alzare il volume e cambiare la luce di tutto il telefono, dalle sue impostazioni.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Come metterla sul telefono</h2>
+    <p>Basta un minuto, e poi la trovi tra le tue app con la stella d'oro.</p>
+    <div class="passi">
+      <div class="c"><b>Android (Chrome)</b><ol><li>Premi «Apri l'app».</li><li>Premi i tre puntini in alto a destra.</li><li>Scegli «Installa app» o «Aggiungi a schermata Home».</li></ol></div>
+      <div class="c"><b>iPhone (Safari)</b><ol><li>Premi «Apri l'app».</li><li>Premi il quadrato con la freccia in basso.</li><li>Scegli «Aggiungi alla schermata Home».</li></ol></div>
+    </div>
+  </section>
+
+  <div class="fine"><a class="apri" href="app/">⚡ Apri l'app</a></div>
+</main>
+<footer class="wrap">Potenza PM · gratis, senza pubblicità, non raccoglie nessun dato</footer>
+</body>
+</html>
