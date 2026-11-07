@@ -1,5 +1,5 @@
 // HOME 3D DESIGN - service worker: rende l'app utilizzabile anche offline
-const CACHE = 'home3d-v2';
+const CACHE = 'home3d-v3';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './js/app.js', './js/catalog.js', './js/materials.js', './js/presets.js', './js/three.module.min.js',

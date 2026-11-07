@@ -187,14 +187,21 @@ new ResizeObserver(resize).observe(stage);
 
 /* ---------- costruzione stanza ---------- */
 function disposeGroup(g){ g.traverse((o) => { if (o.isMesh && o.userData.own){ o.geometry.dispose(); if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); g.clear(); }
-function surf(kind, s, w, h){ if (s.k === 'vetro') return M.material('vetro'); return M.surfaceMaterial(kind, s.k, s.c, w, h); }
-function buildRoom(r, target = roomG, offset = null, forOverview = false){
+function surf(kind, s, w, h){
+  if (s.k === 'vetro') return M.material('vetro');
+  const m = M.surfaceMaterial(kind, s.k, s.c, w, h);
+  // il soffitto riceve poca luce diretta: un leggero bagliore lo tiene chiaro e pulito come in foto
+  if (kind === 'ceil' && m.emissive){ m.emissive.copy(m.color).multiplyScalar(.32); if (m.map){ m.emissiveMap = m.map; } }
+  return m;
+}
+function buildRoom(r, target = roomG, offset = null, forOverview = false, opts = {}){
+  const lift = opts.lift || 0, skip = opts.skip || [];
   if (!forOverview){ disposeGroup(roomG); walls = []; }
   const T = .14, g = forOverview ? new THREE.Group() : target;
   const out = r.kind !== 'interno';
   const mk = (geom, mat, x, y, z) => { const m = new THREE.Mesh(geom, mat); m.position.set(x, y, z); m.receiveShadow = true; m.castShadow = true; m.userData.own = true; g.add(m); return m; };
   // pavimento
-  const fl = mk(new THREE.BoxGeometry(r.w, .1, r.d), surf('floor', r.floor, r.w, r.d), 0, -.05, 0);
+  const fl = mk(new THREE.BoxGeometry(r.w, .1, r.d), surf('floor', r.floor, r.w, r.d), 0, -.05 + lift, 0);
   fl.castShadow = false; fl.userData.surface = 'floor';
   if (!forOverview) floorMesh = fl;
   if (out && !(forOverview && planOn)){
@@ -215,6 +222,7 @@ function buildRoom(r, target = roomG, offset = null, forOverview = false){
       [T, H, r.d, -r.w / 2 - T / 2, H / 2, 0, r.d],
     ];
     defs.forEach((d, i) => {
+      if (skip.includes(i)) return;
       const m = mk(new THREE.BoxGeometry(d[0], d[1], d[2]), surf('wall', r.walls[i], d[6], H), d[3], d[4], d[5]);
       m.userData.surface = 'wall'; m.userData.idx = i;
       if (r.walls[i].k === 'vetro'){ m.castShadow = false; }
@@ -225,7 +233,7 @@ function buildRoom(r, target = roomG, offset = null, forOverview = false){
       }
     });
     if (r.kind === 'interno'){
-      const c = mk(new THREE.BoxGeometry(r.w + 2 * T, .1, r.d + 2 * T), surf('ceil', r.ceil, r.w, r.d), 0, r.h + .05, 0);
+      const c = mk(new THREE.BoxGeometry(r.w + 2 * T, .1, r.d + 2 * T), surf('ceil', r.ceil, r.w, r.d), 0, r.h + .05 - lift, 0);
       c.userData.surface = 'ceil'; c.castShadow = true;
       if (!forOverview) ceilMesh = c;
     }
@@ -299,6 +307,17 @@ function updateLamps(){
   for (const k of ['lampadina', 'paralume', 'fuoco']){ const m = M.material(k); m.emissiveIntensity = (k === 'paralume' ? (night ? .9 : .2) : k === 'fuoco' ? 2.2 : (night ? 3 : 1.4)); }
 }
 let envK = .7;
+// sfondo sfumato (più elegante del colore piatto)
+const skyCache = {};
+function skyTex(out){
+  const k = out ? 'o' : 'i'; if (skyCache[k]) return skyCache[k];
+  const c = document.createElement('canvas'); c.width = 4; c.height = 256; const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, 256);
+  if (out){ gr.addColorStop(0, '#8ec5f2'); gr.addColorStop(.6, '#cfe7fb'); gr.addColorStop(1, '#eef5fb'); }
+  else { gr.addColorStop(0, '#d9e0ea'); gr.addColorStop(.55, '#eef1f5'); gr.addColorStop(1, '#f7f5f1'); }
+  g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return (skyCache[k] = t);
+}
 // luce riflessa dall'ambiente: piena di giorno, quasi spenta di notte
 function fullEnv(root, fn){ const k = envK; envK = .7; tuneEnv(root); fn(); envK = k; tuneEnv(root); }
 function tuneEnv(root){ root.traverse((o) => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms){ if (m.envMapIntensity === undefined) continue; if (m.userData.env0 === undefined) m.userData.env0 = m.envMapIntensity; m.envMapIntensity = m.userData.env0 * envK; } }); }
@@ -313,7 +332,7 @@ function applyLighting(){
     sun.color.set('#9fb4ff'); sun.intensity = out ? .35 : .08; ambient.intensity = .04;
     renderer.toneMappingExposure = L.exposure * 1.1;
   } else {
-    scene.background = new THREE.Color(out ? '#bfe0fb' : (mode === 'progettazione' ? '#e8ecf3' : '#dfe6ef'));
+    scene.background = mode === 'progettazione' ? new THREE.Color('#e8ecf3') : skyTex(out);
     hemi.color.set('#ffffff'); hemi.groundColor.set('#c9b9a5'); hemi.intensity = out ? .9 : .75 * L.sun;
     sun.color.copy(warm); sun.intensity = (out ? 3.2 : 2.6) * L.sun; ambient.intensity = .15;
     renderer.toneMappingExposure = L.exposure;
@@ -332,8 +351,8 @@ function applyLighting(){
   scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
   envK = design ? 1 : night ? .05 : .7; tuneEnv(scene);
   if (planOn){ planShadowFit(); planLamps(); perspBg = scene.background; perspFog = scene.fog; }
-  $('bDay').textContent = night ? '🌙 Notte' : '☀️ Giorno';
-  $('bMode').textContent = design ? '📐 Progettazione' : '✨ Realistico';
+  $('bDay').innerHTML = night ? '<svg class="i" aria-hidden="true"><use href="#i-moon"/></svg> Notte' : '<svg class="i" aria-hidden="true"><use href="#i-sun"/></svg> Giorno';
+  $('bMode').innerHTML = design ? '<svg class="i" aria-hidden="true"><use href="#i-ruler"/></svg> Progettazione' : '<svg class="i" aria-hidden="true"><use href="#i-sparkle"/></svg> Realistico';
 }
 
 /* =========================================================
@@ -570,7 +589,7 @@ function undo(){ if (!undoStack.length) return; redoStack.push(snapshot()); rest
 function redo(){ if (!redoStack.length) return; undoStack.push(snapshot()); restore(redoStack.pop()); afterStructural(); }
 function afterStructural(){ sel = null; selSurface = null; buildRoom(room); rebuildItems(); applyLighting(); updateSelBox(); wallHi.visible = false; renderProps(); commit(); updUR(); }
 function updUR(){ $('eUndo').disabled = !(planOn ? planUndo : undoStack).length; $('eRedo').disabled = !(planOn ? planRedo : redoStack).length; }
-function commit(){ house.upd = Date.now(); updateCost(); saveSoon(); $('eSave').textContent = '💾'; }
+function commit(){ house.upd = Date.now(); updateCost(); saveSoon(); $('eSave').innerHTML = '<svg class="i" aria-hidden="true"><use href="#i-save"/></svg>'; }
 function updateCost(){ const list = planOn && house ? house.rooms.flatMap((r) => r.items) : room ? room.items : []; const tot = list.reduce((a, i) => a + (IT[i.t] ? IT[i.t].price : 0), 0); $('eCost').textContent = euro(tot); }
 
 function insertItem(t, viaDrag = false){
@@ -801,8 +820,8 @@ function itemCard(d){
     <button class="fav" type="button" data-fav="${d.id}" aria-label="${fav ? 'Togli dai preferiti' : 'Aggiungi ai preferiti'}">${fav ? '♥' : '♡'}</button><button class="info" type="button" data-info="${d.id}" aria-label="Prova ${esc(d.n)}">i</button></div>`;
 }
 function renderCatalog(){
-  const chips = [['preferiti', 'Preferiti', '♥'], ...CATS, ...(DB.imported.length ? [['importati', 'Importati', '📦']] : [])];
-  $('cChips').innerHTML = chips.map(([id, n, e]) => `<button class="chip" type="button" data-cat="${id}" aria-pressed="${!query && id === cat}">${e} ${n}</button>`).join('');
+  const chips = [['preferiti', 'Preferiti', '♥'], ...CATS, ...(DB.imported.length ? [['importati', 'Importati', '<svg class="i" aria-hidden="true"><use href="#i-box"/></svg>']] : [])];
+  $('cChips').innerHTML = chips.map(([id, n, e]) => `<button class="chip" type="button" data-cat="${id}" aria-pressed="${!query && id === cat}">${n}</button>`).join('');
   const list = catList();
   $('cItems').innerHTML = list.length ? list.map(itemCard).join('') : `<p class="note" style="padding:10px">${cat === 'preferiti' && !query ? 'Tocca ♡ su un mobile per aggiungerlo ai preferiti.' : 'Nessun oggetto trovato.'}</p>`;
   thumbQ.push(...$('cItems').querySelectorAll('.ph')); queueThumbs();
@@ -855,6 +874,7 @@ function renderProps(keepScroll){
   if (planOn) return renderPlanProps($('props'));
   const p = $('props'), wide = window.innerWidth >= 1000;
   const st = p.scrollTop;
+  p.classList.remove('mini'); p.style.bottom = ''; p.style.borderRadius = '';
   if (sel){ renderItemProps(p); }
   else if (selSurface){ renderSurfaceProps(p); }
   else if (wide){ renderRoomSummary(p); }
@@ -876,8 +896,8 @@ function renderItemProps(p){
       <div class="row"><button class="btn" data-a="r-90">↺ 90°</button><button class="btn" data-a="r-15">↺ 15°</button><button class="btn" data-a="r15">↻ 15°</button><button class="btn" data-a="r90">↻ 90°</button></div>
       ${d.mount === 'floor' ? `<input type="range" min="0" max="355" step="5" value="${Math.round(((it.ry / DEG) % 360 + 360) % 360)}" data-r="rot" aria-label="Rotazione">` : `<p class="note">${d.mount === 'wall' ? 'Gli oggetti a parete si girano da soli verso la stanza.' : ''}</p>`}</div>
       <div class="grp"><label>Altezza da terra · ${Math.round(it.y * 100)} cm</label>
-      <div class="row"><button class="btn" data-a="up">⬆ Alza</button><button class="btn" data-a="down">⬇ Abbassa</button>${d.mount === 'floor' ? '<button class="btn" data-a="drop">⤓ Appoggia</button>' : ''}</div></div>
-      ${d.mount === 'floor' ? `<div class="grp"><label>Posizione</label><div class="row"><button class="btn" data-a="wall">🧱 Alla parete</button><button class="btn" data-a="center">⊕ Al centro</button></div>
+      <div class="row"><button class="btn" data-a="up"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg> Alza</button><button class="btn" data-a="down"><svg class="i" aria-hidden="true"><use href="#i-dn"/></svg> Abbassa</button>${d.mount === 'floor' ? '<button class="btn" data-a="drop">⤓ Appoggia</button>' : ''}</div></div>
+      ${d.mount === 'floor' ? `<div class="grp"><label>Posizione</label><div class="row"><button class="btn" data-a="wall"><svg class="i" aria-hidden="true"><use href="#i-brick"/></svg> Alla parete</button><button class="btn" data-a="center">⊕ Al centro</button></div>
       <div class="row"><button class="btn" data-a="mx-">←</button><button class="btn" data-a="mz-">↑</button><button class="btn" data-a="mz+">↓</button><button class="btn" data-a="mx+">→</button></div>
       <p class="note">Puoi anche trascinarlo col dito. Sopra tavoli, comodini e mensole si appoggia da solo.</p></div>` : `<p class="note">Trascinalo col dito lungo le pareti${d.mount === 'ceiling' ? ' (resta attaccato al soffitto)' : ''}.</p>`}`;
   } else if (ptab === 'misure'){
@@ -898,8 +918,8 @@ function renderItemProps(p){
     if (hasSlot(o, 'sec')) body += `<div class="grp"><label>Struttura e gambe</label>${finGrid(M.SEC_FINISHES, it.s2 || d.sec, 'data-s2')}</div>`;
     if (!body) body = '<p class="note">Questo oggetto ha colori fissi.</p>';
   } else {
-    body = `<div class="grp"><div class="row"><button class="btn" data-a="dup">⧉ Duplica</button><button class="btn" data-a="copy">📋 Copia</button><button class="btn" data-a="paste">📥 Incolla</button></div>
-      <div class="row"><button class="btn" data-a="fav">${DB.favs.includes(d.id) ? '♥ Nei preferiti' : '♡ Preferito'}</button><button class="btn danger" data-a="del">🗑️ Elimina</button></div>
+    body = `<div class="grp"><div class="row"><button class="btn" data-a="dup">⧉ Duplica</button><button class="btn" data-a="copy"><svg class="i" aria-hidden="true"><use href="#i-clipboard"/></svg> Copia</button><button class="btn" data-a="paste"><svg class="i" aria-hidden="true"><use href="#i-download"/></svg> Incolla</button></div>
+      <div class="row"><button class="btn" data-a="fav">${DB.favs.includes(d.id) ? '♥ Nei preferiti' : '♡ Preferito'}</button><button class="btn danger" data-a="del"><svg class="i" aria-hidden="true"><use href="#i-trash"/></svg> Elimina</button></div>
       <p class="note">${esc(d.n)} · ${d.price ? euro(d.price) : 'modello importato'}</p></div>`;
   }
   p.innerHTML = `<div class="ph1"><h3>${esc(d.n)}</h3><small>${Math.round(sz.x * 100)}×${Math.round(sz.z * 100)}×${Math.round(sz.y * 100)} cm</small><button class="btn icon ghost" data-a="close" aria-label="Chiudi">✕</button></div>
@@ -922,7 +942,7 @@ function renderRoomSummary(p){
   const n = room.items.length;
   p.innerHTML = `<div class="ph1"><h3>${esc(room.name)}</h3></div>
     <div class="grp"><label>Stanza</label><p class="note">${room.w.toFixed(1).replace('.', ',')} × ${room.d.toFixed(1).replace('.', ',')} m${room.kind === 'interno' ? `, alta ${room.h.toFixed(1).replace('.', ',')} m` : ''} · ${n} oggetti · ${$('eCost').textContent}</p>
-    <div class="row"><button class="btn" data-a="room">📐 Misure e superfici</button><button class="btn" data-a="light">💡 Luci</button></div></div>
+    <div class="row"><button class="btn" data-a="room"><svg class="i" aria-hidden="true"><use href="#i-ruler"/></svg> Misure e superfici</button><button class="btn" data-a="light"><svg class="i" aria-hidden="true"><use href="#i-bulb"/></svg> Luci</button></div></div>
     <div class="grp"><label>Come si usa</label><p class="note">Tocca un mobile del catalogo per metterlo nella stanza, oppure trascinalo dentro. Tocca un mobile nella stanza per spostarlo, ruotarlo, cambiare misure e colori. Tocca una parete o il pavimento per cambiarne il materiale. Trascina lo sfondo per ruotare la vista, usa due dita o la rotellina per lo zoom.</p></div>`;
 }
 $('props').addEventListener('click', (e) => {
@@ -1001,7 +1021,7 @@ function roomDialog(){
   const sl = (k, n, min, max, st, v) => `<div class="slider"><span>${n}</span><input type="range" min="${min}" max="${max}" step="${st}" value="${v}" data-rd="${k}" aria-label="${n}"><output>${(+v).toFixed(1).replace('.', ',')} m</output></div>`;
   openDlg('Stanza: misure e superfici', `<div class="field"><label class="lab" for="rn">Nome della stanza</label><input type="text" id="rn" value="${esc(r.name)}" maxlength="40"></div>
     <div class="grp"><span class="lab">Misure</span>${sl('w', 'Larghezza', 2, 14, .1, r.w)}${sl('d', 'Profondità', 2, 14, .1, r.d)}${r.kind === 'interno' ? sl('h', 'Altezza', 2.3, 4.5, .05, r.h) : ''}</div>
-    <div class="grp"><span class="lab">Tipo</span><div class="pick">${[['interno', 'Stanza', '🏠'], ['terrazza', 'Terrazza', '🌇'], ['esterno', 'Giardino', '🌳']].map(([k, n, e]) => `<button type="button" data-kind="${k}" aria-pressed="${r.kind === k}"><span>${e}</span>${n}</button>`).join('')}</div></div>
+    <div class="grp"><span class="lab">Tipo</span><div class="pick">${[['interno', 'Stanza', '<svg class="i" aria-hidden="true"><use href="#i-home"/></svg>'], ['terrazza', 'Terrazza', '<svg class="i" aria-hidden="true"><use href="#i-terrace"/></svg>'], ['esterno', 'Giardino', '<svg class="i" aria-hidden="true"><use href="#i-tree"/></svg>']].map(([k, n, e]) => `<button type="button" data-kind="${k}" aria-pressed="${r.kind === k}"><span>${e}</span>${n}</button>`).join('')}</div></div>
     <div class="grp"><span class="lab">Superfici</span><div class="row"><button class="btn" type="button" data-sfx="floor">Pavimento</button>${r.kind === 'interno' ? '<button class="btn" type="button" data-sfx="ceil">Soffitto</button>' : ''}${r.kind !== 'esterno' ? '<button class="btn" type="button" data-sfx="wall">Pareti</button>' : ''}</div></div>`,
     [['Fatto', 'main', () => { const v = $('rn').value.trim(); if (v && v !== r.name){ r.name = v; commit(); updTitle(); } }]]);
   let snapDone = false;
@@ -1030,7 +1050,7 @@ function resizeRoom(){
 function lightDialog(){
   const L = room.light;
   const sl = (k, n, min, max, st) => `<div class="slider"><span>${n}</span><input type="range" min="${min}" max="${max}" step="${st}" value="${L[k]}" data-ld="${k}" aria-label="${n}"><output>${Math.round(L[k] * 100)}%</output></div>`;
-  openDlg('Illuminazione', `<div class="pick">${[['giorno', 'Giorno', '☀️'], ['notte', 'Notte', '🌙']].map(([k, n, e]) => `<button type="button" data-lm="${k}" aria-pressed="${L.mode === k}"><span>${e}</span>${n}</button>`).join('')}</div>
+  openDlg('Illuminazione', `<div class="pick">${[['giorno', 'Giorno', '<svg class="i" aria-hidden="true"><use href="#i-sun"/></svg>'], ['notte', 'Notte', '<svg class="i" aria-hidden="true"><use href="#i-moon"/></svg>']].map(([k, n, e]) => `<button type="button" data-lm="${k}" aria-pressed="${L.mode === k}"><span>${e}</span>${n}</button>`).join('')}</div>
     ${sl('sun', 'Sole', .2, 2, .05)}${sl('warm', 'Luce calda', 0, 1, .05)}${sl('exposure', 'Esposizione', .4, 1.8, .05)}
     <label class="setrow"><div><b>Lampade accese di notte</b><span>Lampadari, abat-jour, camino e lampioni fanno luce</span></div><input type="checkbox" id="lamps" ${L.lamps ? 'checked' : ''}></label>`, [['Fatto', 'main']]);
   let snapDone = false;
@@ -1043,14 +1063,14 @@ function lightDialog(){
   $('dlgB').addEventListener('click', (e) => { const b = e.target.closest('[data-lm]'); if (!b) return; mark(); L.mode = b.dataset.lm; applyLighting(); commit(); $('dlgB').querySelectorAll('[data-lm]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); });
 }
 function roomSwitcher(){
-  openDlg('Stanze di ' + house.name, `<div class="pick">${house.rooms.map((r) => `<button type="button" data-room="${r.id}" aria-pressed="${r === room}"><span>${r.kind === 'esterno' ? '🌳' : r.kind === 'terrazza' ? '🌇' : '🚪'}</span>${esc(r.name)}</button>`).join('')}<button type="button" data-room="__new"><span>➕</span>Nuova stanza</button></div>
+  openDlg('Stanze di ' + house.name, `<div class="pick">${house.rooms.map((r) => `<button type="button" data-room="${r.id}" aria-pressed="${r === room}"><span>${r.kind === 'esterno' ? '<svg class="i" aria-hidden="true"><use href="#i-tree"/></svg>' : r.kind === 'terrazza' ? '<svg class="i" aria-hidden="true"><use href="#i-terrace"/></svg>' : '<svg class="i" aria-hidden="true"><use href="#i-door"/></svg>'}</span>${esc(r.name)}</button>`).join('')}<button type="button" data-room="__new"><span><svg class="i" aria-hidden="true"><use href="#i-plus"/></svg></span>Nuova stanza</button></div>
     <div class="field"><label class="lab" for="hn">Nome della casa</label><input type="text" id="hn" value="${esc(house.name)}" maxlength="40"></div>`,
     [['Fatto', 'main', () => { const v = $('hn').value.trim(); if (v && v !== house.name){ house.name = v; commit(); updTitle(); } }]]);
   $('dlgB').addEventListener('click', (e) => { const b = e.target.closest('[data-room]'); if (!b) return; dlg.close(); if (b.dataset.room === '__new') newRoomDialog(house); else openRoom(house, house.rooms.find((r) => r.id === b.dataset.room)); });
 }
 function newRoomDialog(h, after){
   let choice = 'vuota';
-  openDlg('Nuova stanza', `<div class="pick" id="nrp"><button type="button" data-p="vuota" aria-pressed="true"><span>⬜</span>Stanza vuota</button><button type="button" data-p="terrazza-vuota"><span>🌇</span>Terrazza vuota</button><button type="button" data-p="giardino-vuoto"><span>🌳</span>Giardino vuoto</button>${PRESETS.map((p) => `<button type="button" data-p="${p.id}"><span>${p.img}</span>${esc(p.n)}</button>`).join('')}</div>
+  openDlg('Nuova stanza', `<div class="pick" id="nrp"><button type="button" data-p="vuota" aria-pressed="true"><span><svg class="i" aria-hidden="true"><use href="#i-square"/></svg></span>Stanza vuota</button><button type="button" data-p="terrazza-vuota"><span><svg class="i" aria-hidden="true"><use href="#i-terrace"/></svg></span>Terrazza vuota</button><button type="button" data-p="giardino-vuoto"><span><svg class="i" aria-hidden="true"><use href="#i-tree"/></svg></span>Giardino vuoto</button>${PRESETS.map((p) => `<button type="button" data-p="${p.id}"><span>${p.img}</span>${esc(p.n)}</button>`).join('')}</div>
     <div class="grp" id="nrsize"><span class="lab">Misure (stanza vuota)</span>
       <div class="slider"><span>Larghezza</span><input type="range" min="2" max="14" step=".1" value="4.5" id="nw"><output>4,5 m</output></div>
       <div class="slider"><span>Profondità</span><input type="range" min="2" max="14" step=".1" value="4" id="nd"><output>4,0 m</output></div>
@@ -1103,7 +1123,7 @@ async function sharePhoto(url, name){
   try { const blob = await (await fetch(url)).blob(); const file = new File([blob], name + '.jpg', { type: 'image/jpeg' }); if (navigator.canShare && navigator.canShare({ files: [file] })){ await navigator.share({ files: [file], title: name }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
   downloadURL(url, name + '.jpg');
 }
-function downloadURL(url, fn){ const a = document.createElement('a'); a.href = url; a.download = fn; document.body.appendChild(a); a.click(); a.remove(); toast('Foto salvata 📸'); }
+function downloadURL(url, fn){ const a = document.createElement('a'); a.href = url; a.download = fn; document.body.appendChild(a); a.click(); a.remove(); toast('Foto salvata'); }
 
 /* ---------- import GLB ---------- */
 $('cImport').onclick = () => $('fileGlb').click();
@@ -1139,6 +1159,7 @@ function openRoom(h, r){
     delete room._settle;
   }
   applyLighting(); updTitle(); updateCost(); updUR(); renderCatalog(); renderProps();
+  buildContext();
   $('badge').hidden = true;
   setCam('libera');
   const s = Math.max(room.w, room.d); camera.position.set(s * .85, s * .8 + 1, s * 1.05); controls.target.set(0, room.kind === 'interno' ? room.h * .45 : 1, 0); camAnim = null;
@@ -1149,6 +1170,7 @@ function defaultHelp(){ return window.matchMedia('(pointer:coarse)').matches ? '
 function setHelp(t){ const h = $('help'); h.textContent = t; h.hidden = false; clearTimeout(setHelp.t); setHelp.t = setTimeout(() => (h.hidden = true), 6000); }
 function goHome(){
   if (planOn) planOff();
+  disposeGroup(ctxG);
   saveNow(); select(null); selectSurface(null);
   if (camMode === 'casa') hideHouse();
   $('editor').hidden = true; $('home').hidden = false; $('eMenu').hidden = true;
@@ -1159,7 +1181,7 @@ function goHome(){
 $('eBack').onclick = goHome;
 $('eTitle').onclick = roomSwitcher;
 $('eUndo').onclick = () => (planOn ? planUndoFn() : undo()); $('eRedo').onclick = () => (planOn ? planRedoFn() : redo());
-$('eSave').onclick = () => { if (saveNow()){ $('eSave').textContent = '✅'; toast('Progetto salvato'); setTimeout(() => ($('eSave').textContent = '💾'), 1500); } };
+$('eSave').onclick = () => { if (saveNow()){ $('eSave').innerHTML = '<svg class="i" aria-hidden="true"><use href="#i-check"/></svg>'; toast('Progetto salvato'); setTimeout(() => ($('eSave').innerHTML = '<svg class="i" aria-hidden="true"><use href="#i-save"/></svg>'), 1500); } };
 $('eMenuBtn').onclick = (e) => { e.stopPropagation(); $('eMenu').hidden = !$('eMenu').hidden; };
 document.addEventListener('click', (e) => { if (!e.target.closest('#eMenu') && e.target.id !== 'eMenuBtn') $('eMenu').hidden = true; });
 $('eMenu').addEventListener('click', (e) => {
@@ -1271,9 +1293,9 @@ function roomFromPresetForThumb(p){
 }
 function houseCard(h){
   const r0 = h.rooms[0];
-  return `<article class="card"><button class="th" type="button" data-open="${h.id}" aria-label="Apri ${esc(h.name)}" ${r0 ? `data-rt="${h.id}|${r0.id}"` : ''}>🏠</button>
+  return `<article class="card"><button class="th" type="button" data-open="${h.id}" aria-label="Apri ${esc(h.name)}" ${r0 ? `data-rt="${h.id}|${r0.id}"` : ''}><svg class="i" aria-hidden="true"><use href="#i-home"/></svg></button>
     <div class="bd"><div class="t"><h4>${esc(h.name)}</h4><p>${h.rooms.length} ${h.rooms.length === 1 ? 'stanza' : 'stanze'} · ${new Date(h.upd).toLocaleDateString('it-IT')}</p></div>
-    <button class="btn icon" type="button" data-hren="${h.id}" aria-label="Rinomina">✏️</button><button class="btn icon" type="button" data-hdup="${h.id}" aria-label="Duplica">⧉</button><button class="btn icon" type="button" data-hdel="${h.id}" aria-label="Elimina">🗑️</button></div></article>`;
+    <button class="btn icon" type="button" data-hren="${h.id}" aria-label="Rinomina"><svg class="i" aria-hidden="true"><use href="#i-pencil"/></svg></button><button class="btn icon" type="button" data-hdup="${h.id}" aria-label="Duplica">⧉</button><button class="btn icon" type="button" data-hdel="${h.id}" aria-label="Elimina"><svg class="i" aria-hidden="true"><use href="#i-trash"/></svg></button></div></article>`;
 }
 function renderHome(v){
   hview = v || hview;
@@ -1285,14 +1307,14 @@ function renderHome(v){
       ${houses.length ? `<div class="cards">${houses.map(houseCard).join('')}</div>` : '<div class="empty">Non hai ancora nessuna casa. Creane una nuova!</div>'}`;
   } else if (hview === 'stanze'){
     const all = []; houses.forEach((h) => h.rooms.forEach((r) => all.push([h, r])));
-    el.innerHTML = `<h3>Le mie stanze</h3>${all.length ? `<div class="cards">${all.map(([h, r]) => `<article class="card"><button class="th" type="button" data-oroom="${h.id}|${r.id}" data-rt="${h.id}|${r.id}" aria-label="Apri ${esc(r.name)}">🚪</button><div class="bd"><div class="t"><h4>${esc(r.name)}</h4><p>${esc(h.name)} · ${r.items.length} oggetti</p></div></div></article>`).join('')}</div>` : '<div class="empty">Nessuna stanza ancora.</div>'}`;
+    el.innerHTML = `<h3>Le mie stanze</h3>${all.length ? `<div class="cards">${all.map(([h, r]) => `<article class="card"><button class="th" type="button" data-oroom="${h.id}|${r.id}" data-rt="${h.id}|${r.id}" aria-label="Apri ${esc(r.name)}"><svg class="i" aria-hidden="true"><use href="#i-door"/></svg></button><div class="bd"><div class="t"><h4>${esc(r.name)}</h4><p>${esc(h.name)} · ${r.items.length} oggetti</p></div></div></article>`).join('')}</div>` : '<div class="empty">Nessuna stanza ancora.</div>'}`;
   } else if (hview === 'ispirazioni'){
     el.innerHTML = `<h3>Ispirazioni</h3><p class="note" style="margin:-6px 0 12px">Stanze già arredate da cui partire. Si apriranno in una nuova casa e potrai cambiare tutto.</p>
       <div class="cards">${PRESETS.map((p) => `<article class="card"><button class="th" type="button" data-pre="${p.id}" data-rt="preset|${p.id}" aria-label="Usa ${esc(p.n)}">${p.img}</button><div class="bd"><div class="t"><h4>${esc(p.n)}</h4><p>${p.w} × ${p.d} m · ${p.items.length} oggetti</p></div><button class="btn main" type="button" data-pre="${p.id}">Usa</button></div></article>`).join('')}</div>`;
   } else if (hview === 'catalogo'){
-    el.innerHTML = `<h3>Catalogo · ${ITEMS.length} modelli 3D <span class="sp"></span><button class="btn" type="button" data-act="import">⬆️ Importa GLB</button></h3>
+    el.innerHTML = `<h3>Catalogo · ${ITEMS.length} modelli 3D <span class="sp"></span><button class="btn" type="button" data-act="import"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg> Importa GLB</button></h3>
       <input class="search" id="hSearch" type="search" placeholder="Cerca un mobile…" aria-label="Cerca nel catalogo" style="max-width:420px;margin-bottom:12px">
-      <div id="hCat">${[['preferiti', 'Preferiti', '♥'], ...CATS, ...(DB.imported.length ? [['importati', 'Importati', '📦']] : [])].map(([id, n, e]) => {
+      <div id="hCat">${[['preferiti', 'Preferiti', '♥'], ...CATS, ...(DB.imported.length ? [['importati', 'Importati', '<svg class="i" aria-hidden="true"><use href="#i-box"/></svg>']] : [])].map(([id, n, e]) => {
         const list = id === 'preferiti' ? ITEMS.filter((d) => DB.favs.includes(d.id)) : ITEMS.filter((d) => d.cat === id);
         if (!list.length) return '';
         return `<div class="sec" style="margin-bottom:18px" data-catsec="${id}"><h3 style="font-size:17px">${e} ${n} <span class="note">${list.length}</span></h3><div class="cgrid">${list.map((d) => `<div class="it" style="width:auto" role="button" tabindex="0" data-hinfo="${d.id}" data-name="${esc(d.n.toLowerCase())}">${thumbs.get(d.id) ? `<img src="${thumbs.get(d.id)}" alt="">` : `<div class="ph" data-t="${d.id}">…</div>`}<b>${esc(d.n)}</b><span>${d.price ? euro(d.price) : 'Importato'}</span></div>`).join('')}</div></div>`;
@@ -1304,9 +1326,9 @@ function renderHome(v){
     el.innerHTML = `<h3>Impostazioni</h3><div class="card" style="padding:4px 16px">
       <label class="setrow"><div><b>Grafica</b><span>"Leggera" per telefoni meno potenti: niente ombre e meno dettagli</span></div><select id="sQ" class="btn"><option value="alta" ${DB.settings.quality === 'alta' ? 'selected' : ''}>Alta qualità</option><option value="leggera" ${DB.settings.quality === 'leggera' ? 'selected' : ''}>Leggera</option></select></label>
       <label class="setrow"><div><b>Tema</b><span>Chiaro, scuro o come il telefono</span></div><select id="sT" class="btn"><option value="auto">Automatico</option><option value="light" ${DB.settings.theme === 'light' ? 'selected' : ''}>Chiaro</option><option value="dark" ${DB.settings.theme === 'dark' ? 'selected' : ''}>Scuro</option></select></label>
-      <div class="setrow"><div><b>Salvataggio</b><span>Tutto viene salvato da solo su questo dispositivo (${used} KB usati)</span></div><button class="btn" type="button" data-act="export">⬇️ Esporta backup</button></div>
-      <div class="setrow"><div><b>Ripristina backup</b><span>Carica un file di backup esportato prima</span></div><button class="btn" type="button" data-act="importjson">⬆️ Carica</button></div>
-      <div class="setrow"><div><b>Modelli importati</b><span>${DB.imported.length} modelli GLB</span></div><button class="btn" type="button" data-act="import">⬆️ Importa GLB</button></div>
+      <div class="setrow"><div><b>Salvataggio</b><span>Tutto viene salvato da solo su questo dispositivo (${used} KB usati)</span></div><button class="btn" type="button" data-act="export"><svg class="i" aria-hidden="true"><use href="#i-dn"/></svg> Esporta backup</button></div>
+      <div class="setrow"><div><b>Ripristina backup</b><span>Carica un file di backup esportato prima</span></div><button class="btn" type="button" data-act="importjson"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg> Carica</button></div>
+      <div class="setrow"><div><b>Modelli importati</b><span>${DB.imported.length} modelli GLB</span></div><button class="btn" type="button" data-act="import"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg> Importa GLB</button></div>
       <div class="setrow"><div><b>Cancella tutto</b><span>Elimina case, stanze e preferiti da questo dispositivo</span></div><button class="btn danger" type="button" data-act="reset">Cancella</button></div>
       <div class="setrow" style="border:0"><div><b>HOME 3D DESIGN PM</b><span>Versione 1.0 · ${ITEMS.length} modelli 3D · realizzata con Three.js</span></div></div></div>`;
     $('sQ').onchange = (e) => { DB.settings.quality = e.target.value; saveNow(); toast('Riavvio per applicare la grafica…'); setTimeout(() => location.reload(), 800); };
@@ -1318,7 +1340,7 @@ function chooseRoomFor(t, tmpl){
   const houses = DB.houses.slice().sort((a, b) => b.upd - a.upd);
   if (!houses.length){ toast('Crea prima una casa'); return; }
   const opts = []; houses.forEach((h) => h.rooms.forEach((r) => opts.push([h, r])));
-  openDlg('In quale stanza?', `<div class="pick">${opts.map(([h, r], i) => `<button type="button" data-ci="${i}"><span>🚪</span>${esc(r.name)}<small class="note">${esc(h.name)}</small></button>`).join('')}</div>`);
+  openDlg('In quale stanza?', `<div class="pick">${opts.map(([h, r], i) => `<button type="button" data-ci="${i}"><span><svg class="i" aria-hidden="true"><use href="#i-door"/></svg></span>${esc(r.name)}<small class="note">${esc(h.name)}</small></button>`).join('')}</div>`);
   $('dlgB').addEventListener('click', (e) => { const b = e.target.closest('[data-ci]'); if (!b) return; const [h, r] = opts[+b.dataset.ci]; dlg.close(); openRoom(h, r); insertItem(t); const s = selItem(); if (s && tmpl.m){ s.m = clone(tmpl.m); applyMaterials(objs.get(s.u), s); commit(); } });
 }
 document.querySelector('.hwrap').addEventListener('click', (e) => {
@@ -1342,7 +1364,7 @@ document.querySelector('.hwrap').addEventListener('click', (e) => {
 function newHouseDialog(){
   let choice = 'disegna';
   openDlg('Nuovo progetto', `<div class="field"><label class="lab" for="nh2">Nome della casa</label><input type="text" id="nh2" value="La mia casa" maxlength="40"></div>
-    <div class="grp"><span class="lab">Da dove parti?</span><div class="pick" id="nhp"><button type="button" data-p="disegna" aria-pressed="true"><span>✏️</span>Disegno la pianta</button><button type="button" data-p="piantina"><span>📐</span>Carico la piantina</button><button type="button" data-p="vuota"><span>⬜</span>Stanza vuota</button>${PRESETS.map((p) => `<button type="button" data-p="${p.id}"><span>${p.img}</span>${esc(p.n)}</button>`).join('')}</div></div>
+    <div class="grp"><span class="lab">Da dove parti?</span><div class="pick" id="nhp"><button type="button" data-p="disegna" aria-pressed="true"><span><svg class="i" aria-hidden="true"><use href="#i-pencil"/></svg></span>Disegno la pianta</button><button type="button" data-p="piantina"><span><svg class="i" aria-hidden="true"><use href="#i-ruler"/></svg></span>Carico la piantina</button><button type="button" data-p="vuota"><span><svg class="i" aria-hidden="true"><use href="#i-square"/></svg></span>Stanza vuota</button>${PRESETS.map((p) => `<button type="button" data-p="${p.id}"><span>${p.img}</span>${esc(p.n)}</button>`).join('')}</div></div>
     <div class="grp" id="nhs" hidden><span class="lab">Misure della prima stanza</span>
       <div class="slider"><span>Larghezza</span><input type="range" min="2" max="14" step=".1" value="5" id="w2"><output>5,0 m</output></div>
       <div class="slider"><span>Profondità</span><input type="range" min="2" max="14" step=".1" value="4" id="d2"><output>4,0 m</output></div>
@@ -1385,7 +1407,16 @@ const UNDER = { img: null, hid: null };
 const rectOf = (r) => ({ x0: r.px - r.w / 2, x1: r.px + r.w / 2, z0: r.pz - r.d / 2, z1: r.pz + r.d / 2 });
 const roomById = (id) => house.rooms.find((r) => r.id === id);
 const insideRoom = (r, x, z) => { const q = rectOf(r); return x > q.x0 && x < q.x1 && z > q.z0 && z < q.z1; };
-const roomAt = (x, z) => house.rooms.find((r) => insideRoom(r, x, z));
+const roomAt = (x, z) => house.rooms.filter((r) => typeof r.px === 'number' && insideRoom(r, x, z)).sort((a, b) => a.w * a.d - b.w * b.d)[0];
+const rectIn = (p, q) => p.x0 >= q.x0 - .002 && p.x1 <= q.x1 + .002 && p.z0 >= q.z0 - .002 && p.z1 <= q.z1 + .002;
+// la stanza b sta dentro la stanza a (per esempio una camera dentro la casa)
+const contains = (a, b) => a !== b && typeof a.px === 'number' && typeof b.px === 'number' && a.w * a.d > b.w * b.d + 1e-6 && rectIn(rectOf(b), rectOf(a));
+const kidsOf = (r) => house.rooms.filter((o) => contains(r, o));
+function roomOpts(r){
+  const parents = house.rooms.filter((p) => contains(p, r)), q = rectOf(r), skip = [];
+  for (const p of parents){ const b = rectOf(p); if (Math.abs(q.z0 - b.z0) < .01) skip.push(0); if (Math.abs(q.x1 - b.x1) < .01) skip.push(1); if (Math.abs(q.z1 - b.z1) < .01) skip.push(2); if (Math.abs(q.x0 - b.x0) < .01) skip.push(3); }
+  return { lift: parents.length * .004, skip };
+}
 const snapVal = (v) => Math.round(v / SN) * SN;
 function houseBounds(h = house){
   const rs = h.rooms.filter((r) => typeof r.px === 'number');
@@ -1402,35 +1433,40 @@ function placeNewRoom(h, r){
   r.px = x1 + WT + r.w / 2; r.pz = z0 + r.d / 2;
 }
 function ensureLayout(h){ for (const r of h.rooms) if (typeof r.px !== 'number' || typeof r.pz !== 'number'){ delete r.px; placeNewRoom(h, r); } }
-function overlaps(r, nx, nz, nw, nd){
+function overlaps(r, nx, nz, nw, nd, ignore){
   const a = { x0: nx - nw / 2, x1: nx + nw / 2, z0: nz - nd / 2, z1: nz + nd / 2 };
   for (const o of house.rooms){
-    if (o === r || typeof o.px !== 'number') continue;
+    if (o === r || typeof o.px !== 'number' || (ignore && ignore.includes(o))) continue;
     const b = rectOf(o);
+    if (rectIn(a, b) || rectIn(b, a)) continue; // una dentro l'altra: va bene
     if (a.x1 + WT > b.x0 + .005 && b.x1 + WT > a.x0 + .005 && a.z1 + WT > b.z0 + .005 && b.z1 + WT > a.z0 + .005) return true;
   }
   return false;
 }
 // bordi delle altre stanze a cui agganciarsi (muro in comune oppure allineato)
+let snapIgnore = [];
 function edgeCands(r, axis, side){
   const c = [];
   for (const o of house.rooms){
-    if (o === r || typeof o.px !== 'number') continue;
+    if (o === r || typeof o.px !== 'number' || snapIgnore.includes(o)) continue;
     const b = rectOf(o);
     if (axis === 'x') side === 'min' ? c.push(b.x1 + WT, b.x0) : c.push(b.x0 - WT, b.x1);
     else side === 'min' ? c.push(b.z1 + WT, b.z0) : c.push(b.z0 - WT, b.z1);
   }
   return c;
 }
-function bestSnap(pairs, thr){ let best = null, bd = thr; for (const [v, cs] of pairs) for (const c of cs){ const d = Math.abs(c - v); if (d < bd){ bd = d; best = c - v; } } return best; }
+function bestSnapC(pairs, thr){ let best = null, bd = thr; for (const [v, cs] of pairs) for (const c of cs){ const d = Math.abs(c - v); if (d < bd){ bd = d; best = { d: c - v, c }; } } return best; }
+function bestSnap(pairs, thr){ const b = bestSnapC(pairs, thr); return b ? b.d : null; }
+let planGuides = [], lenTag = null;
 const snapThr = () => Math.max(.1, 14 / pv.s);
-function snapEdge(v, r, axis, side){ const s = bestSnap([[v, edgeCands(r, axis, side)]], snapThr()); return s !== null ? v + s : snapVal(v); }
+function snapEdge(v, r, axis, side){ const s = bestSnapC([[v, edgeCands(r, axis, side)]], snapThr()); if (s){ planGuides.push({ a: axis, v: s.c }); return s.c; } return snapVal(v); }
 function snapRoomPos(r, nx, nz){
   const thr = snapThr();
-  const sx = bestSnap([[nx - r.w / 2, edgeCands(r, 'x', 'min')], [nx + r.w / 2, edgeCands(r, 'x', 'max')]], thr);
-  const sz = bestSnap([[nz - r.d / 2, edgeCands(r, 'z', 'min')], [nz + r.d / 2, edgeCands(r, 'z', 'max')]], thr);
-  nx = sx !== null ? nx + sx : nx + (snapVal(nx - r.w / 2) - (nx - r.w / 2));
-  nz = sz !== null ? nz + sz : nz + (snapVal(nz - r.d / 2) - (nz - r.d / 2));
+  const sx = bestSnapC([[nx - r.w / 2, edgeCands(r, 'x', 'min')], [nx + r.w / 2, edgeCands(r, 'x', 'max')]], thr);
+  const sz = bestSnapC([[nz - r.d / 2, edgeCands(r, 'z', 'min')], [nz + r.d / 2, edgeCands(r, 'z', 'max')]], thr);
+  if (sx) planGuides.push({ a: 'x', v: sx.c }); if (sz) planGuides.push({ a: 'z', v: sz.c });
+  nx = sx ? nx + sx.d : nx + (snapVal(nx - r.w / 2) - (nx - r.w / 2));
+  nz = sz ? nz + sz.d : nz + (snapVal(nz - r.d / 2) - (nz - r.d / 2));
   return [nx, nz];
 }
 // dopo aver cambiato le misure: i mobili restano dove sono nella casa, quelli a parete seguono il loro muro
@@ -1472,7 +1508,7 @@ function dropPlanRoom(id){
 function buildPlanRoom(r){
   dropPlanRoom(r.id);
   if (!house.rooms.includes(r)) return;
-  const g = buildRoom(r, houseG, new THREE.Vector3(r.px, 0, r.pz), true);
+  const g = buildRoom(r, houseG, new THREE.Vector3(r.px, 0, r.pz), true, roomOpts(r));
   g.userData.rid = r.id;
   for (const it of r.items){
     const o = buildObject(it); if (!o) continue;
@@ -1482,6 +1518,7 @@ function buildPlanRoom(r){
   planGroups.set(r.id, g); collectTopHide(); planLamps();
 }
 function planRebuildAll(){ for (const id of [...planGroups.keys()]) dropPlanRoom(id); for (const r of house.rooms) buildPlanRoom(r); collectTopHide(); }
+function rebuildFamily(r){ const fam = new Set([r, ...kidsOf(r), ...house.rooms.filter((p) => contains(p, r))]); for (const x of fam) buildPlanRoom(x); }
 function collectTopHide(){ planTopHide = []; houseG.traverse((o) => { if (o.userData.surface === 'ceil' || o.userData.top) planTopHide.push(o); }); }
 function planLamps(){
   const night = (room || house.rooms[0] || PLAN_DEF).light.mode === 'notte'; let n = 0;
@@ -1506,7 +1543,7 @@ function planRestore(s){
 }
 function planUndoFn(){ if (!planUndo.length) return; planRedo.push(planSnapshot()); planRestore(planUndo.pop()); }
 function planRedoFn(){ if (!planRedo.length) return; planUndo.push(planSnapshot()); planRestore(planRedo.pop()); }
-function planCommit(){ house.upd = Date.now(); updateCost(); saveSoon(); updPlanTitle(); $('eSave').textContent = '💾'; }
+function planCommit(){ house.upd = Date.now(); updateCost(); saveSoon(); updPlanTitle(); $('eSave').innerHTML = '<svg class="i" aria-hidden="true"><use href="#i-save"/></svg>'; }
 function updPlanTitle(){
   const area = house.rooms.reduce((a, r) => a + (r.kind === 'interno' ? r.w * r.d : 0), 0);
   $('eRoom').textContent = 'Pianta della casa ▾';
@@ -1526,8 +1563,8 @@ function openPlan(h){
   if (!room && h.rooms.length) loadQuiet(h.rooms[0]); else if (!h.rooms.length) unloadRoom();
   roomG.visible = itemsG.visible = false; selBox.visible = false; wallHi.visible = false; controls.enabled = false; grid.visible = false;
   ov.hidden = false; $('pv').hidden = false; $('planBar').hidden = false; $('fpPad').hidden = true; $('badge').hidden = true;
-  $('pvT').textContent = '📷 Telecamera';
-  houseG.visible = true; renderer.shadowMap.autoUpdate = false;
+  $('pvT').innerHTML = '<svg class="i" aria-hidden="true"><use href="#i-camera"/></svg> Telecamera';
+  houseG.visible = true; renderer.shadowMap.autoUpdate = false; disposeGroup(ctxG);
   if (h.under && UNDER.hid !== h.id){
     UNDER.img = null; UNDER.hid = h.id;
     idb.get('under-' + h.id).then((url) => { if (url && UNDER.hid === h.id){ const im = new Image(); im.onload = () => { UNDER.img = im; }; im.src = url; } });
@@ -1558,7 +1595,7 @@ function planFit(){
 }
 function setSwap(v){
   planSwap = v; $('editor').classList.toggle('swap', v);
-  $('pvT').textContent = v ? '🗺️ Pianta' : '📷 Telecamera';
+  $('pvT').innerHTML = v ? '<svg class="i" aria-hidden="true"><use href="#i-map"/></svg> Pianta' : '<svg class="i" aria-hidden="true"><use href="#i-camera"/></svg> Telecamera';
   $('pvSwap').setAttribute('aria-label', v ? 'Torna alla pianta' : 'Guarda a schermo intero');
   $('fpPad').hidden = !v;
   setHelp(v ? 'Trascina per guardarti intorno, usa le frecce per camminare. Tocca la piantina in alto per tornare.' : 'Trascina la telecamera blu per spostarla e il pallino per decidere dove guarda.');
@@ -1650,10 +1687,8 @@ function drawRect(d){
   return { x0, x1, z0, z1 };
 }
 function wallSeg(d){
-  const r = d.r; const a = { x: snapVal(d.w0.x), z: snapVal(d.w0.z) }, b = { x: snapVal((d.w1 || d.w0).x), z: snapVal((d.w1 || d.w0).z) };
-  const dx = b.x - a.x, dz = b.z - a.z;
-  if (Math.abs(dz) < Math.abs(dx) * .2) b.z = a.z; else if (Math.abs(dx) < Math.abs(dz) * .2) b.x = a.x;
-  if (r){ const q = rectOf(r); for (const p of [a, b]){ p.x = clampN(p.x, q.x0 + .06, q.x1 - .06); p.z = clampN(p.z, q.z0 + .06, q.z1 - .06); } }
+  planGuides = []; lenTag = null;
+  const r = d.r, a = snapPt(d.w0, null), b = endPt(a, d.w1 || d.w0, null, r);
   return { a, b, len: Math.hypot(b.x - a.x, b.z - a.z) };
 }
 function drawPlanOverlay(W, H){
@@ -1675,12 +1710,18 @@ function drawPlanOverlay(W, H){
     g.beginPath(); g.rect(X(q.x0 - WT), Z(q.z0 - WT), (r.w + 2 * WT) * s, (r.d + 2 * WT) * s); g.rect(X(q.x0), Z(q.z0), r.w * s, r.d * s);
     g.fillStyle = r.kind === 'terrazza' ? 'rgba(110,160,205,.85)' : '#3a404c'; g.fill('evenodd');
   }
+  for (const r of house.rooms) for (const it of r.items){
+    if (!isWallT(it.t)) continue;
+    const [a, b] = wallEnds(it), th = it.t === 'parete' ? .12 * (it.sz || 1) : .06;
+    g.strokeStyle = it.t === 'parete' ? '#3a404c' : 'rgba(110,160,205,.9)'; g.lineWidth = Math.max(2, th * s); g.lineCap = 'butt';
+    g.beginPath(); g.moveTo(X(r.px + a.x), Z(r.pz + a.z)); g.lineTo(X(r.px + b.x), Z(r.pz + b.z)); g.stroke();
+  }
   for (const r of house.rooms){
     const q = rectOf(r), on = planSel && planSel.type === 'room' && planSel.r === r;
     dimH(g, X(q.x0), X(q.x1), Z(q.z0 - WT) - 13, r.w);
     dimV(g, Z(q.z0), Z(q.z1), X(q.x0 - WT) - 13, r.d);
     if (on){ dimH(g, X(q.x0), X(q.x1), Z(q.z1 + WT) + 13, r.w); dimV(g, Z(q.z0), Z(q.z1), X(q.x1 + WT) + 13, r.d); }
-    if (r.w * s > 74 && r.d * s > 44) pill(g, X(r.px), Z(r.pz), r.name, fmtA(r.w * r.d));
+    if (r.w * s > 74 && r.d * s > 44){ const [lx, lz] = labelPos(r); pill(g, X(lx), Z(lz), r.name, fmtA(r.w * r.d)); }
   }
   if (planSel && planSel.type === 'room' && house.rooms.includes(planSel.r)){
     const r = planSel.r, q = rectOf(r);
@@ -1688,22 +1729,36 @@ function drawPlanOverlay(W, H){
     handle(g, X(r.px), Z(q.z0 - WT / 2), true); handle(g, X(q.x1 + WT / 2), Z(r.pz), false);
     handle(g, X(r.px), Z(q.z1 + WT / 2), true); handle(g, X(q.x0 - WT / 2), Z(r.pz), false);
   }
-  if (planSel && planSel.type === 'item'){
+  const sw = selWall();
+  if (sw){
+    const [a, b] = wallEnds(sw.it), ax = X(sw.r.px + a.x), az = Z(sw.r.pz + a.z), bx = X(sw.r.px + b.x), bz = Z(sw.r.pz + b.z);
+    g.strokeStyle = ACC; g.lineWidth = 2; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(ax, az); g.lineTo(bx, bz); g.stroke(); g.setLineDash([]);
+    for (const [x, z] of [[ax, az], [bx, bz]]){ g.beginPath(); g.arc(x, z, 10, 0, Math.PI * 2); g.fillStyle = '#fff'; g.fill(); g.lineWidth = 3; g.strokeStyle = ACC; g.stroke(); g.beginPath(); g.arc(x, z, 3.5, 0, Math.PI * 2); g.fillStyle = ACC; g.fill(); }
+    const nx = -(bz - az), nz = bx - ax, nl = Math.hypot(nx, nz) || 1;
+    tag(g, (ax + bx) / 2 + nx / nl * 18, (az + bz) / 2 + nz / nl * 18, fmtM(Math.hypot(b.x - a.x, b.z - a.z)));
+  } else if (planSel && planSel.type === 'item'){
     const o = planObjs.get(planSel.u);
     if (o){ const b = new THREE.Box3().setFromObject(o); g.setLineDash([5, 4]); g.strokeStyle = ACC; g.lineWidth = 2; g.strokeRect(X(b.min.x) - 3, Z(b.min.z) - 3, (b.max.x - b.min.x) * s + 6, (b.max.z - b.min.z) * s + 6); g.setLineDash([]); }
   }
   if (pd && pd.moved && pd.kind === 'draw'){
-    const q = drawRect(pd);
+    const keepG = planGuides; const q = drawRect(pd); planGuides = keepG;
     g.fillStyle = 'rgba(47,109,246,.14)'; g.fillRect(X(q.x0), Z(q.z0), (q.x1 - q.x0) * s, (q.z1 - q.z0) * s);
     g.strokeStyle = ACC; g.lineWidth = 2; g.setLineDash([7, 5]); g.strokeRect(X(q.x0), Z(q.z0), (q.x1 - q.x0) * s, (q.z1 - q.z0) * s); g.setLineDash([]);
     dimH(g, X(q.x0), X(q.x1), Z(q.z0) - 14, q.x1 - q.x0); dimV(g, Z(q.z0), Z(q.z1), X(q.x0) - 14, q.z1 - q.z0);
   }
   if (pd && pd.moved && (pd.kind === 'wall' || pd.kind === 'scale')){
-    const sg = pd.kind === 'wall' ? wallSeg(pd) : { a: pd.w0, b: pd.w1 || pd.w0, len: Math.hypot((pd.w1 || pd.w0).x - pd.w0.x, (pd.w1 || pd.w0).z - pd.w0.z) };
+    const sg = pd.kind === 'wall' ? pd.seg || wallSeg(pd) : { a: pd.w0, b: pd.w1 || pd.w0, len: Math.hypot((pd.w1 || pd.w0).x - pd.w0.x, (pd.w1 || pd.w0).z - pd.w0.z) };
     g.strokeStyle = pd.kind === 'wall' ? ACC : '#e8590c'; g.lineWidth = pd.kind === 'wall' ? Math.max(3, .12 * s) : 3; g.lineCap = 'round';
     g.beginPath(); g.moveTo(X(sg.a.x), Z(sg.a.z)); g.lineTo(X(sg.b.x), Z(sg.b.z)); g.stroke(); g.lineCap = 'butt';
     tag(g, (X(sg.a.x) + X(sg.b.x)) / 2, (Z(sg.a.z) + Z(sg.b.z)) / 2 - 16, fmtM(sg.len));
   }
+  // linee guida: allineato a un muro o a una stanza che c'è già
+  if (planGuides.length){
+    g.save(); g.strokeStyle = '#e8590c'; g.lineWidth = 1.2; g.setLineDash([8, 6]);
+    for (const gd of planGuides){ g.beginPath(); if (gd.a === 'x'){ g.moveTo(X(gd.v), 0); g.lineTo(X(gd.v), H); } else { g.moveTo(0, Z(gd.v)); g.lineTo(W, Z(gd.v)); } g.stroke(); }
+    g.restore();
+  }
+  if (lenTag && pd){ const P2 = lenTag; g.font = '800 11px Inter, system-ui, sans-serif'; const tw = g.measureText(P2.t).width + 14; rrect(g, X(P2.x) - tw / 2, Z(P2.z) - 30, tw, 18, 9); g.fillStyle = '#e8590c'; g.fill(); g.fillStyle = '#fff'; g.fillText(P2.t, X(P2.x), Z(P2.z) - 21); }
   // telecamera: campo visivo, linea verso il punto guardato
   const C = house.cam, cx = X(C.x), cz = Z(C.z), tx = X(C.tx), tz = Z(C.tz);
   const yaw = Math.atan2(C.tx - C.x, C.tz - C.z);
@@ -1719,6 +1774,103 @@ function drawPlanOverlay(W, H){
   g.save(); g.translate(cx, cz); g.rotate(Math.atan2(Math.cos(yaw), Math.sin(yaw)));
   g.fillStyle = '#fff'; rrect(g, -8, -5, 11, 10, 2); g.fill(); g.beginPath(); g.moveTo(3, -2.5); g.lineTo(9, -6); g.lineTo(9, 6); g.lineTo(3, 2.5); g.closePath(); g.fill();
   g.restore();
+}
+
+/* ---------- muri divisori: estremità, agganci, linee guida ---------- */
+const isWallT = (t) => t === 'parete' || t === 'paretevetro';
+function wallEnds(it){ const L = (it.sx || 1) * 2, dx = Math.cos(it.ry), dz = -Math.sin(it.ry); return [{ x: it.x - dx * L / 2, z: it.z - dz * L / 2 }, { x: it.x + dx * L / 2, z: it.z + dz * L / 2 }]; }
+function selWall(){
+  if (!planSel || planSel.type !== 'item' || !planSel.r || !house.rooms.includes(planSel.r)) return null;
+  const it = planSel.r.items.find((i) => i.u === planSel.u);
+  return it && isWallT(it.t) ? { r: planSel.r, it } : null;
+}
+function segDist(px, pz, a, b){ const vx = b.x - a.x, vz = b.z - a.z, L2 = vx * vx + vz * vz || 1; const t = clampN(((px - a.x) * vx + (pz - a.z) * vz) / L2, 0, 1); return Math.hypot(px - (a.x + vx * t), pz - (a.z + vz * t)); }
+// valori a cui agganciarsi: facce interne delle stanze ed estremità degli altri muri (coordinate della casa)
+function axisCands(axis, exceptU){
+  const c = [];
+  for (const r of house.rooms){
+    if (typeof r.px !== 'number') continue;
+    const q = rectOf(r); axis === 'x' ? c.push(q.x0, q.x1) : c.push(q.z0, q.z1);
+    for (const it of r.items){ if (!isWallT(it.t) || it.u === exceptU) continue; for (const e of wallEnds(it)) c.push(axis === 'x' ? r.px + e.x : r.pz + e.z); }
+  }
+  return c;
+}
+function snapAxisV(v, axis, exceptU){ const s = bestSnapC([[v, axisCands(axis, exceptU)]], snapThr()); if (s){ planGuides.push({ a: axis, v: s.c }); return s.c; } return null; }
+function snapPt(p, exceptU){ const x = snapAxisV(p.x, 'x', exceptU), z = snapAxisV(p.z, 'z', exceptU); return { x: x ?? snapVal(p.x), z: z ?? snapVal(p.z) }; }
+// estremità mobile di un muro: dritto se quasi dritto, agganci, stessa lunghezza di un altro muro, dentro la stanza
+function endPt(a, raw, exceptU, r){
+  let b = { x: raw.x, z: raw.z };
+  const dx = b.x - a.x, dz = b.z - a.z;
+  const straightX = Math.abs(dz) < Math.abs(dx) * .27, straightZ = Math.abs(dx) < Math.abs(dz) * .27;
+  b = snapPt(b, exceptU);
+  if (straightX){ b.z = a.z; planGuides = planGuides.filter((g) => g.a !== 'z'); }
+  if (straightZ){ b.x = a.x; planGuides = planGuides.filter((g) => g.a !== 'x'); }
+  if (straightX || straightZ){
+    const L = Math.hypot(b.x - a.x, b.z - a.z), lens = [];
+    for (const rr of house.rooms){ lens.push(rr.w, rr.d); for (const it of rr.items) if (isWallT(it.t) && it.u !== exceptU) lens.push((it.sx || 1) * 2); }
+    const hit = planGuides.length ? null : bestSnapC([[L, lens]], snapThr());
+    if (hit && L > .2){ const k = hit.c / L; b = { x: a.x + (b.x - a.x) * k, z: a.z + (b.z - a.z) * k }; lenTag = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, t: 'Stessa misura: ' + fmtM(hit.c) }; }
+  }
+  if (r){ const q = rectOf(r); b.x = clampN(b.x, q.x0, q.x1); b.z = clampN(b.z, q.z0, q.z1); }
+  return b;
+}
+function setWall(r, it, a, b){
+  const L = Math.max(.1, Math.hypot(b.x - a.x, b.z - a.z));
+  it.x = (a.x + b.x) / 2; it.z = (a.z + b.z) / 2; it.ry = Math.atan2(-(b.z - a.z), b.x - a.x); it.sx = L / 2;
+  const o = objs.get(it.u); if (o && room === r) applyTransform(o, it);
+  const po = planObjs.get(it.u); if (po) applyTransform(po, it);
+}
+function moveWall(d, w){
+  const r = d.r, [a0, b0] = d.ends0, dx = w.x - d.w0.x, dz = w.z - d.w0.z;
+  const wa = { x: r.px + a0.x + dx, z: r.pz + a0.z + dz }, wb = { x: r.px + b0.x + dx, z: r.pz + b0.z + dz };
+  const thr = snapThr();
+  const sx = bestSnapC([[wa.x, axisCands('x', d.u)], [wb.x, axisCands('x', d.u)]], thr), sz = bestSnapC([[wa.z, axisCands('z', d.u)], [wb.z, axisCands('z', d.u)]], thr);
+  let ox = sx ? sx.d : snapVal(wa.x) - wa.x, oz = sz ? sz.d : snapVal(wa.z) - wa.z;
+  if (sx) planGuides.push({ a: 'x', v: sx.c }); if (sz) planGuides.push({ a: 'z', v: sz.c });
+  const q = rectOf(r); let A = { x: wa.x + ox, z: wa.z + oz }, B = { x: wb.x + ox, z: wb.z + oz };
+  const fx = Math.max(0, q.x0 - Math.min(A.x, B.x)) - Math.max(0, Math.max(A.x, B.x) - q.x1), fz = Math.max(0, q.z0 - Math.min(A.z, B.z)) - Math.max(0, Math.max(A.z, B.z) - q.z1);
+  A = { x: A.x + fx - r.px, z: A.z + fz - r.pz }; B = { x: B.x + fx - r.px, z: B.z + fz - r.pz };
+  setWall(r, d.it, A, B);
+}
+function stretchWall(d, w){
+  const r = d.r, fixed = d.ends0[1 - d.end], fw = { x: r.px + fixed.x, z: r.pz + fixed.z };
+  const b = endPt(fw, w, d.u, r), loc = { x: b.x - r.px, z: b.z - r.pz };
+  if (Math.hypot(loc.x - fixed.x, loc.z - fixed.z) < .2) return;
+  if (d.end === 1) setWall(r, d.it, fixed, loc); else setWall(r, d.it, loc, fixed);
+}
+function planNudge(dx, dz){
+  const S = planSel; if (!S) return;
+  const before = planSnapshot();
+  if (S.type === 'room'){
+    const r = S.r, kids = kidsOf(r);
+    if (overlaps(r, r.px + dx, r.pz + dz, r.w, r.d, kids) || kids.some((k) => overlaps(k, k.px + dx, k.pz + dz, k.w, k.d, [r, ...kids]))){ toast('Lì tocca un\'altra stanza'); return; }
+    for (const x of [r, ...kids]){ x.px += dx; x.pz += dz; }
+    rebuildFamily(r); house.rooms.forEach((x) => { if (contains(x, r)) buildPlanRoom(x); });
+  } else if (S.type === 'item'){
+    const ws = selWall();
+    if (ws){ const [a, b] = wallEnds(ws.it), q = rectOf(ws.r); const ok = [a, b].every((e) => { const x = ws.r.px + e.x + dx, z = ws.r.pz + e.z + dz; return x >= q.x0 - 1e-6 && x <= q.x1 + 1e-6 && z >= q.z0 - 1e-6 && z <= q.z1 + 1e-6; }); if (!ok){ toast('Il muro è già contro la parete'); return; } loadQuiet(ws.r); setWall(ws.r, ws.it, { x: a.x + dx, z: a.z + dz }, { x: b.x + dx, z: b.z + dz }); }
+    else { const r = S.r; loadQuiet(r); sel = S.u; const it = selItem(), o = objs.get(S.u); if (!it || !o) return; if (!tryMove(it, o, it.x + dx, it.y, it.z + dz)){ toast('Lì c\'è già qualcosa'); return; } const po = planObjs.get(it.u); if (po) applyTransform(po, it); }
+  }
+  pushBefore(before); planCommit();
+}
+function nudgeRow(label){ return `<div class="grp"><label>${label}</label><div class="nudge"><button class="btn" type="button" data-pa="nx-" aria-label="A sinistra">←</button><button class="btn" type="button" data-pa="nz-" aria-label="In alto">↑</button><button class="btn" type="button" data-pa="nz+" aria-label="In basso">↓</button><button class="btn" type="button" data-pa="nx+" aria-label="A destra">→</button></div></div>`; }
+function labelPos(r){
+  const kids = kidsOf(r); if (!kids.some((k) => insideRoom(k, r.px, r.pz))) return [r.px, r.pz];
+  const q = rectOf(r), ox = 66 / pv.s, oz = 30 / pv.s;
+  for (const c of [[q.x0 + ox, q.z0 + oz], [q.x1 - ox, q.z0 + oz], [q.x0 + ox, q.z1 - oz], [q.x1 - ox, q.z1 - oz]]) if (!kids.some((k) => { const b = rectOf(k); return c[0] > b.x0 - WT - ox && c[0] < b.x1 + WT + ox && c[1] > b.z0 - WT - oz && c[1] < b.z1 + WT + oz; })) return c;
+  return [q.x0 + ox, q.z0 + oz];
+}
+// nella vista 3D di una stanza si vedono anche le stanze disegnate dentro (per esempio dentro la casa)
+const ctxG = new THREE.Group(); scene.add(ctxG);
+function buildContext(){
+  disposeGroup(ctxG);
+  if (!house || !room || typeof room.px !== 'number') return;
+  for (const o of house.rooms){
+    if (!contains(room, o)) continue;
+    const g = buildRoom(o, ctxG, new THREE.Vector3(o.px - room.px, 0, o.pz - room.pz), true, roomOpts(o));
+    for (const it of o.items){ const ob = buildObject(it); if (ob){ tuneEnv(ob); g.add(ob); } }
+    g.traverse((m) => { if (m.userData.surface === 'ceil') m.visible = false; });
+  }
 }
 
 /* ---------- tocchi e trascinamenti sulla pianta ---------- */
@@ -1742,15 +1894,23 @@ function planHit(P, w){
   if (planTool === 'scala') return { kind: 'scale' };
   if (planTool === 'stanza') return { kind: 'draw' };
   if (planTool === 'muro' || planTool === 'murovetro') return { kind: 'wall', r: roomAt(w.x, w.z) };
-  // i muri si trascinano sempre per allargare (prima quelli della stanza selezionata)
+  // maniglie alle estremità del muro selezionato: allunga / accorcia
+  const ws = selWall(), wl = [];
+  if (ws) wl.push(ws);
+  for (const rr of house.rooms) for (const it of rr.items) if (isWallT(it.t) && (!ws || it.u !== ws.it.u)) wl.push({ r: rr, it });
+  for (const x of wl){ const [a, b] = wallEnds(x.it), Lp = (x.it.sx || 1) * 2 * pv.s, thr = Math.min(x === ws ? 18 : 14, Lp * .22); for (const [k, e] of [[0, a], [1, b]]) if (dpx(x.r.px + e.x, x.r.pz + e.z) < thr) return { kind: 'wend', r: x.r, u: x.it.u, end: k }; }
+  // i muri si trascinano sempre per allargare (prima quelli della stanza selezionata, poi le più piccole)
   const sr = planSel && planSel.type === 'room' && house.rooms.includes(planSel.r) ? planSel.r : null;
-  for (const r2 of sr ? [sr, ...house.rooms] : house.rooms){ if (r2.kind === 'esterno' && r2 !== sr) continue; const e = edgeHit(r2, w); if (e >= 0) return { kind: 'edge', r: r2, e }; }
+  const bySize = house.rooms.slice().sort((x, y) => x.w * x.d - y.w * y.d);
+  for (const r2 of sr ? [sr, ...bySize] : bySize){ if (r2.kind === 'esterno' && r2 !== sr) continue; const e = edgeHit(r2, w); if (e >= 0) return { kind: 'edge', r: r2, e }; }
+  // i muri divisori si prendono anche toccando la loro fascia scura
+  for (const rr of house.rooms) for (const it of rr.items){ if (!isWallT(it.t)) continue; const [a, b] = wallEnds(it); if (segDist(w.x - rr.px, w.z - rr.pz, a, b) < WT / 2 + 8 / pv.s) return { kind: 'wmove', r: rr, u: it.u }; }
   // l'etichetta con il nome seleziona la stanza (anche se sotto c'è un mobile)
-  for (const r2 of house.rooms){ if (r2.w * pv.s > 74 && r2.d * pv.s > 44 && Math.abs((w.x - r2.px) * pv.s) < 58 && Math.abs((w.z - r2.pz) * pv.s) < 20) return { kind: 'room', r: r2 }; }
+  for (const r2 of house.rooms){ if (r2.w * pv.s > 74 && r2.d * pv.s > 44){ const [lx, lz] = labelPos(r2); if (Math.abs((w.x - lx) * pv.s) < 58 && Math.abs((w.z - lz) * pv.s) < 20) return { kind: 'room', r: r2 }; } }
   updateOcam(P.W, P.H); ndc.set(P.sx / P.W * 2 - 1, -(P.sy / P.H) * 2 + 1); ray.setFromCamera(ndc, ocam);
   const ms = []; for (const o of planObjs.values()){ if (o.userData.top) continue; o.traverse((m) => { if (m.isMesh) ms.push(m); }); }
   const h = ray.intersectObjects(ms, false)[0];
-  if (h){ const u = h.object.userData.item, po = planObjs.get(u), rr = po && roomById(po.userData.rid); if (rr) return { kind: 'item', r: rr, u }; }
+  if (h){ const u = h.object.userData.item, po = planObjs.get(u), rr = po && roomById(po.userData.rid); if (rr){ const it = rr.items.find((i) => i.u === u); return { kind: it && isWallT(it.t) ? 'wmove' : 'item', r: rr, u }; } }
   const r = roomAt(w.x, w.z); if (r) return { kind: 'room', r };
   return { kind: 'pan' };
 }
@@ -1811,23 +1971,34 @@ function startPlanDrag(d){
     d.off = { x: d.it.x - (d.w0.x - r.px), z: d.it.z - (d.w0.z - r.pz) };
     const b = objBox(d.o); d.small = b.max.y - b.min.y < .6;
     planSel = { type: 'item', r, u: d.u };
-  } else if (d.kind === 'room'){ d.px0 = d.r.px; d.pz0 = d.r.pz; planSel = { type: 'room', r: d.r }; }
+  } else if (d.kind === 'wmove' || d.kind === 'wend'){
+    loadQuiet(d.r); sel = d.u; d.it = d.r.items.find((i) => i.u === d.u); d.o = objs.get(d.u);
+    if (!d.it){ d.kind = 'pan'; return; }
+    d.ends0 = wallEnds(d.it); planSel = { type: 'item', r: d.r, u: d.u };
+  } else if (d.kind === 'room'){ d.px0 = d.r.px; d.pz0 = d.r.pz; d.kids = kidsOf(d.r).map((k) => [k, k.px, k.pz]); planSel = { type: 'room', r: d.r }; }
   else if (d.kind === 'edge'){ planSel = { type: 'room', r: d.r }; d.q0 = rectOf(d.r); d.items0 = clone(d.r.items); d.opx = d.r.px; d.opz = d.r.pz; }
   else if (d.kind === 'cam' || d.kind === 'tgt') planSel = { type: 'cam' };
   else if (d.kind === 'under'){ d.ux = house.under.x; d.uz = house.under.z; planSel = { type: 'under' }; }
 }
 function movePlanDrag(d, P, w, e){
-  const C = house.cam;
+  const C = house.cam; planGuides = []; lenTag = null;
   if (d.kind === 'pan'){ pv.cx = d.cx - (P.sx - d.sx) / pv.s; pv.cz = d.cz - (P.sy - d.sy) / pv.s; }
   else if (d.kind === 'look'){ lookBy(e.clientX - d.lx, e.clientY - d.ly); d.lx = e.clientX; d.ly = e.clientY; }
   else if (d.kind === 'cam'){ C.x = w.x; C.z = w.z; }
   else if (d.kind === 'tgt'){ C.tx = w.x; C.tz = w.z; }
   else if (d.kind === 'under'){ house.under.x = d.ux + (w.x - d.w0.x); house.under.z = d.uz + (w.z - d.w0.z); }
-  else if (d.kind === 'draw' || d.kind === 'wall' || d.kind === 'scale') d.w1 = w;
+  else if (d.kind === 'draw' || d.kind === 'scale'){ d.w1 = w; if (d.kind === 'draw') drawRect(d); }
+  else if (d.kind === 'wall'){ d.w1 = w; d.seg = wallSeg(d); }
   else if (d.kind === 'room'){
-    const r = d.r; let [nx, nz] = snapRoomPos(r, d.px0 + (w.x - d.w0.x), d.pz0 + (w.z - d.w0.z));
-    if (!overlaps(r, nx, nz, r.w, r.d)){ r.px = nx; r.pz = nz; const g = planGroups.get(r.id); if (g) g.position.set(nx, 0, nz); }
+    const r = d.r, kids = d.kids.map((k) => k[0]); snapIgnore = kids;
+    let [nx, nz] = snapRoomPos(r, d.px0 + (w.x - d.w0.x), d.pz0 + (w.z - d.w0.z)); snapIgnore = [];
+    const dx = nx - d.px0, dz = nz - d.pz0;
+    const ok = !overlaps(r, nx, nz, r.w, r.d, kids) && d.kids.every(([k, x, z]) => !overlaps(k, x + dx, z + dz, k.w, k.d, [r, ...kids]));
+    if (ok){ r.px = nx; r.pz = nz; const g = planGroups.get(r.id); if (g) g.position.set(nx, 0, nz);
+      for (const [k, x, z] of d.kids){ k.px = x + dx; k.pz = z + dz; const gk = planGroups.get(k.id); if (gk) gk.position.set(k.px, 0, k.pz); } }
   } else if (d.kind === 'edge') resizeEdge(d, w);
+  else if (d.kind === 'wmove') moveWall(d, w);
+  else if (d.kind === 'wend') stretchWall(d, w);
   else if (d.kind === 'item') dragPlanItem(d, w);
 }
 function resizeEdge(d, w){
@@ -1841,7 +2012,7 @@ function resizeEdge(d, w){
   if (Math.abs(nw - r.w) < 1e-4 && Math.abs(nd - r.d) < 1e-4 && Math.abs(nx - r.px) < 1e-4 && Math.abs(nz - r.pz) < 1e-4) return;
   r.w = nw; r.d = nd; r.px = nx; r.pz = nz;
   refitItems(r, d.items0, d.opx, d.opz);
-  planDirty.add(r);
+  planDirty.add(r); for (const k of kidsOf(r)) planDirty.add(k); for (const p2 of house.rooms) if (contains(p2, r)) planDirty.add(p2);
 }
 function dragPlanItem(d, w){
   const r = d.r, it = d.it, o = d.o, def = d.def;
@@ -1859,6 +2030,8 @@ function dragPlanItem(d, w){
   const po = planObjs.get(it.u); if (po) applyTransform(po, it);
 }
 function endPlanDrag(d){
+  planGuides = []; lenTag = null;
+  if (d.kind === 'room'){ rebuildFamily(d.r); house.rooms.forEach((x) => { if (contains(x, d.r) || contains(d.r, x)) buildPlanRoom(x); }); }
   if (d.kind === 'edge'){
     const r = d.r; loadQuiet(r, true);
     for (const it of r.items){ if (IT[it.t] && IT[it.t].mount === 'floor'){ const o = objs.get(it.u); if (o) clampInside(it, o); } }
@@ -1872,6 +2045,7 @@ function endPlanDrag(d){
 }
 function planTap(d){
   if (['look', 'draw', 'wall', 'scale', 'under'].includes(d.kind)) return;
+  if (d.kind === 'wmove' || d.kind === 'wend'){ loadQuiet(d.r); sel = d.u; planSel = { type: 'item', r: d.r, u: d.u }; renderProps(); return; }
   if (d.kind === 'cam' || d.kind === 'tgt') planSel = { type: 'cam' };
   else if (d.kind === 'item'){ loadQuiet(d.r); sel = d.u; planSel = { type: 'item', r: d.r, u: d.u }; }
   else if (d.kind === 'room' || d.kind === 'edge'){ loadQuiet(d.r); planSel = { type: 'room', r: d.r }; }
@@ -1889,7 +2063,7 @@ function finishDrawRoom(d){
   nr.light.mode = (room || PLAN_DEF).light.mode;
   house.rooms.push(nr);
   if (house.rooms.length === 1) house.cam = camForRoom(nr);
-  loadQuiet(nr); buildPlanRoom(nr); planSel = { type: 'room', r: nr };
+  loadQuiet(nr); rebuildFamily(nr); planSel = { type: 'room', r: nr };
   pushBefore(d.before); planCommit(); setTool('sel');
   toast('Stanza creata: trascina i pallini blu per cambiarne le misure');
 }
@@ -1902,6 +2076,7 @@ function finishDrawWall(d){
   it.x = (sg.a.x + sg.b.x) / 2 - r.px; it.z = (sg.a.z + sg.b.z) / 2 - r.pz;
   it.ry = Math.atan2(-(sg.b.z - sg.a.z), sg.b.x - sg.a.x); it.sx = sg.len / 2;
   it.sy = r.kind === 'interno' ? r.h / (t === 'parete' ? 2.7 : 2.6) : 1;
+  if (t === 'parete') it.sz = WT / .12; // stesso spessore dei muri della stanza
   r.items.push(it); addObject(it); buildPlanRoom(r);
   planSel = { type: 'item', r, u: it.u }; sel = it.u;
   pushBefore(d.before); planCommit();
@@ -1958,7 +2133,26 @@ function targetRoom(){
   const C = house.cam;
   return roomAt(C.tx, C.tz) || roomAt(C.x, C.z) || room || house.rooms[0] || null;
 }
+// sul telefono il pannello parte piccolo (solo il titolo) per non coprire la pianta e gli strumenti
+let propsMini = true, propsKey = '';
 function renderPlanProps(p){
+  renderPlanPropsFull(p);
+  const key = planSel ? planSel.type + ':' + (planSel.u || (planSel.r && planSel.r.id) || '') : '';
+  if (key !== propsKey){ propsKey = key; propsMini = true; }
+  const small = window.innerWidth < 1000 && !p.hidden && !!planSel;
+  p.classList.toggle('mini', small && propsMini);
+  const cp = $('catPanel'); p.style.bottom = small && propsMini && cp && !cp.hidden ? cp.offsetHeight + 'px' : '';
+  p.style.borderRadius = small && propsMini ? '16px 16px 0 0' : '';
+  const h = p.querySelector('.ph1');
+  if (small && h && !h.querySelector('[data-mini]')){
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn icon ghost minib'; b.dataset.mini = '1';
+    b.textContent = propsMini ? '▴' : '▾'; b.setAttribute('aria-label', propsMini ? 'Apri le opzioni' : 'Riduci');
+    b.addEventListener('click', (e) => { e.stopPropagation(); propsMini = !propsMini; renderPlanProps(p); });
+    h.insertBefore(b, h.lastElementChild);
+    h.addEventListener('click', (e) => { if (propsMini && !e.target.closest('button')){ propsMini = false; renderPlanProps(p); } });
+  }
+}
+function renderPlanPropsFull(p){
   const wide = window.innerWidth >= 1000, S = planSel;
   if (S && S.r && !house.rooms.includes(S.r)) planSel = null;
   if (!planSel){
@@ -1972,7 +2166,7 @@ function renderPlanProps(p){
         <li><b>Sposta</b>: trascina il pavimento di una stanza o un mobile.</li>
         <li><b>Telecamera</b>: trascina l'icona blu per spostarla e il pallino bianco per decidere dove guarda. In alto a destra vedi la casa in 3D, in tempo reale.</li>
         <li><b>Libreria</b>: tocca un mobile per metterlo nella stanza selezionata.</li></ul></div>
-      <div class="row"><button class="btn main" type="button" data-pa="swap">📷 Guarda con la telecamera</button></div>`;
+      <div class="row"><button class="btn main" type="button" data-pa="swap"><svg class="i" aria-hidden="true"><use href="#i-camera"/></svg> Guarda con la telecamera</button></div>`;
     return;
   }
   p.hidden = false;
@@ -1986,29 +2180,38 @@ function renderPlanProps(p){
         ${r.kind === 'interno' ? `<label for="prh">Altezza (cm)<input type="number" id="prh" data-pd="h" min="220" max="500" step="5" value="${Math.round(r.h * 100)}"></label>` : ''}</div>
         <p class="note">Oppure trascina i pallini blu sui muri. Le stanze si agganciano da sole ai muri vicini.</p></div>
       <div class="grp"><label>Pavimento</label><div class="fins">${M.FLOORS.map((f) => `<button class="fin" type="button" data-pf="${esc(f.k)}" aria-pressed="${f.k === r.floor.k}"><img src="${M.swatchURL('floor', f.k, f.color ? (r.floor.c || '#d9d4cc') : null)}" alt=""><span>${esc(f.n)}</span></button>`).join('')}</div></div>
-      <div class="grp"><div class="row"><button class="btn main" type="button" data-pa="open3d">🛋️ Arreda in 3D</button><button class="btn" type="button" data-pa="camhere">📷 Telecamera qui</button></div>
-      <div class="row"><button class="btn" type="button" data-pa="duproom">⧉ Duplica</button><button class="btn danger" type="button" data-pa="delroom">🗑️ Elimina</button></div></div>`;
+      ${nudgeRow('Sposta la stanza')}
+      <div class="grp"><div class="row"><button class="btn main" type="button" data-pa="open3d"><svg class="i" aria-hidden="true"><use href="#i-sofa"/></svg> Arreda in 3D</button><button class="btn" type="button" data-pa="camhere"><svg class="i" aria-hidden="true"><use href="#i-camera"/></svg> Telecamera qui</button></div>
+      <div class="row"><button class="btn" type="button" data-pa="duproom">⧉ Duplica</button><button class="btn danger" type="button" data-pa="delroom"><svg class="i" aria-hidden="true"><use href="#i-trash"/></svg> Elimina</button></div></div>`;
+  } else if (planSel.type === 'item' && selWall()){
+    const { it } = selWall(), L = (it.sx || 1) * 2;
+    p.innerHTML = `<div class="ph1"><h3>${esc(IT[it.t].n)}</h3><small>${fmtM(L)}</small><button class="btn icon ghost" type="button" data-pa="close" aria-label="Chiudi">✕</button></div>
+      <div class="grp"><div class="nums"><label for="pwl">Lunghezza (cm)<input type="number" id="pwl" data-pw="len" min="20" max="3000" step="1" value="${Math.round(L * 100)}"></label></div>
+      <p class="note">Oppure trascina i pallini bianchi alle estremità per allungarlo o accorciarlo. Trascina il muro per spostarlo: le linee arancioni ti dicono quando è allineato.</p></div>
+      ${nudgeRow('Sposta il muro')}
+      <div class="grp"><div class="row"><button class="btn" type="button" data-pa="wrot">↻ Gira di 90°</button><button class="btn" type="button" data-pa="dupitem">⧉ Duplica</button><button class="btn danger" type="button" data-pa="delitem"><svg class="i" aria-hidden="true"><use href="#i-trash"/></svg> Elimina</button></div></div>`;
   } else if (planSel.type === 'item'){
     const it = planSel.r.items.find((i) => i.u === planSel.u); if (!it){ planSel = null; return renderPlanProps(p); }
     const d = IT[it.t], o = planObjs.get(it.u), sz = o ? new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()) : new THREE.Vector3();
     p.innerHTML = `<div class="ph1"><h3>${esc(d.n)}</h3><small>${Math.round(sz.x * 100)}×${Math.round(sz.z * 100)}×${Math.round(sz.y * 100)} cm</small><button class="btn icon ghost" type="button" data-pa="close" aria-label="Chiudi">✕</button></div>
       <p class="note">In: ${esc(planSel.r.name)} · ${d.price ? euro(d.price) : 'creato da te'}</p>
-      <div class="grp"><div class="row">${d.mount === 'floor' ? '<button class="btn" type="button" data-pa="rot-90">↺ 90°</button><button class="btn" type="button" data-pa="rot90">↻ 90°</button>' : ''}<button class="btn" type="button" data-pa="dupitem">⧉ Duplica</button><button class="btn danger" type="button" data-pa="delitem">🗑️ Elimina</button></div>
-      <div class="row"><button class="btn main" type="button" data-pa="edititem">🎨 Colori e misure in 3D</button></div></div>
+      <div class="grp"><div class="row">${d.mount === 'floor' ? '<button class="btn" type="button" data-pa="rot-90">↺ 90°</button><button class="btn" type="button" data-pa="rot90">↻ 90°</button>' : ''}<button class="btn" type="button" data-pa="dupitem">⧉ Duplica</button><button class="btn danger" type="button" data-pa="delitem"><svg class="i" aria-hidden="true"><use href="#i-trash"/></svg> Elimina</button></div>
+      <div class="row"><button class="btn main" type="button" data-pa="edititem"><svg class="i" aria-hidden="true"><use href="#i-palette"/></svg> Colori e misure in 3D</button></div></div>
+      ${d.mount === 'floor' ? nudgeRow('Sposta di 5 cm') : ''}
       <p class="note">${d.mount === 'wall' ? 'Trascinalo lungo i muri della stanza.' : 'Trascinalo sulla pianta per spostarlo. I soprammobili si appoggiano da soli su tavoli e mensole.'}</p>`;
   } else if (planSel.type === 'cam'){
     const C = house.cam;
-    p.innerHTML = `<div class="ph1"><h3>📷 Telecamera</h3><button class="btn icon ghost" type="button" data-pa="close" aria-label="Chiudi">✕</button></div>
+    p.innerHTML = `<div class="ph1"><h3><svg class="i" aria-hidden="true"><use href="#i-camera"/></svg> Telecamera</h3><button class="btn icon ghost" type="button" data-pa="close" aria-label="Chiudi">✕</button></div>
       <div class="grp"><div class="slider"><span>Altezza occhi</span><input type="range" min="40" max="260" step="5" value="${Math.round(C.h * 100)}" data-pc="h" aria-label="Altezza occhi"><output>${Math.round(C.h * 100)} cm</output></div>
       <div class="slider"><span>Obiettivo</span><input type="range" min="35" max="100" step="1" value="${Math.round(C.fov || 62)}" data-pc="fov" aria-label="Ampiezza della vista"><output>${Math.round(C.fov || 62)}°</output></div></div>
       <div class="row"><button class="btn main" type="button" data-pa="swap">⤢ Guarda a schermo intero</button><button class="btn" type="button" data-pa="camhere">Rimetti nella stanza</button></div>
       <p class="note">Trascina l'icona blu per spostarla, il pallino bianco per decidere dove guarda. Puoi anche trascinare dentro la vista 3D per girarti.</p>`;
   } else if (planSel.type === 'under'){
     const U = house.under; if (!U){ planSel = null; return renderPlanProps(p); }
-    p.innerHTML = `<div class="ph1"><h3>📐 Piantina caricata</h3><button class="btn icon ghost" type="button" data-pa="close" aria-label="Chiudi">✕</button></div>
+    p.innerHTML = `<div class="ph1"><h3><svg class="i" aria-hidden="true"><use href="#i-ruler"/></svg> Piantina caricata</h3><button class="btn icon ghost" type="button" data-pa="close" aria-label="Chiudi">✕</button></div>
       <div class="grp"><div class="slider"><span>Visibilità</span><input type="range" min="10" max="100" step="5" value="${Math.round((U.op ?? .55) * 100)}" data-pu="op" aria-label="Visibilità della piantina"><output>${Math.round((U.op ?? .55) * 100)}%</output></div></div>
-      <div class="grp"><div class="row"><button class="btn main" type="button" data-pa="underscale">📏 Metti in scala</button><button class="btn" type="button" data-pa="undermove">✋ Sposta</button></div>
-      <div class="row"><button class="btn" type="button" data-pa="undertrace">✏️ Ricalca le stanze</button><button class="btn" type="button" data-pa="undershow">${U.show === false ? '👁️ Mostra' : '🙈 Nascondi'}</button><button class="btn danger" type="button" data-pa="underdel">🗑️ Togli</button></div></div>
+      <div class="grp"><div class="row"><button class="btn main" type="button" data-pa="underscale"><svg class="i" aria-hidden="true"><use href="#i-ruler"/></svg> Metti in scala</button><button class="btn" type="button" data-pa="undermove"><svg class="i" aria-hidden="true"><use href="#i-move"/></svg> Sposta</button></div>
+      <div class="row"><button class="btn" type="button" data-pa="undertrace"><svg class="i" aria-hidden="true"><use href="#i-pencil"/></svg> Ricalca le stanze</button><button class="btn" type="button" data-pa="undershow">${U.show === false ? '<svg class="i" aria-hidden="true"><use href="#i-eye"/></svg> Mostra' : '<svg class="i" aria-hidden="true"><use href="#i-eyeoff"/></svg> Nascondi'}</button><button class="btn danger" type="button" data-pa="underdel"><svg class="i" aria-hidden="true"><use href="#i-trash"/></svg> Togli</button></div></div>
       <p class="note">1. Metti in scala: trascina lungo un muro di cui sai la misura. 2. Ricalca: disegna le stanze sopra la piantina.</p>`;
   }
 }
@@ -2035,6 +2238,9 @@ function removeRoom(r){
 }
 function planAction(a){
   const S = planSel, r = S && S.r;
+  const nd = { 'nx-': [-.05, 0], 'nx+': [.05, 0], 'nz-': [0, -.05], 'nz+': [0, .05] }[a];
+  if (nd){ planNudge(nd[0], nd[1]); return; }
+  if (a === 'wrot' && selWall()){ const ws = selWall(), before = planSnapshot(); const [e0, e1] = wallEnds(ws.it), cx = (e0.x + e1.x) / 2, cz = (e0.z + e1.z) / 2, h = (ws.it.sx || 1); const ang = ws.it.ry - Math.PI / 2; setWall(ws.r, ws.it, { x: cx - Math.cos(ang) * h, z: cz + Math.sin(ang) * h }, { x: cx + Math.cos(ang) * h, z: cz - Math.sin(ang) * h }); pushBefore(before); planCommit(); renderProps(); return; }
   if (a === 'close'){ planSel = null; renderProps(); return; }
   if (a === 'swap'){ setSwap(!planSwap); return; }
   if (a === 'open3d'){ const t = r || targetRoom(); if (!t){ toast('Disegna prima una stanza'); return; } planOff(); openRoom(house, t); return; }
@@ -2083,6 +2289,7 @@ $('props').addEventListener('input', (e) => {
 $('props').addEventListener('change', (e) => {
   if (!planOn || !planSel) return; const t = e.target;
   if (t.dataset.pd && planSel.type === 'room') setRoomSize(planSel.r, t.dataset.pd, +t.value / 100);
+  if (t.dataset.pw && selWall()){ const ws = selWall(), v = +t.value / 100; if (v >= .2){ const before = planSnapshot(), [a, b] = wallEnds(ws.it), L = Math.hypot(b.x - a.x, b.z - a.z) || 1; setWall(ws.r, ws.it, a, { x: a.x + (b.x - a.x) / L * v, z: a.z + (b.z - a.z) / L * v }); pushBefore(before); planCommit(); } renderProps(); }
   if (t.dataset.pn !== undefined && planSel.type === 'room'){ planSel.r.name = t.value.trim() || 'Stanza'; planCommit(); }
   if (t.dataset.pc || t.dataset.pu) planCommit();
 });
@@ -2155,7 +2362,7 @@ function underPick(){
     toast('Piantina caricata. Ora trascina lungo un muro di cui conosci la misura.', 4200);
   });
 }
-const PHOTO_TYPES = [['blocco', '🗄️', 'Mobile'], ['quadro', '🖼️', 'Quadro o poster'], ['tappeto', '🟫', 'Tappeto'], ['sagoma', '✂️', 'Sagoma ritagliata']];
+const PHOTO_TYPES = [['blocco', '<svg class="i" aria-hidden="true"><use href="#i-cabinet"/></svg>', 'Mobile'], ['quadro', '<svg class="i" aria-hidden="true"><use href="#i-frame"/></svg>', 'Quadro o poster'], ['tappeto', '<svg class="i" aria-hidden="true"><use href="#i-rug"/></svg>', 'Tappeto'], ['sagoma', '<svg class="i" aria-hidden="true"><use href="#i-scissors"/></svg>', 'Sagoma ritagliata']];
 function avgColor(im){ const c = document.createElement('canvas'); c.width = c.height = 6; const x = c.getContext('2d'); x.drawImage(im, im.width * .3, im.height * .3, im.width * .4, im.height * .4, 0, 0, 6, 6); const d = x.getImageData(0, 0, 6, 6).data; let r = 0, g = 0, b = 0; for (let i = 0; i < d.length; i += 4){ r += d[i]; g += d[i + 1]; b += d[i + 2]; } const n = d.length / 4, h = (v) => Math.round(v / n * .8).toString(16).padStart(2, '0'); return '#' + h(r) + h(g) + h(b); }
 // toglie lo sfondo partendo dai bordi della foto (colori simili a quelli del bordo)
 function cutout(c){
