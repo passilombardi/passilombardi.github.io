@@ -1,8 +1,8 @@
 // HOME 3D DESIGN - service worker: rende l'app utilizzabile anche offline
-const CACHE = 'home3d-v3';
+const CACHE = 'home3d-v4';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
-  './js/app.js', './js/catalog.js', './js/materials.js', './js/presets.js', './js/three.module.min.js',
+  './js/app.js', './js/account.js', './fb/firebase-app-compat.js', './fb/firebase-auth-compat.js', './fb/firebase-firestore-compat.js', './js/catalog.js', './js/materials.js', './js/presets.js', './js/three.module.min.js',
   './js/addons/controls/OrbitControls.js', './js/addons/environments/RoomEnvironment.js',
   './js/addons/geometries/RoundedBoxGeometry.js', './js/addons/loaders/GLTFLoader.js',
   './js/addons/utils/BufferGeometryUtils.js',
@@ -18,6 +18,8 @@ self.addEventListener('fetch', e => {
   const r = e.request;
   if (r.method !== 'GET') return;
   const u = new URL(r.url);
+  // account e salvataggio online (Firebase/Google): sempre dalla rete, mai dalla cache
+  if (u.origin !== location.origin && !/^fonts\.(googleapis|gstatic)\.com$/.test(u.hostname)) return;
   if (u.origin !== location.origin) {
     // font Google: prova la rete, poi la cache
     e.respondWith(fetch(r).then(res => { const c = res.clone(); caches.open(CACHE).then(k => k.put(r, c)); return res; }).catch(() => caches.match(r)));

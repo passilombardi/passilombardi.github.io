@@ -6,6 +6,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { ITEMS, IT, CATS, makeKit } from './catalog.js';
 import * as M from './materials.js';
 import { PRESETS } from './presets.js';
+import * as AC from './account.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
@@ -26,6 +27,8 @@ DB.settings = Object.assign({ quality: 'alta', theme: 'auto' }, DB.settings || {
 DB.favs = DB.favs || []; DB.imported = DB.imported || [];
 let saveT = 0;
 function saveNow(){
+  DB.localMs = Date.now();
+  if (AC.acc.user) AC.cloudSaveSoon(DB);
   try { localStorage.setItem(KEY, JSON.stringify(DB)); return true; }
   catch (e){ toast('Memoria piena: elimina qualche progetto'); return false; }
 }
@@ -119,13 +122,14 @@ function placeOnWall(it, r, along){
   else { it.x = -r.w / 2; it.z = along; }
 }
 function newHouse(name){ return { id: uid(), name, upd: Date.now(), rooms: [] }; }
-if (!DB.houses.length){
-  // al primo avvio: una casa di esempio con due stanze arredate
-  const h = newHouse('Casa di esempio');
+// una casa di esempio con due stanze arredate (al primo avvio)
+function sampleHouse(){
+  const h = newHouse('Casa di esempio'); h.sample = h.upd;
   h.rooms.push(roomFromPreset(PRESETS[0]), roomFromPreset(PRESETS[2]));
   h.rooms.forEach((r) => (r.before = { items: [], floor: r.floor, walls: r.walls, ceil: r.ceil }));
-  DB.houses.push(h);
+  return h;
 }
+if (!DB.houses.length) DB.houses.push(sampleHouse());
 
 /* =========================================================
    MOTORE 3D
@@ -450,6 +454,15 @@ function pickItem(cx, cy){
   return h ? h.object.userData.item : null;
 }
 function onDown(e){
+  if (follow){
+    e.stopImmediatePropagation(); down0 = null;
+    followMove(e.clientX, e.clientY);
+    const u = follow.u; endFollow();
+    if (drag){ drag = null; commit(); }
+    controls.enabled = camMode !== 'persona' && camMode !== 'casa';
+    select(u); toast('Fatto! Trascinalo per spostarlo ancora');
+    return;
+  }
   if (showBefore || camMode === 'casa') return;
   down0 = { x: e.clientX, y: e.clientY, t: performance.now() };
   if (camMode === 'persona'){ fpLook = { x: e.clientX, y: e.clientY, id: e.pointerId }; canvas.setPointerCapture(e.pointerId); return; }
@@ -510,6 +523,7 @@ function dragTo(cx, cy){
 }
 window.addEventListener('pointermove', (e) => {
   if (fpLook && e.pointerId === fpLook.id){ const dx = e.clientX - fpLook.x, dy = e.clientY - fpLook.y; fpLook.x = e.clientX; fpLook.y = e.clientY; fp.yaw -= dx * .005; fp.pitch = Math.max(-1.2, Math.min(1.2, fp.pitch - dy * .005)); return; }
+  if (follow && e.pointerType === 'mouse' && e.buttons === 0){ const rc = canvas.getBoundingClientRect(); if (e.clientX > rc.left && e.clientX < rc.right && e.clientY > rc.top && e.clientY < rc.bottom) followMove(e.clientX, e.clientY); return; }
   if (drag) dragTo(e.clientX, e.clientY);
   else if (catDrag) catDragMove(e);
 });
@@ -595,7 +609,7 @@ function updateCost(){ const list = planOn && house ? house.rooms.flatMap((r) =>
 function insertItem(t, viaDrag = false){
   const d = IT[t]; if (!d) return null;
   if (showBefore) toggleBefore(false);
-  if (!viaDrag) mark(); else catDrag.before = JSON.stringify(room.items);
+  if (!viaDrag) mark(); else if (catDrag) catDrag.before = JSON.stringify(room.items);
   const it = newItem(t);
   if (d.mount === 'wall' && room.kind !== 'esterno'){
     it.wall = visibleWallFacingCamera();
@@ -664,6 +678,7 @@ function animateCam(pos, target, ms = 650){
   camAnim = { p0: camera.position.clone(), t0: controls.target.clone(), p1: pos, t1: target, s: performance.now(), ms };
 }
 function setCam(m){
+  if (follow) endFollow();
   if (m === 'pianta'){ openPlan(house); return; }
   if (m === 'casa'){ showHouse(); return; }
   if (camMode === 'casa') hideHouse();
@@ -874,7 +889,7 @@ function renderProps(keepScroll){
   if (planOn) return renderPlanProps($('props'));
   const p = $('props'), wide = window.innerWidth >= 1000;
   const st = p.scrollTop;
-  p.classList.remove('mini'); p.style.bottom = ''; p.style.borderRadius = '';
+  p.classList.remove('mini'); p.style.bottom = ''; p.style.borderRadius = ''; $('help').style.marginBottom = '';
   if (sel){ renderItemProps(p); }
   else if (selSurface){ renderSurfaceProps(p); }
   else if (wide){ renderRoomSummary(p); }
@@ -1145,6 +1160,7 @@ $('fileGlb').addEventListener('change', async (e) => {
    APRIRE CASE E STANZE
    ========================================================= */
 function openRoom(h, r){
+  if (follow) endFollow();
   if (planOn) planOff();
   loadedRid = r.id;
   house = h; room = r; sel = null; selSurface = null; showBefore = false; undoStack = []; redoStack = [];
@@ -1169,6 +1185,7 @@ function updTitle(){ $('eRoom').textContent = room.name + ' ▾'; $('eHouse').te
 function defaultHelp(){ return window.matchMedia('(pointer:coarse)').matches ? 'Un dito: ruota · Due dita: zoom e sposta · Tocca un mobile per modificarlo' : 'Trascina: ruota · Rotellina: zoom · Tasto destro: sposta · Tocca un mobile per modificarlo'; }
 function setHelp(t){ const h = $('help'); h.textContent = t; h.hidden = false; clearTimeout(setHelp.t); setHelp.t = setTimeout(() => (h.hidden = true), 6000); }
 function goHome(){
+  if (follow) endFollow();
   if (planOn) planOff();
   disposeGroup(ctxG);
   saveNow(); select(null); selectSurface(null);
@@ -1210,8 +1227,10 @@ document.querySelectorAll('[data-cam]').forEach((b) => (b.onclick = () => setCam
 $('zIn').onclick = () => zoom(.8); $('zOut').onclick = () => zoom(1.25);
 document.addEventListener('keydown', (e) => {
   if ($('editor').hidden || e.target.closest('input,select,textarea,dialog')) return;
+  if (follow && e.key === 'Escape'){ cancelFollow(); return; }
   if (planOn){
     const k = e.key.toLowerCase(), c = e.ctrlKey || e.metaKey;
+    if (placing && k === 'escape'){ cancelPlacing(); return; }
     if (c && k === 'z'){ e.preventDefault(); e.shiftKey ? planRedoFn() : planUndoFn(); return; }
     if (c && k === 'y'){ e.preventDefault(); planRedoFn(); return; }
     if (c && k === 's'){ e.preventDefault(); $('eSave').click(); return; }
@@ -1323,10 +1342,10 @@ function renderHome(v){
     $('hSearch').addEventListener('input', (e) => { const q = e.target.value.toLowerCase(); el.querySelectorAll('[data-hinfo]').forEach((c) => (c.hidden = q && !c.dataset.name.includes(q))); el.querySelectorAll('[data-catsec]').forEach((s) => (s.hidden = ![...s.querySelectorAll('[data-hinfo]')].some((c) => !c.hidden))); });
   } else if (hview === 'impostazioni'){
     const used = (JSON.stringify(DB).length / 1024).toFixed(0);
-    el.innerHTML = `<h3>Impostazioni</h3><div class="card" style="padding:4px 16px">
+    el.innerHTML = `<h3>Impostazioni</h3>${accountCard()}<div class="card" style="padding:4px 16px">
       <label class="setrow"><div><b>Grafica</b><span>"Leggera" per telefoni meno potenti: niente ombre e meno dettagli</span></div><select id="sQ" class="btn"><option value="alta" ${DB.settings.quality === 'alta' ? 'selected' : ''}>Alta qualità</option><option value="leggera" ${DB.settings.quality === 'leggera' ? 'selected' : ''}>Leggera</option></select></label>
       <label class="setrow"><div><b>Tema</b><span>Chiaro, scuro o come il telefono</span></div><select id="sT" class="btn"><option value="auto">Automatico</option><option value="light" ${DB.settings.theme === 'light' ? 'selected' : ''}>Chiaro</option><option value="dark" ${DB.settings.theme === 'dark' ? 'selected' : ''}>Scuro</option></select></label>
-      <div class="setrow"><div><b>Salvataggio</b><span>Tutto viene salvato da solo su questo dispositivo (${used} KB usati)</span></div><button class="btn" type="button" data-act="export"><svg class="i" aria-hidden="true"><use href="#i-dn"/></svg> Esporta backup</button></div>
+      <div class="setrow"><div><b>Salvataggio</b><span>Tutto viene salvato da solo su questo dispositivo (${used} KB usati)${AC.acc.user ? ' e online nel tuo account' : ''}</span></div><button class="btn" type="button" data-act="export"><svg class="i" aria-hidden="true"><use href="#i-dn"/></svg> Esporta backup</button></div>
       <div class="setrow"><div><b>Ripristina backup</b><span>Carica un file di backup esportato prima</span></div><button class="btn" type="button" data-act="importjson"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg> Carica</button></div>
       <div class="setrow"><div><b>Modelli importati</b><span>${DB.imported.length} modelli GLB</span></div><button class="btn" type="button" data-act="import"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg> Importa GLB</button></div>
       <div class="setrow"><div><b>Cancella tutto</b><span>Elimina case, stanze e preferiti da questo dispositivo</span></div><button class="btn danger" type="button" data-act="reset">Cancella</button></div>
@@ -1357,6 +1376,9 @@ document.querySelector('.hwrap').addEventListener('click', (e) => {
   const a = act.dataset.act;
   if (a === 'newhouse') newHouseDialog();
   if (a === 'import') $('fileGlb').click();
+  if (a === 'acclogin'){ loginScreen().then((ok) => { if (ok) syncCloud().then(() => renderHome()); }); return; }
+  if (a === 'accsave'){ AC.cloudSave(DB).then((ok) => toast(ok ? 'Salvato online' : AC.acc.error)); return; }
+  if (a === 'accout'){ openDlg('Uscire dall\'account?', '<p>Le tue case restano salvate online: le ritrovi quando rientri, anche da un altro telefono o computer.</p>', [['Annulla', ''], ['Esci', 'danger', async () => { await AC.cloudSave(DB); await AC.signOut(); location.reload(); }]]); return; }
   if (a === 'export'){ const blob = new Blob([JSON.stringify(DB)], { type: 'application/json' }); const url = URL.createObjectURL(blob); downloadURL(url, 'home3d-backup.json'); setTimeout(() => URL.revokeObjectURL(url), 3000); }
   if (a === 'importjson'){ const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'application/json,.json'; inp.onchange = async () => { try { const d = JSON.parse(await inp.files[0].text()); if (!Array.isArray(d.houses)) throw 0; DB.houses = d.houses; DB.favs = d.favs || []; saveNow(); toast('Backup caricato'); renderHome('case'); } catch (e) { toast('File di backup non valido'); } }; inp.click(); }
   if (a === 'reset') openDlg('Cancellare tutto?', '<p>Tutte le case, le stanze e i preferiti salvati su questo dispositivo verranno eliminati. Non si può annullare.</p>', [['Annulla', ''], ['Cancella tutto', 'danger', async () => { for (const imp of DB.imported) await idb.del(imp.id); localStorage.removeItem(KEY); location.reload(); }]]);
@@ -1552,6 +1574,7 @@ function updPlanTitle(){
 
 /* ---------- entrare e uscire dalla pianta ---------- */
 function openPlan(h){
+  if (follow) endFollow();
   house = h; ensureLayout(h);
   if (!h.cam) h.cam = defaultCam(h);
   if (planOn) planOff();
@@ -1576,6 +1599,7 @@ function openPlan(h){
 }
 function planOff(){
   if (!planOn) return;
+  if (placing) cancelPlacing();
   planOn = false; planSwap = false; planSel = null;
   for (const id of [...planGroups.keys()]) dropPlanRoom(id);
   houseG.clear(); houseG.visible = false; planGrid.visible = false;
@@ -1601,6 +1625,7 @@ function setSwap(v){
   setHelp(v ? 'Trascina per guardarti intorno, usa le frecce per camminare. Tocca la piantina in alto per tornare.' : 'Trascina la telecamera blu per spostarla e il pallino per decidere dove guarda.');
 }
 function setTool(t){
+  if (placing && t !== 'sel') cancelPlacing();
   planTool = t; renderBuildTabs();
   const H = { sel: 'Tocca una stanza, un mobile o la telecamera. Trascina per spostare.', stanza: 'Trascina sulla griglia per disegnare una stanza rettangolare.', muro: 'Trascina dentro una stanza per tirare un muro divisorio.', murovetro: 'Trascina dentro una stanza per mettere una parete in vetro.', scala: 'Trascina lungo un muro della piantina di cui conosci la lunghezza.', piantina: 'Trascina la piantina caricata per allinearla.' };
   setHelp(H[t] || ''); ov.style.cursor = t === 'sel' ? 'default' : 'crosshair';
@@ -1899,18 +1924,20 @@ function planHit(P, w){
   if (ws) wl.push(ws);
   for (const rr of house.rooms) for (const it of rr.items) if (isWallT(it.t) && (!ws || it.u !== ws.it.u)) wl.push({ r: rr, it });
   for (const x of wl){ const [a, b] = wallEnds(x.it), Lp = (x.it.sx || 1) * 2 * pv.s, thr = Math.min(x === ws ? 18 : 14, Lp * .22); for (const [k, e] of [[0, a], [1, b]]) if (dpx(x.r.px + e.x, x.r.pz + e.z) < thr) return { kind: 'wend', r: x.r, u: x.it.u, end: k }; }
+  // il mobile toccato (quello selezionato vince anche sui muri: così si sposta sempre)
+  updateOcam(P.W, P.H); ndc.set(P.sx / P.W * 2 - 1, -(P.sy / P.H) * 2 + 1); ray.setFromCamera(ndc, ocam);
+  const ms = []; for (const o of planObjs.values()){ if (o.userData.top) continue; o.traverse((m) => { if (m.isMesh) ms.push(m); }); }
+  let itemHit = null;
+  for (const h of ray.intersectObjects(ms, false)){ const u = h.object.userData.item, po = planObjs.get(u), rr = po && roomById(po.userData.rid); if (!rr) continue; const it = rr.items.find((i) => i.u === u); itemHit = { kind: it && isWallT(it.t) ? 'wmove' : 'item', r: rr, u }; if (planSel && planSel.type === 'item' && planSel.u === u) return itemHit; break; }
   // i muri si trascinano sempre per allargare (prima quelli della stanza selezionata, poi le più piccole)
   const sr = planSel && planSel.type === 'room' && house.rooms.includes(planSel.r) ? planSel.r : null;
   const bySize = house.rooms.slice().sort((x, y) => x.w * x.d - y.w * y.d);
   for (const r2 of sr ? [sr, ...bySize] : bySize){ if (r2.kind === 'esterno' && r2 !== sr) continue; const e = edgeHit(r2, w); if (e >= 0) return { kind: 'edge', r: r2, e }; }
   // i muri divisori si prendono anche toccando la loro fascia scura
   for (const rr of house.rooms) for (const it of rr.items){ if (!isWallT(it.t)) continue; const [a, b] = wallEnds(it); if (segDist(w.x - rr.px, w.z - rr.pz, a, b) < WT / 2 + 8 / pv.s) return { kind: 'wmove', r: rr, u: it.u }; }
+  if (itemHit) return itemHit;
   // l'etichetta con il nome seleziona la stanza (anche se sotto c'è un mobile)
   for (const r2 of house.rooms){ if (r2.w * pv.s > 74 && r2.d * pv.s > 44){ const [lx, lz] = labelPos(r2); if (Math.abs((w.x - lx) * pv.s) < 58 && Math.abs((w.z - lz) * pv.s) < 20) return { kind: 'room', r: r2 }; } }
-  updateOcam(P.W, P.H); ndc.set(P.sx / P.W * 2 - 1, -(P.sy / P.H) * 2 + 1); ray.setFromCamera(ndc, ocam);
-  const ms = []; for (const o of planObjs.values()){ if (o.userData.top) continue; o.traverse((m) => { if (m.isMesh) ms.push(m); }); }
-  const h = ray.intersectObjects(ms, false)[0];
-  if (h){ const u = h.object.userData.item, po = planObjs.get(u), rr = po && roomById(po.userData.rid); if (rr){ const it = rr.items.find((i) => i.u === u); return { kind: it && isWallT(it.t) ? 'wmove' : 'item', r: rr, u }; } }
   const r = roomAt(w.x, w.z); if (r) return { kind: 'room', r };
   return { kind: 'pan' };
 }
@@ -1926,11 +1953,13 @@ ov.addEventListener('pointerdown', (e) => {
   }
   if (ptrs.size > 2) return;
   const P = evP(e), w = s2w(P);
+  if (placing){ placeMove(w); pd = { kind: 'place', sx: P.sx, sy: P.sy, moved: false }; return; }
   if (planSwap){ pd = { kind: 'look', lx: e.clientX, ly: e.clientY, sx: P.sx, sy: P.sy, moved: false }; return; }
   const hit = planHit(P, w);
   pd = Object.assign(hit, { sx: P.sx, sy: P.sy, w0: w, moved: false, before: planSnapshot(), cx: pv.cx, cz: pv.cz });
 });
 ov.addEventListener('pointermove', (e) => {
+  if (planOn && placing && (e.pointerType === 'mouse' || ptrs.has(e.pointerId)) && ptrs.size < 2){ placeMove(s2w(evP(e))); return; }
   if (!planOn || !ptrs.has(e.pointerId)) return;
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pinch && ptrs.size >= 2){
@@ -1953,6 +1982,7 @@ function planPtrUp(e){
   if (pinch){ if (ptrs.size < 2){ pinch = null; saveSoon(); } return; }
   if (!pd) return;
   const d = pd; pd = null;
+  if (d.kind === 'place'){ if (placing && e.type === 'pointerup') finishPlacing(s2w(evP(e))); return; }
   if (d.moved) endPlanDrag(d); else planTap(d);
 }
 ov.addEventListener('pointerup', planPtrUp); ov.addEventListener('pointercancel', planPtrUp);
@@ -2143,6 +2173,9 @@ function renderPlanProps(p){
   p.classList.toggle('mini', small && propsMini);
   const cp = $('catPanel'); p.style.bottom = small && propsMini && cp && !cp.hidden ? cp.offsetHeight + 'px' : '';
   p.style.borderRadius = small && propsMini ? '16px 16px 0 0' : '';
+  // la barra in basso (Arreda in 3D, zoom) sale sopra il pannello piccolo
+  const lift = small && propsMini ? p.offsetHeight + 'px' : '';
+  const pb = $('planBar'); if (pb) pb.style.marginBottom = lift; const hp = $('help'); if (hp) hp.style.marginBottom = lift;
   const h = p.querySelector('.ph1');
   if (small && h && !h.querySelector('[data-mini]')){
     const b = document.createElement('button'); b.type = 'button'; b.className = 'btn icon ghost minib'; b.dataset.mini = '1';
@@ -2332,8 +2365,76 @@ $('cBuild').addEventListener('click', (e) => {
   if (k === 'photo') photoPick();
   if (k === 'under'){ if (house.under){ planSel = { type: 'under' }; renderProps(); } else underPick(); }
 });
+/* ---------- mettere un mobile: resta attaccato alla freccetta (o al dito) e si posa dove tocchi ---------- */
+let placing = null;
+function placeBar(on, t){
+  let b = $('placeBar');
+  if (!on){ if (b) b.hidden = true; return; }
+  if (!b){ b = document.createElement('div'); b.id = 'placeBar'; b.className = 'placebar'; $('stage').appendChild(b); b.addEventListener('click', (e) => { if (e.target.closest('[data-pc]')){ if (follow) cancelFollow(); else cancelPlacing(); } }); }
+  const touch = matchMedia('(pointer: coarse)').matches;
+  b.innerHTML = `<span><b>${esc(IT[t || placing.t].n)}</b>: ${touch ? 'tocca dove vuoi metterlo' : 'muovi la freccetta e clicca dove vuoi metterlo'}</span><button class="btn" type="button" data-pc="1">Annulla</button>`;
+  b.hidden = false;
+}
+function startPlacing(t){
+  if (placing) cancelPlacing();
+  if (!house.rooms.length){ toast('Disegna prima una stanza'); return null; }
+  if (planSwap) setSwap(false);
+  if (planTool !== 'sel') setTool('sel');
+  placing = { t, r: null, u: null, before: planSnapshot() };
+  planSel = null; sel = null; renderProps(); placeBar(true);
+  ov.style.cursor = 'copy';
+  return true;
+}
+function dropPlacingItem(){
+  const P = placing; if (!P || !P.u) return;
+  loadQuiet(P.r); P.r.items = P.r.items.filter((i) => i.u !== P.u); if (room === P.r){ room.items = P.r.items; removeObject(P.u); }
+  buildPlanRoom(P.r); P.u = null; P.r = null;
+}
+function placeMove(w){
+  const P = placing; if (!P) return false;
+  const r = roomAt(w.x, w.z);
+  if (!r){ return false; }
+  if (P.r !== r){ dropPlacingItem(); loadQuiet(r); const u = insertItem(P.t, true); if (!u) return false; P.r = r; P.u = u; }
+  const it = P.r.items.find((i) => i.u === P.u), o = objs.get(P.u); if (!it || !o) return false;
+  const b = objBox(o);
+  dragPlanItem({ r: P.r, it, o, def: IT[P.t], off: { x: 0, z: 0 }, small: b.max.y - b.min.y < .6 }, w);
+  buildPlanRoom(P.r);
+  return true;
+}
+function finishPlacing(w){
+  const P = placing; if (!P) return;
+  if (!placeMove(w)){ toast('Mettilo dentro una stanza'); return; }
+  placing = null; placeBar(false); ov.style.cursor = '';
+  sel = P.u; planSel = { type: 'item', r: P.r, u: P.u };
+  pushBefore(P.before); planCommit(); renderProps();
+  toast('Fatto! Trascinalo per spostarlo ancora');
+}
+function cancelPlacing(){
+  if (!placing) return;
+  dropPlacingItem(); placing = null; placeBar(false); ov.style.cursor = ''; renderProps();
+}
+/* nell'editor 3D: il mobile appena scelto segue la freccetta (o va dove tocchi) */
+let follow = null;
+function startFollow(u){
+  const it = room && room.items.find((i) => i.u === u); if (!it || camMode === 'persona' || camMode === 'casa') return;
+  if (IT[it.t].mount === 'ceiling' && room.kind === 'interno' && camMode === 'alto'){ /* va bene lo stesso */ }
+  follow = { u, t: it.t }; placeBar(true, it.t); canvas.style.cursor = 'copy';
+  if (window.innerWidth < 1000) $('props').hidden = true; // sul telefono il pannello si apre dopo, così vedi dove toccare
+}
+function endFollow(){ follow = null; placeBar(false); canvas.style.cursor = ''; }
+function cancelFollow(){
+  const f = follow; endFollow(); if (!f) return;
+  if (drag){ drag = null; controls.enabled = true; }
+  room.items = room.items.filter((i) => i.u !== f.u); removeObject(f.u); select(null); commit(); updateLamps();
+}
+function followMove(cx, cy){
+  if (!follow) return;
+  if (!drag || drag.u !== follow.u){ startDrag(follow.u, cx, cy); if (!drag) return; drag.off.set(0, 0, 0); drag.follow = true; }
+  dragTo(cx, cy);
+}
 function addFromCatalog(t){
-  if (!planOn) return insertItem(t);
+  if (!planOn){ const u = insertItem(t); if (u) startFollow(u); return u; }
+  if (house.rooms.length) return startPlacing(t);
   const r = targetRoom(); if (!r){ toast('Disegna prima una stanza'); return null; }
   const before = planSnapshot(); loadQuiet(r);
   const u = insertItem(t); if (!u) return null;
@@ -2434,10 +2535,110 @@ async function createPhotoItem(im, type, n, w, d, h, removeBg){
 $('cPhoto').onclick = photoPick;
 
 /* =========================================================
+   ACCOUNT: accesso obbligatorio sul sito, case salvate online
+   ========================================================= */
+const PREVIEW = !/(^|\.)github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname) || /[?&]prova\b/.test(location.search);
+function accountCard(){
+  const u = AC.acc.user;
+  if (!u) return AC.accountAvailable() ? `<div class="card acccard"><div class="accav">?</div><div class="accinfo"><b>Nessun account</b><span>Entra per salvare le case online</span></div><button class="btn main" type="button" data-act="acclogin">Entra</button></div>` : '';
+  const st = AC.acc.status, when = AC.acc.last ? new Date(AC.acc.last).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '';
+  const line = st === 'saving' ? 'Salvo online…' : st === 'ok' ? `Salvato online alle ${when}` : st === 'err' || st === 'big' ? esc(AC.acc.error) : 'Le case si salvano online da sole';
+  return `<div class="card acccard"><div class="accav">${esc(AC.displayName(u).slice(0, 1).toUpperCase())}</div><div class="accinfo"><b>${esc(AC.displayName(u))}</b><span>${esc(u.email || '')}</span><span class="accst ${st}">${line}</span></div><div class="accbt"><button class="btn" type="button" data-act="accsave">Salva ora</button><button class="btn ghost" type="button" data-act="accout">Esci</button></div></div>`;
+}
+function updAccChip(){
+  const c = $('accChip'); if (!c) return; const u = AC.acc.user;
+  c.hidden = !u; if (u) c.innerHTML = `<span class="accav sm">${esc(AC.displayName(u).slice(0, 1).toUpperCase())}</span><span class="accn">${esc(AC.displayName(u))}</span>`;
+}
+AC.onAccount(() => { updAccChip(); if (!$('home').hidden && hview === 'impostazioni'){ const c = document.querySelector('#hview .acccard'); if (c) c.outerHTML = accountCard(); } });
+// mette insieme le case del dispositivo e quelle online
+async function syncCloud(){
+  let r = null;
+  try { r = await AC.cloudLoad(); } catch (e){ AC.acc.status = 'err'; AC.acc.error = AC.errText(e); updAccChip(); return; }
+  const uid = AC.acc.user.uid, mine = DB.cloud && DB.cloud.uid === uid, other = DB.cloud && DB.cloud.uid !== uid;
+  const take = (d) => { DB.houses = d.houses || []; DB.favs = d.favs || []; if (d.settings) DB.settings = Object.assign(DB.settings, d.settings); };
+  if (r){
+    const localChanged = !mine || (DB.localMs || 0) > (DB.cloud.ms || 0);
+    if (other || (mine && !localChanged)){ if (!mine || r.ms > (DB.cloud.ms || 0)) take(r.dati); DB.cloud = { uid, ms: r.ms }; }
+    else {
+      // modifiche sia qui sia online: per ogni casa vince la più recente
+      const by = new Map(); for (const h of (r.dati.houses || [])) by.set(h.id, h);
+      for (const h of DB.houses){ if (!mine && h.sample && h.upd === h.sample) continue; const o = by.get(h.id); if (!o || (h.upd || 0) >= (o.upd || 0)) by.set(h.id, h); }
+      DB.houses = [...by.values()]; DB.favs = [...new Set([...(r.dati.favs || []), ...DB.favs])];
+      DB.cloud = { uid, ms: r.ms };
+      await AC.cloudSave(DB);
+    }
+    try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) { /* pieno */ }
+  } else {
+    if (other){ DB.houses = [sampleHouse()]; DB.favs = []; }
+    DB.cloud = { uid, ms: 0 };
+    await AC.cloudSave(DB);
+    try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) { /* pieno */ }
+  }
+  AC.acc.status = AC.acc.status === 'err' ? 'err' : 'ok'; if (!AC.acc.last) AC.acc.last = r ? r.ms : Date.now();
+  updAccChip();
+}
+function loginScreen(){
+  return new Promise((done) => {
+    const L = $('login'); L.hidden = false;
+    let mode = 'in';
+    const draw = (msg = '', busy = false) => {
+      L.querySelector('.lgbox').innerHTML = `
+        <div class="lgbrand"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#2f6df6"/><path d="M32 12 L54 24 L32 36 L10 24Z" fill="#fff"/><path d="M10 24 L32 36 V56 L10 44Z" fill="#fff" opacity=".55"/><path d="M54 24 L32 36 V56 L54 44Z" fill="#fff" opacity=".8"/></svg><div><h1>HOME 3D DESIGN PM</h1><small>Progetta e arreda la tua casa in 3D</small></div></div>
+        <h2>${mode === 'up' ? 'Crea il tuo account' : mode === 'pw' ? 'Password dimenticata' : 'Entra nel tuo account'}</h2>
+        <p class="lgsub">${mode === 'pw' ? 'Ti mandiamo una email per scegliere una password nuova.' : 'È lo stesso account del Gioco della Vita PM: le tue case si salvano online e le ritrovi su ogni telefono e computer.'}</p>
+        ${mode !== 'pw' ? `<button class="btn lgg" type="button" data-l="google"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.2-2.1 3.5-5.1 3.5-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6h-4a12 12 0 0 0 0 10.8z"/><path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9z"/></svg> Continua con Google</button><div class="lgor"><span>oppure con email</span></div>` : ''}
+        <form class="lgf" novalidate>
+          ${mode === 'up' ? '<label>Il tuo nome<input name="n" autocomplete="name" maxlength="40" required></label>' : ''}
+          <label>Email<input name="e" type="email" autocomplete="email" required></label>
+          ${mode !== 'pw' ? `<label>Password<input name="p" type="password" autocomplete="${mode === 'up' ? 'new-password' : 'current-password'}" minlength="6" required></label>` : ''}
+          <p class="lgmsg" role="status">${esc(msg)}</p>
+          <button class="btn main lgbtn" type="submit" ${busy ? 'disabled' : ''}>${busy ? 'Un momento…' : mode === 'up' ? 'Crea account' : mode === 'pw' ? 'Mandami la email' : 'Entra'}</button>
+        </form>
+        <div class="lglinks">${mode === 'in' ? '<button type="button" data-l="up">Non hai un account? <b>Registrati</b></button><button type="button" data-l="pw">Password dimenticata?</button>' : '<button type="button" data-l="in">Hai già un account? <b>Entra</b></button>'}</div>
+        ${PREVIEW ? '<div class="lglinks"><button type="button" data-l="skip">Prova senza account (anteprima)</button></div>' : ''}`;
+      const f = L.querySelector('.lgf');
+      f.onsubmit = async (e) => {
+        e.preventDefault(); const v = (k) => (f.elements[k] ? f.elements[k].value : '');
+        if (mode === 'up' && !v('n').trim()){ draw('Scrivi il tuo nome'); return; }
+        const keep = { n: v('n'), e: v('e') };
+        draw('', true); const fill = () => { const g = L.querySelector('.lgf'); if (g.elements.n) g.elements.n.value = keep.n; g.elements.e.value = keep.e; };
+        fill();
+        try {
+          if (mode === 'up') await AC.register(keep.n, keep.e, v('p') || '');
+          else if (mode === 'pw'){ await AC.resetPassword(keep.e); mode = 'in'; draw('Email mandata: guarda nella posta (anche nello spam)'); fill(); return; }
+          else await AC.signInEmail(keep.e, v('p') || '');
+        } catch (err){ draw(AC.errText(err)); fill(); }
+      };
+      // la password resta scritta solo se si riprova subito
+    };
+    L.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-l]'); if (!b) return;
+      const k = b.dataset.l;
+      if (k === 'google'){ try { await AC.signInGoogle(); } catch (err){ draw(AC.errText(err)); } return; }
+      if (k === 'skip'){ L.hidden = true; done(false); return; }
+      mode = k; draw();
+    });
+    draw(AC.acc.error || '');
+    AC.onAccount((a) => { if (a.user && !L.hidden){ L.hidden = true; done(true); } });
+  });
+}
+async function accountGate(){
+  if (!AC.accountAvailable()) return; // senza internet la prima volta: si usa sul dispositivo
+  const u = await Promise.race([AC.initAccount(), new Promise((r) => setTimeout(() => r('lento'), 8000))]);
+  if (u === 'lento'){ toast('Connessione lenta: le case restano su questo dispositivo'); return; }
+  if (!AC.acc.user){ $('loading').hidden = true; const ok = await loginScreen(); $('loading').hidden = false; if (!ok) return; }
+  $('loading').textContent = 'Carico le tue case…';
+  await syncCloud();
+  updAccChip();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && AC.acc.user) AC.cloudSave(DB); });
+}
+
+/* =========================================================
    AVVIO
    ========================================================= */
 (async function start(){
   await idb.open(); await loadImported();
+  await accountGate();
   $('loading').remove(); $('home').hidden = false;
   renderHome('case');
   // immagine grande della home: anteprima di una stanza pronta
