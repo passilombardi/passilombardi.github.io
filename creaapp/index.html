@@ -50,6 +50,10 @@ input,textarea{font:inherit;color:inherit}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:12px;padding:12px 18px;background:var(--acc);color:var(--on-acc);font-weight:700;font-size:16px}
 .btn.wide{width:100%;margin-top:6px}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+#setBox{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px}
+#setBox h1{font-family:var(--f-read);font-weight:500;font-size:28px;text-align:center;margin:0 0 6px}
+.opt{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;font-size:17px;font-weight:500;cursor:pointer}
+.opt input{width:22px;height:22px;accent-color:var(--acc)}
 .err{color:var(--bad);font-size:14px;min-height:20px;margin:6px 0 0;text-align:center}
 .note{font-size:13px;color:var(--soft);margin-top:16px;text-align:center}
 
@@ -199,10 +203,10 @@ main{flex:1;min-width:0;display:flex;flex-direction:column;height:100%}
     <div class="mark"></div>
     <h1 id="gTitle">Crea App</h1>
     <p class="sub" id="gSub"></p>
-    <label class="fld"><span>Nome dell'account</span><div class="row"><input id="gName" autocomplete="username" required></div></label>
-    <label class="fld"><span>Password 1</span><div class="row"><input id="gP1" type="password" required><button type="button" class="eye" aria-label="Mostra">👁</button></div></label>
-    <label class="fld"><span>Password 2</span><div class="row"><input id="gP2" type="password" required><button type="button" class="eye" aria-label="Mostra">👁</button></div></label>
-    <label class="fld"><span>Password 3</span><div class="row"><input id="gP3" type="password" required><button type="button" class="eye" aria-label="Mostra">👁</button></div></label>
+    <label class="fld"><span>Email o nome dell'account</span><div class="row"><input id="gName" autocomplete="username" required></div></label>
+    <label class="fld" id="gF1"><span>Password 1</span><div class="row"><input id="gP1" type="password"><button type="button" class="eye" aria-label="Mostra">👁</button></div></label>
+    <label class="fld" id="gF2"><span>Password 2</span><div class="row"><input id="gP2" type="password"><button type="button" class="eye" aria-label="Mostra">👁</button></div></label>
+    <label class="fld" id="gF3"><span>Password 3</span><div class="row"><input id="gP3" type="password"><button type="button" class="eye" aria-label="Mostra">👁</button></div></label>
     <button class="btn wide" id="gBtn">Entra</button>
     <p class="err" id="gErr"></p>
     <p class="note" id="gNote"></p>
@@ -216,9 +220,20 @@ main{flex:1;min-width:0;display:flex;flex-direction:column;height:100%}
     <button class="newbtn" id="newBtn"><i>+</i> Nuova app</button>
     <div class="side-h">Le tue app</div>
     <nav class="plist" id="plist"></nav>
-    <div class="side-foot"><span class="avatar" id="av"></span><div id="who"></div><button id="outBtn">Esci</button></div>
+    <div class="side-foot"><span class="avatar" id="av"></span><div id="who"></div><button id="setBtn" title="Impostazioni">⚙️</button><button id="outBtn">Esci</button></div>
   </aside>
   <div id="scrim"></div>
+  <div id="setBox" hidden><form class="gate-box" id="setForm">
+    <h1>Impostazioni</h1>
+    <p class="sub">Quali password vuoi scrivere per entrare con l'account <b id="setWho"></b>?</p>
+    <label class="opt"><input type="checkbox" id="sR1"> Password 1</label>
+    <label class="opt"><input type="checkbox" id="sR2"> Password 2</label>
+    <label class="opt"><input type="checkbox" id="sR3"> Password 3</label>
+    <p class="err" id="sErr"></p>
+    <button class="btn wide">Salva</button>
+    <button type="button" class="btn ghost wide" id="setCancel">Annulla</button>
+    <p class="note">Vale per questo telefono. Meno password vuol dire entrare più facilmente, anche per gli altri.</p>
+  </form></div>
   <main>
     <div class="top">
       <button class="ibtn" id="menuBtn" aria-label="Menu">☰</button>
@@ -273,25 +288,39 @@ function showGate(){
   $("#gate").hidden=false;$("#app").hidden=true;
   ["#gP1","#gP2","#gP3"].forEach(s=>$(s).value="");
   $("#gTitle").textContent="Crea App";
-  $("#gSub").textContent="Scrivi il tuo nome e le 3 password. Si entra solo se sono giuste tutte e 3.";
+
   $("#gBtn").textContent="Entra";
   $("#gNote").textContent="";
   $("#gName").value=store.get("creaapp-lastname","");
   $("#gErr").textContent="";
+  updateGate();
 }
+/* quali password chiede ogni account (si sceglie in Impostazioni) */
+const norm=s=>String(s).trim().toLowerCase();
+const reqKey=n=>"creaapp-req:"+norm(n);
+const getReq=n=>{const r=store.get(reqKey(n),null);return Array.isArray(r)&&r.length===3&&r.some(Boolean)?r:[true,true,true]};
+function updateGate(){
+  const r=getReq($("#gName").value);
+  r.forEach((on,i)=>$("#gF"+(i+1)).hidden=!on);
+  const list=r.map((on,i)=>on?i+1:0).filter(Boolean);
+  $("#gSub").textContent=list.length===3?"Scrivi l'email o il nome e le 3 password. Si entra solo se sono tutte giuste."
+    :list.length===1?"Scrivi l'email o il nome e la password "+list[0]+".":"Scrivi l'email o il nome e le password "+list.join(" e ")+".";
+}
+$("#gName").addEventListener("input",updateGate);
 document.querySelectorAll(".eye").forEach(b=>b.onclick=()=>{const i=b.previousElementSibling;i.type=i.type==="password"?"text":"password"});
 $("#gateForm").onsubmit=async e=>{
   e.preventDefault();
   const err=$("#gErr");err.textContent="";
   const name=$("#gName").value.trim(), pw=[$("#gP1").value,$("#gP2").value,$("#gP3").value];
-  if(name.length<2){err.textContent="Scrivi il nome dell'account.";return}
+  if(name.length<2){err.textContent="Scrivi l'email o il nome dell'account.";return}
+  const req=getReq(name);
   if(!window.crypto||!crypto.subtle){err.textContent="Apri l'app dal sito (https) per usare le password.";return}
   const wait=store.get("creaapp-wait",0);
   if(Date.now()<wait){err.textContent="Troppi tentativi. Riprova tra "+Math.ceil((wait-Date.now())/1000)+" secondi.";return}
   $("#gBtn").disabled=true;$("#gBtn").textContent="Controllo…";
-  const h=await Promise.all(pw.map((p,i)=>hashPw(p,i)));
+  const h=await Promise.all(pw.map((p,i)=>req[i]?hashPw(p,i):null));
   $("#gBtn").disabled=false;$("#gBtn").textContent="Entra";
-  if(h.every((x,i)=>x===HASHES[i])){
+  if(h.every((x,i)=>!req[i]||x===HASHES[i])){
     store.set("creaapp-fails",0);store.set("creaapp-lastname",name);sess.set("creaapp-in",name);enterApp();
   }else{
     const f=store.get("creaapp-fails",0)+1;store.set("creaapp-fails",f);
@@ -299,6 +328,12 @@ $("#gateForm").onsubmit=async e=>{
     err.textContent="Le password non sono giuste.";
   }
 };
+$("#setBtn").onclick=()=>{const r=getReq(user);[1,2,3].forEach(i=>$("#sR"+i).checked=r[i-1]);$("#setWho").textContent=user;$("#sErr").textContent="";$("#setBox").hidden=false;$("#app").classList.remove("menu")};
+$("#setCancel").onclick=()=>$("#setBox").hidden=true;
+$("#setForm").onsubmit=e=>{e.preventDefault();const r=[1,2,3].map(i=>$("#sR"+i).checked);
+  if(!r.some(Boolean)){$("#sErr").textContent="Scegli almeno una password.";return}
+  store.set(reqKey(user),r);$("#setBox").hidden=true;
+  alert("Salvato! La prossima volta che entri con «"+user+"» ti chiedo: password "+r.map((on,i)=>on?i+1:0).filter(Boolean).join(", ")+".")};
 $("#outBtn").onclick=()=>{sess.del("creaapp-in");location.reload()};
 
 /* ================= DATI ================= */
