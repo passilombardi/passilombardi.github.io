@@ -134,6 +134,19 @@ main{flex:1;min-width:0;display:flex;flex-direction:column;height:100%}
 .ptabs button.t.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .ptabs .sp{flex:1}
 .pbody{flex:1;overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:22px 12px}
+.phone iframe{width:100%;height:100%;border:0;border-radius:31px;background:#fff;display:block}
+.sitebox{width:100%;max-width:420px;border-radius:12px;overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.18);background:#fff}
+.sitebox .bar{background:#ddd;padding:8px 10px;display:flex;gap:6px;align-items:center}
+.sitebox .bar i{width:10px;height:10px;border-radius:50%;background:#bbb}
+.sitebox iframe{width:100%;height:620px;border:0;display:block}
+.drawing{display:inline-flex;align-items:center;gap:8px;margin-top:8px;font-family:var(--f-ui);font-size:14px;color:var(--soft)}
+.drawing:before{content:"";width:14px;height:14px;border-radius:50%;border:2px solid var(--acc);border-right-color:transparent;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.keyrow{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.keyrow h2{font-size:17px;margin:0 0 4px}
+.keyrow p{font-size:14px;color:var(--soft);margin:0 0 10px}
+.keyrow a{color:var(--acc)}
+.mode{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;background:var(--acc-soft);color:var(--acc);margin-right:6px}
 .empty{color:var(--soft);text-align:center;margin-top:30%;padding:0 30px}
 
 /* telefono finto */
@@ -229,10 +242,15 @@ main{flex:1;min-width:0;display:flex;flex-direction:column;height:100%}
     <label class="opt"><input type="checkbox" id="sR1"> Password 1</label>
     <label class="opt"><input type="checkbox" id="sR2"> Password 2</label>
     <label class="opt"><input type="checkbox" id="sR3"> Password 3</label>
+    <div class="keyrow">
+      <h2>Claude vero</h2>
+      <p>Metti qui la chiave API di Anthropic e la chat parla con Claude. Senza chiave usa le domande guidate gratis. La chiave la prendi su <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.</p>
+      <label class="fld"><div class="row"><input id="sKey" type="password" placeholder="sk-ant-…" autocomplete="off"><button type="button" class="eye" aria-label="Mostra">👁</button></div></label>
+    </div>
     <p class="err" id="sErr"></p>
     <button class="btn wide">Salva</button>
     <button type="button" class="btn ghost wide" id="setCancel">Annulla</button>
-    <p class="note">Vale per questo telefono. Meno password vuol dire entrare più facilmente, anche per gli altri.</p>
+    <p class="note">Vale per questo telefono. Meno password vuol dire entrare più facilmente, anche per gli altri. La chiave resta solo su questo telefono.</p>
   </form></div>
   <main>
     <div class="top">
@@ -328,12 +346,18 @@ $("#gateForm").onsubmit=async e=>{
     err.textContent="Le password non sono giuste.";
   }
 };
-$("#setBtn").onclick=()=>{const r=getReq(user);[1,2,3].forEach(i=>$("#sR"+i).checked=r[i-1]);$("#setWho").textContent=user;$("#sErr").textContent="";$("#setBox").hidden=false;$("#app").classList.remove("menu")};
+$("#setBtn").onclick=()=>{const r=getReq(user);[1,2,3].forEach(i=>$("#sR"+i).checked=r[i-1]);$("#sKey").value=getKey();$("#setWho").textContent=user;$("#sErr").textContent="";$("#setBox").hidden=false;$("#app").classList.remove("menu")};
 $("#setCancel").onclick=()=>$("#setBox").hidden=true;
 $("#setForm").onsubmit=e=>{e.preventDefault();const r=[1,2,3].map(i=>$("#sR"+i).checked);
   if(!r.some(Boolean)){$("#sErr").textContent="Scegli almeno una password.";return}
+  const k=$("#sKey").value.trim();
+  if(k&&!/^sk-ant-/.test(k)){$("#sErr").textContent="La chiave deve cominciare con sk-ant-";return}
+  const hadKey=!!getKey();store.set(keyKey(),k);
   store.set(reqKey(user),r);$("#setBox").hidden=true;
-  alert("Salvato! La prossima volta che entri con «"+user+"» ti chiedo: password "+r.map((on,i)=>on?i+1:0).filter(Boolean).join(", ")+".")};
+  alert("Salvato! La prossima volta che entri con «"+user+"» ti chiedo: password "+r.map((on,i)=>on?i+1:0).filter(Boolean).join(", ")+"."+(k&&!hadKey?"\n\nClaude è collegato: tocca «Nuova app» per parlare con lui.":!k&&hadKey?"\n\nChiave tolta: le nuove app usano le domande guidate.":""));
+  if(cur&&cur.msgs.length<=1&&(!cur.api||!cur.api.length)&&(cur.mode==="ai")!==!!getKey()){projects.splice(projects.indexOf(cur),1);newProject()}else renderChat()};
+const keyKey=()=>"creaapp-key:"+norm(user);
+const getKey=()=>store.get(keyKey(),"")||"";
 $("#outBtn").onclick=()=>{sess.del("creaapp-in");location.reload()};
 
 /* ================= DATI ================= */
@@ -372,11 +396,12 @@ const PK=()=>"creaapp-projects:"+user.trim().toLowerCase();
 function save(){store.set(PK(),projects)}
 function newProject(){
   const p={id:Date.now().toString(36),created:Date.now(),step:"idea",d:{feat:[]},msgs:[]};
-  projects.unshift(p);cur=p;
+  projects.unshift(p);cur=p;pscreen=null;
+  if(getKey()){p.mode="ai";p.ai={};p.api=[];say("Ciao "+user+"! Sono collegato a Claude. Raccontami l'app che vuoi creare, con parole tue: ti faccio qualche domanda e ti disegno l'app e il sito.");save();renderAll();return}
   say("Ciao "+user+"! Che app vuoi creare oggi?\nRaccontamela con parole tue: a cosa serve, cosa ti piacerebbe che facesse.");
   save();renderAll();
 }
-function title(p){return p.d.name||(p.d.idea?p.d.idea.slice(0,40):"Nuova app")}
+function title(p){return (p.ai&&p.ai.name)||p.d.name||(p.d.idea?p.d.idea.slice(0,40):"Nuova app")}
 
 /* ================= CONVERSAZIONE ================= */
 function say(t,k){cur.msgs.push({r:"a",t,k:k||null})}
@@ -384,6 +409,10 @@ let viaVoice=false;
 function said(t){const m={r:"u",t};if(viaVoice)m.v=1;cur.msgs.push(m)}
 function chipsFor(p){
   const d=p.d;
+  if(p.mode==="ai"){
+    if(p.api.length===0)return ["Un gioco per Pietro","Un'app per i compiti","Una lista della spesa","Una guida della città"];
+    return p.ai.app?[{t:"Mi piace! Dammi il testo per Claude",main:true},"Cambia i colori","Aggiungi una cosa"]:[];
+  }
   switch(p.step){
     case "idea":return ["Un gioco per Pietro","Un'app per i compiti","Una lista della spesa","Una guida della città"];
     case "who":return ["Per Pietro","Per me","Per la famiglia","Per i bambini","Per tutti"];
@@ -545,28 +574,33 @@ function fmt(t){
 function renderChat(typing){
   const el=$("#inner");el.innerHTML="";
   if(cur.msgs.length<=1&&cur.step==="idea"){
-    el.insertAdjacentHTML("beforeend",`<div class="hello"><div class="mark"></div><h1>Che app creiamo, ${esc(user)}?</h1><p>Raccontami la tua idea. Io ti faccio qualche domanda e ti mostro come viene.</p></div>`);
+    el.insertAdjacentHTML("beforeend",`<div class="hello"><div class="mark"></div><h1>Che app creiamo, ${esc(user)}?</h1><p>${cur.mode==="ai"?"Sono collegato a Claude: scrivi o manda un vocale, capisco tutto.":"Raccontami la tua idea. Io ti faccio qualche domanda e ti mostro come viene."}</p></div>`);
   }else cur.msgs.forEach((m,i)=>{
     if(m.r==="u"){el.insertAdjacentHTML("beforeend",`<div class="m-u">${m.v?'<span class="v">🎤</span>':""}${esc(m.t)}</div>`);return}
     let extra="";
-    if(m.k==="preview"){const pal=PALETTES[cur.d.color]||PALETTES["Blu mare"];
+    if(m.k==="preview"&&cur.mode==="ai"){
+      extra=`<button class="pcard" data-open="1"><span class="ico" style="background:var(--acc);color:#fff">📱</span><span><b>${esc(cur.ai.name||"La tua app")}</b><small>Tocca per vedere l'anteprima dell'app e del sito</small></span></button>`}
+    else if(m.k==="preview"){const pal=PALETTES[cur.d.color]||PALETTES["Blu mare"];
       extra=`<button class="pcard" data-open="1"><span class="ico" style="background:${pal[0]};color:#fff">${esc(cur.d.icon||"🌟")}</span><span><b>${esc(cur.d.name||"La tua app")}</b><small>Tocca per vedere l'anteprima</small></span></button>`}
     if(m.k==="final"){
-      extra=`<div class="final"><div class="fh"><span>Testo da dare a Claude</span><button class="small-btn" data-copy="1">Copia</button></div><pre>${esc(buildPrompt(cur.d))}</pre>
+      extra=`<div class="final"><div class="fh"><span>Testo da dare a Claude</span><button class="small-btn" data-copy="1">Copia</button></div><pre>${esc(m.prompt||buildPrompt(cur.d))}</pre>
       <div class="fa"><button class="btn" data-copy="1">📋 Copia il testo</button><a class="btn ghost" href="${CLAUDE_URL}" target="_blank" rel="noopener">Vai su Claude →</a></div></div>`}
     el.insertAdjacentHTML("beforeend",`<div class="m-a"><div class="mark"></div><div class="txt">${fmt(m.t)}${extra}</div></div>`);
   });
-  if(typing)el.insertAdjacentHTML("beforeend",`<div class="m-a"><div class="mark"></div><div class="txt typing"><span></span><span></span><span></span></div></div>`);
+  if(typing&&live!=null){const v=visible(live);
+    el.insertAdjacentHTML("beforeend",`<div class="m-a"><div class="mark"></div><div class="txt">${v.text.trim()?fmt(v.text.trim()):'<span class="typing"><span></span><span></span><span></span></span>'}${v.drawing?'<div class="drawing">Sto disegnando l\'anteprima…</div>':""}</div></div>`)}
+  else if(typing)el.insertAdjacentHTML("beforeend",`<div class="m-a"><div class="mark"></div><div class="txt typing"><span></span><span></span><span></span></div></div>`);
   el.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openPrev(true));
-  el.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>copyPrompt(b));
+  el.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>copyPrompt(b,b.closest(".final").querySelector("pre").textContent));
+  $(".hint").innerHTML=(getKey()&&cur.mode==="ai"?'<span class="mode">Claude</span>':'<span class="mode">Gratis</span>')+"Tocca 🎤 per mandare un vocale. L'app vera la costruisce Claude quando gli incolli il testo finale.";
   const ch=$("#chips");ch.innerHTML="";
   if(!typing)chipsFor(cur).forEach(c=>{const o=typeof c==="string"?{t:c}:c;const b=document.createElement("button");b.className="chip"+(o.main?" main":"");
     b.innerHTML=(o.sw?`<span class="sw" style="background:${o.sw}"></span>`:"")+esc(o.t);b.onclick=()=>send(o.t);ch.appendChild(b)});
-  $("#inp").placeholder={idea:"Descrivi l'app che vuoi…",feat:"Scrivi le cose che deve fare…",name:"Scrivi il nome…",edit:"Dimmi cosa cambiare…",add:"Cosa aggiungo?"}[cur.step]||"Scrivi qui…";
+  $("#inp").placeholder=cur.mode==="ai"?"Scrivi a Claude…":{idea:"Descrivi l'app che vuoi…",feat:"Scrivi le cose che deve fare…",name:"Scrivi il nome…",edit:"Dimmi cosa cambiare…",add:"Cosa aggiungo?"}[cur.step]||"Scrivi qui…";
   const ms=$("#msgs");requestAnimationFrame(()=>ms.scrollTop=ms.scrollHeight);
 }
-async function copyPrompt(b){
-  const t=buildPrompt(cur.d);let ok=false;
+async function copyPrompt(b,t){
+  let ok=false;
   try{await navigator.clipboard.writeText(t);ok=true}catch(e){
     const ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();try{ok=document.execCommand("copy")}catch(_){}ta.remove()}
   const old=b.textContent;b.textContent=ok?"✓ Copiato!":"Tieni premuto sul testo per copiarlo";setTimeout(()=>b.textContent=old,2200);
@@ -574,10 +608,92 @@ async function copyPrompt(b){
 function send(t,voice){
   if(busy||!t.trim())return;
   viaVoice=!!voice;
+  if(cur.mode==="ai"){aiSend(t);return}
   busy=true;$("#inp").value="";autosize();$("#send").disabled=true;
   answer(t);viaVoice=false;
   renderList();renderChat(true);
   setTimeout(()=>{busy=false;renderChat();renderPrev()},550);
+}
+
+/* ================= CLAUDE VERO (con la chiave) ================= */
+const SYSTEM=`Sei «Crea App», un assistente che aiuta una famiglia italiana (Daniela e suo figlio Pietro, un bambino) a progettare app per il telefono, ciascuna con il suo sito di presentazione. Parli sempre in italiano semplice, caldo e breve, come in una chat: frasi corte, niente parole tecniche, al massimo una o due domande per volta.
+
+Come lavori:
+1. Capisci l'idea: a cosa serve l'app, per chi è, cosa deve fare, colori e stile che piacciono. Se l'idea è già chiara non fare domande inutili: proponi tu.
+2. Appena hai abbastanza idea (di solito dopo 1-3 messaggi) disegna l'anteprima, e ridisegnala ogni volta che si cambia qualcosa che si vede. Se il messaggio non cambia niente che si vede, non ridisegnare.
+3. Quando l'utente dice che gli piace (per esempio «mi piace», «va bene così», «dammi il testo per Claude»), scrivi il testo finale.
+
+Formato dell'anteprima (l'app legge questi blocchi e li mostra nel pannello Anteprima; tu non nominarli mai, di' solo «guarda l'anteprima»):
+<app_name>Nome dell'app</app_name>
+<app_html>
+un documento HTML completo e autonomo (<!doctype html> … </html>) che mostra l'app vera su uno schermo di telefono largo circa 360px: CSS e JavaScript dentro il file, nessun file o link esterno, nessuna libreria, nessuna immagine esterna (usa emoji, SVG e CSS). Deve funzionare: i pulsanti portano alle varie schermate con JavaScript, con dati di esempio realistici. Niente localStorage. Stai sotto le 300 righe.
+</app_html>
+<site_html>
+un documento HTML completo e autonomo per il sito che presenta l'app: nome, icona, a cosa serve, cosa fa, il pulsante «Apri l'app», con lo stesso stile e gli stessi colori. Stesse regole, sotto le 200 righe.
+</site_html>
+
+Testo finale, quando l'utente è contento:
+<claude_prompt>
+un testo in italiano da incollare a Claude, che costruirà davvero l'app e il sito. Comincia con «Ciao Claude! Ho progettato una nuova app con «Crea App». Per favore costruiscila davvero:» e poi descrivi tutto con precisione: nome, icona (com'è disegnata), per chi è, a cosa serve, ogni schermata e cosa c'è dentro, ogni funzione, colori con i codici esadecimali, stile e caratteri, se serve un account con password, cosa si salva sul telefono, e il sito di presentazione. Chiudi con: «Mettila su GitHub (passilombardi.github.io o guidapm.github.io) in una cartella sua, come app installabile sul telefono (PWA) con il suo sito, provala bene, e poi mandami il link.»
+</claude_prompt>
+Dopo il testo finale di' in una frase: copia il testo e tocca «Vai su Claude».
+
+Non chiedere mai password, chiavi o dati personali. Il nome e i colori dell'app li scegli insieme all'utente; non copiare marchi, loghi o personaggi di altri.`;
+let live=null, Anth=null;
+function visible(t){
+  let drawing=false;
+  let out=t.replace(/<(app_html|site_html|claude_prompt)>[\s\S]*?<\/\1>/g,"").replace(/<app_name>[\s\S]*?<\/app_name>/g,"");
+  const open=out.search(/<(app_html|site_html|claude_prompt|app_name)>/);
+  if(open>=0){drawing=!/<claude_prompt>/.test(out.slice(open,open+16));out=out.slice(0,open)}
+  out=out.replace(/<[a-z_]*$/,"");
+  return {text:out.replace(/\n{3,}/g,"\n\n"),drawing};
+}
+const grab=(t,tag)=>{const m=t.match(new RegExp("<"+tag+">\\s*([\\s\\S]*?)\\s*</"+tag+">"));return m?m[1]:null};
+async function aiSend(t){
+  const p=cur,key=getKey();
+  if(!key){say("Per parlare con Claude serve la chiave: mettila in ⚙️ Impostazioni.");save();renderChat();return}
+  busy=true;inp.value="";autosize();$("#send").disabled=true;
+  said(t);viaVoice=false;p.api.push({role:"user",content:t});save();
+  live="";renderList();renderChat(true);
+  let lastDraw=0;
+  try{
+    if(!Anth)Anth=(await import("./anthropic.js")).default;
+    const client=new Anth({apiKey:key,dangerouslyAllowBrowser:true});
+    const stream=client.beta.messages.stream({
+      model:"claude-opus-5-5",max_tokens:64000,
+      system:SYSTEM,messages:p.api,
+      output_config:{effort:"medium"},
+      cache_control:{type:"ephemeral"},
+      betas:["server-side-fallback-2026-07-01"],fallbacks:"default"
+    });
+    for await(const ev of stream){
+      if(ev.type==="content_block_delta"&&ev.delta.type==="text_delta"){live+=ev.delta.text;
+        const now=Date.now();if(now-lastDraw>120&&p===cur){lastDraw=now;renderChat(true)}}
+    }
+    const msg=await stream.finalMessage();
+    p.api.push({role:"assistant",content:msg.content});
+    if(msg.stop_reason==="refusal"){say("Scusa, su questo non posso aiutarti. Proviamo con un'altra idea?")}
+    else{
+      const full=msg.content.filter(b=>b.type==="text").map(b=>b.text).join("");
+      const name=grab(full,"app_name"),app=grab(full,"app_html"),site=grab(full,"site_html"),fin=grab(full,"claude_prompt");
+      if(name)p.ai.name=name.slice(0,40);
+      if(app)p.ai.app=app;if(site)p.ai.site=site;
+      const text=visible(full).text.trim()||(app||site?"Ecco l'anteprima!":"");
+      if(fin){p.step="done";cur.msgs.push({r:"a",t:text||"Ecco il testo per Claude!",k:"final",prompt:fin})}
+      else say(text,(app||site)?"preview":null);
+      if(msg.stop_reason==="max_tokens")say("La risposta era troppo lunga e si è fermata. Scrivimi «continua».");
+      if((app||site)&&p===cur&&innerWidth>1100)openPrev();
+    }
+  }catch(e){
+    p.api.pop();
+    const st=e&&e.status;
+    say(st===401?"La chiave di Claude non è giusta. Controllala in ⚙️ Impostazioni."
+      :st===429?"Claude è molto occupato in questo momento. Aspetta un minuto e riscrivi."
+      :st===400&&/credit|balance/i.test(String(e.message))?"Sulla chiave di Claude non c'è più credito. Ricaricalo su console.anthropic.com."
+      :!navigator.onLine||!st?"Non riesco a raggiungere Claude. Controlla internet e riprova."
+      :"Qualcosa non ha funzionato con Claude (errore "+st+"). Riprova tra poco.");
+    console.error(e);
+  }finally{live=null;busy=false;save();if(p===cur){renderAll()}}
 }
 
 /* ---- anteprima ---- */
@@ -590,6 +706,12 @@ function vars(d){
 function renderPrev(){
   document.querySelectorAll(".ptabs .t").forEach(b=>b.classList.toggle("on",b.dataset.v===pview));
   const el=$("#pbody"),d=cur.d;
+  if(cur.mode==="ai"){
+    const html=pview==="site"?cur.ai.site:cur.ai.app;
+    if(!html){el.innerHTML=`<div class="empty">Qui vedrai ${pview==="site"?"il sito":"l'app"} appena Claude la disegna.<br><br>Raccontagli la tua idea nella chat.</div>`;return}
+    el.innerHTML=pview==="site"?`<div class="sitebox"><div class="bar"><i></i><i></i><i></i></div><iframe sandbox="allow-scripts allow-forms" title="Anteprima del sito"></iframe></div>`
+      :`<div class="phone"><iframe sandbox="allow-scripts allow-forms" title="Anteprima dell'app"></iframe></div>`;
+    el.querySelector("iframe").srcdoc=html;return}
   if(!d.feat||!d.feat.length){el.innerHTML=`<div class="empty">Qui vedrai la tua app mentre la prepariamo insieme.<br><br>Prima raccontami l'idea nella chat.</div>`;return}
   const name=esc(d.name||"La tua app"),ic=esc(d.icon||"🌟");
   if(pview==="site"){
@@ -614,7 +736,7 @@ function renderPrev(){
 }
 function slug(s){return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"app"}
 function openPrev(fromChat){
-  if(cur.d.account&&fromChat)pscreen="login";
+  if(cur.mode!=="ai"&&cur.d.account&&fromChat)pscreen="login";
   $("#prev").classList.add("open");renderPrev();
 }
 document.querySelectorAll(".ptabs .t").forEach(b=>b.onclick=()=>{pview=b.dataset.v;renderPrev()});
@@ -644,7 +766,7 @@ $("#mic").onclick=()=>{
     if(recText.trim())send(inp.value,true)};
   try{rec.start()}catch(e){rec=null;$("#mic").classList.remove("on")}
 };
-$("#newBtn").onclick=()=>{$("#app").classList.remove("menu");const empty=projects.find(p=>p.step==="idea"&&p.msgs.length<=1);if(empty){cur=empty;renderAll()}else newProject()};
+$("#newBtn").onclick=()=>{$("#app").classList.remove("menu");const empty=projects.find(p=>p.step==="idea"&&p.msgs.length<=1&&(p.mode==="ai")===!!getKey());if(empty){cur=empty;renderAll()}else newProject()};
 $("#menuBtn").onclick=()=>$("#app").classList.add("menu");
 $("#scrim").onclick=()=>$("#app").classList.remove("menu");
 
@@ -657,7 +779,16 @@ function enterApp(){
   if(!projects.length)newProject();else{cur=projects[0];renderAll()}
 }
 if(sess.get("creaapp-in"))enterApp();else showGate();
-if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+/* aggiornamento automatico: quando metto online una versione nuova, l'app si ricarica da sola */
+if("serviceWorker" in navigator){
+  let reloaded=false;const hadCtl=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{if(hadCtl&&!reloaded&&!busy){reloaded=true;location.reload()}});
+  addEventListener("load",()=>navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(reg=>{
+    const check=()=>reg.update().catch(()=>{});
+    setInterval(check,5*60*1000);
+    document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")check()});
+  }).catch(()=>{}));
+}
 </script>
 </body>
 </html>
