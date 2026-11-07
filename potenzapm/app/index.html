@@ -21,6 +21,7 @@
 :root{--fondo:#121110;--nero:#1c1c1c;--scheda:#24221f;--scheda2:#2c2925;--linea:#3a362f;--oro:#d4a017;--oro2:#f0c75e;--crema:#f6f3ea;--tenue:#a59f90;--rosso:#e5484d;--verde:#3fb950;
  --f:'Sora',system-ui,-apple-system,'Segoe UI',sans-serif;color-scheme:dark}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
 html,body{margin:0;height:100%}
 body{background:var(--fondo);color:var(--crema);font:16px/1.45 var(--f);overflow:hidden}
 body.grande{font-size:18.5px}
@@ -176,6 +177,8 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid
         <p>Su iPhone premi «Attiva sensori» e rispondi «Consenti». Se la bussola sbaglia, muovi il telefono disegnando un 8 nell'aria. Sul computer questi sensori non ci sono.</p></details>
       <details><summary>Come uso il Megafono?</summary>
         <p>Tieni premuto il cerchio grande e parla: la voce esce forte dall'altoparlante. Se lasci il dito si spegne, così non fischia. Con una cassa Bluetooth diventa fortissimo: tieni il telefono lontano dalla cassa. Gli effetti Stadio, Eco, Robot e Radio cambiano la voce.</p></details>
+      <details><summary>Come collego due telefoni (microfono + cassa)?</summary>
+        <ol><li>Apri Potenza PM su tutti e due i telefoni e scegli «Microfono + Cassa».</li><li>Sul telefono che deve suonare premi «Questo è la CASSA»: compare un codice di 4 numeri.</li><li>Sull'altro premi «Questo è il MICROFONO», scrivi il codice e premi «Collega».</li><li>Parla nel microfono: la voce esce forte dalla cassa. Tienili a qualche passo di distanza.</li></ol></details>
       <details><summary>Come funziona la Gara di rutti?</summary>
         <p>Scrivi il nome e premi «Tocca a me». Dopo il 3, 2, 1 hai 5 secondi per il rutto. L'app misura la forza (in decibel) e quanto dura, e dà i punti. La classifica resta salvata sul telefono. Tenete tutti il telefono alla stessa distanza dalla bocca, se no non vale!</p></details>
       <details><summary>L'orecchio potenziato fischia</summary>
@@ -198,7 +201,7 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid
       <label class="opz"><span><b>Vibra quando tocchi</b><br><small class="tenue">Un piccolo colpo a ogni pulsante (solo Android)</small></span><input type="checkbox" id="oVibra"></label>
       <label class="opz"><span><b>Schermo sempre acceso</b><br><small class="tenue">Lo schermo non si spegne finché l'app è aperta</small></span><input type="checkbox" id="oAcceso"></label>
       <button class="btn" id="oReset">Rimetti tutto come all'inizio</button>
-      <p class="tenue" style="font-size:.8em;text-align:center">Potenza PM · versione 1.1 · gratis e senza pubblicità</p>
+      <p class="tenue" style="font-size:.8em;text-align:center">Potenza PM · versione 1.2 · gratis e senza pubblicità</p>
     </section>
   </main>
   <nav class="barra">
@@ -624,10 +627,68 @@ function ruttoFinto(forza=1){const c=ac(),t=c.currentTime,dur=.5+forza*.7,out=us
   const env=c.createGain();env.gain.setValueAtTime(0,t);env.gain.linearRampToValueAtTime(1,t+.04);env.gain.setValueAtTime(1,t+dur*.7);env.gain.exponentialRampToValueAtTime(.001,t+dur);
   o.connect(f);ng.connect(f);f.connect(am);am.connect(env);env.connect(out);[o,vib,n,flut].forEach(x=>{x.start(t);x.stop(t+dur+.05)});vibra(Math.round(dur*1000))}
 
+/* ---- Microfono + Cassa (due telefoni) ---- */
+const MC={peer:null,call:null,s:null,n:null,vol:LS.get('mcvol',3),raf:0,el:null};
+function caricaPeer(){return new Promise((ok,no)=>{if(window.Peer)return ok();const s=document.createElement('script');s.src='peerjs.min.js';s.onload=()=>ok();s.onerror=()=>no(new Error('peer'));document.head.appendChild(s)})}
+T.duetel={titolo:'Microfono + Cassa',ic:'🎙️',desc:'Due telefoni: uno parla, l\'altro suona forte',g:'fun',
+ html:()=>`<p>Usa due telefoni: uno fa da <b>microfono</b>, l'altro da <b>cassa</b>. Parli in uno e la voce esce fortissimo dall'altro, senza fischi e senza eco.</p>
+ <div id="mcScelta" class="griglia" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+  <button class="t" id="mcC" style="min-height:130px"><span class="ic">🔊</span><b>Questo è la CASSA</b><small>Il telefono che suona forte</small></button>
+  <button class="t" id="mcM" style="min-height:130px"><span class="ic">🎙️</span><b>Questo è il MICROFONO</b><small>Il telefono in cui parli</small></button></div>
+ <div id="mcCassa" hidden class="box" style="text-align:center">
+  <p>Sul telefono MICROFONO scrivi questo codice:</p>
+  <div class="grosso" id="mcCod" style="letter-spacing:.15em">····</div>
+  <p id="mcCS" style="font-weight:700">Preparo la cassa…</p>
+  <div class="vu"><i id="mcVu"></i></div>
+  <label class="sl" style="text-align:left"><span>Volume della cassa <output id="mcVv">${MC.vol*100}%</output></span><input type="range" id="mcV" min="1" max="5" step="0.5" value="${MC.vol}"></label>
+  <p class="tenue" style="font-size:.85em">Alza anche il volume del telefono al massimo.</p></div>
+ <div id="mcMic" hidden class="box" style="text-align:center">
+  <div id="mcIns"><p>Scrivi il codice che vedi sulla CASSA:</p>
+   <div class="riga" style="justify-content:center"><input id="mcIn" inputmode="numeric" maxlength="4" placeholder="0000" style="width:150px;text-align:center;font:800 1.8em var(--f);letter-spacing:.15em;padding:10px;border-radius:12px;border:1px solid var(--linea);background:var(--scheda2);color:var(--crema)"><button class="btn oro" id="mcGo">Collega</button></div></div>
+  <p id="mcMS" style="font-weight:700"></p>
+  <button class="big-toggle" id="mcTalk" hidden>🎙️ Microfono<br>acceso</button>
+  <div class="vu"><i id="mcVu2"></i></div></div>
+ <p class="nota">Serve internet su tutti e due i telefoni: va meglio se sono sulla stessa rete Wi-Fi. Tieni i due telefoni a qualche passo di distanza: più sono lontani, meno fischia.</p>`,
+ start(){const vu=(an,sel,k)=>{const d=new Uint8Array(an.fftSize);const loop=()=>{const e=$(sel);if(!e)return;an.getByteTimeDomainData(d);let m=0;for(const v of d)m=Math.max(m,Math.abs(v-128));e.style.width=Math.min(100,m/128*k)+'%';MC.raf=requestAnimationFrame(loop)};loop()};
+  const scegli=r=>{$('#mcScelta').hidden=true;$(r).hidden=false};
+  $('#mcV').oninput=e=>{MC.vol=+e.target.value;LS.set('mcvol',MC.vol);$('#mcVv').textContent=MC.vol*100+'%';if(MC.n)MC.n.g.gain.setTargetAtTime(MC.vol,AC.currentTime,.05)};
+  /* CASSA */
+  $('#mcC').onclick=async()=>{scegli('#mcCassa');ac();WL.on('duetel');
+   try{await caricaPeer()}catch(e){$('#mcCS').textContent='Non riesco a collegarmi: controlla internet.';return}
+   const nuovo=()=>{const cod=String(Math.floor(1000+Math.random()*9000));const p=new Peer('potenzapm-'+cod,Object.assign({debug:0},window.PPM_PEER||{}));MC.peer=p;
+    p.on('open',()=>{$('#mcCod').textContent=cod;$('#mcCS').textContent='Aspetto il microfono…'});
+    p.on('error',e=>{if(e.type==='unavailable-id'){p.destroy();nuovo()}else $('#mcCS').textContent='Problema di collegamento: controlla internet e riprova.'});
+    p.on('call',call=>{if(MC.call)try{MC.call.close()}catch(e){}MC.call=call;call.answer();
+     call.on('stream',st=>{const c=ac();if(!MC.el){MC.el=new Audio();MC.el.muted=true}MC.el.srcObject=st;MC.el.play().catch(()=>{});
+      if(MC.n)try{MC.n.src.disconnect()}catch(e){}const src=c.createMediaStreamSource(st),hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=90;
+      const g=c.createGain();g.gain.value=MC.vol;const comp=c.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=12;comp.attack.value=.003;const an=c.createAnalyser();
+      src.connect(hp);hp.connect(g);g.connect(comp);comp.connect(an);an.connect(c.destination);MC.n={src,g};
+      $('#mcCS').textContent='✅ Microfono collegato! Parla nell\'altro telefono';vibra([80,50,80]);cancelAnimationFrame(MC.raf);vu(an,'#mcVu',150)});
+     call.on('close',()=>{$('#mcCS').textContent='Il microfono si è scollegato. Aspetto…';$('#mcVu').style.width=0})})};
+   nuovo()};
+  /* MICROFONO */
+  $('#mcM').onclick=()=>{scegli('#mcMic');setTimeout(()=>$('#mcIn').focus(),100)};
+  $('#mcGo').onclick=async()=>{const cod=$('#mcIn').value.replace(/\D/g,'');if(cod.length!==4){avviso('Il codice ha 4 numeri');return}
+   $('#mcMS').textContent='Mi collego…';$('#mcGo').disabled=true;
+   try{await caricaPeer();if(!MC.s)MC.s=await apriMicro({echoCancellation:true,noiseSuppression:true,autoGainControl:true})}
+   catch(e){$('#mcMS').textContent=e.message==='peer'?'Non riesco a collegarmi: controlla internet.':erroreMic(e);$('#mcGo').disabled=false;return}
+   if(MC.peer)MC.peer.destroy();const p=new Peer(Object.assign({debug:0},window.PPM_PEER||{}));MC.peer=p;
+   const fallito=t=>{$('#mcMS').textContent=t;$('#mcGo').disabled=false;$('#mcTalk').hidden=true;$('#mcIns').hidden=false};
+   p.on('error',e=>fallito(e.type==='peer-unavailable'?'Non trovo la cassa: controlla il codice e che la cassa sia aperta.':'Problema di collegamento: controlla internet e riprova.'));
+   p.on('open',()=>{const call=p.call('potenzapm-'+cod,MC.s);MC.call=call;
+    const to=setTimeout(()=>fallito('La cassa non risponde. Riprova.'),15000);
+    const ok=()=>{clearTimeout(to);$('#mcIns').hidden=true;$('#mcTalk').hidden=false;$('#mcTalk').classList.add('on');$('#mcMS').textContent='✅ Collegato alla cassa '+cod+'. Parla!';WL.on('duetel');vibra([80,50,80])};
+    call.on('stream',ok);if(call.peerConnection)call.peerConnection.addEventListener('connectionstatechange',()=>{const s=call.peerConnection.connectionState;if(s==='connected')ok();if(s==='failed')fallito('Collegamento non riuscito. Riprova.')});
+    call.on('close',()=>fallito('La cassa si è scollegata.'))});
+   const c=ac(),an=c.createAnalyser();c.createMediaStreamSource(MC.s).connect(an);cancelAnimationFrame(MC.raf);vu(an,'#mcVu2',150)};
+  $('#mcTalk').onclick=()=>{const t=MC.s&&MC.s.getAudioTracks()[0];if(!t)return;t.enabled=!t.enabled;$('#mcTalk').classList.toggle('on',t.enabled);$('#mcTalk').innerHTML=t.enabled?'🎙️ Microfono<br>acceso':'🔇 Microfono<br>spento'}},
+ stop(){cancelAnimationFrame(MC.raf);try{MC.call&&MC.call.close()}catch(e){}try{MC.peer&&MC.peer.destroy()}catch(e){}MC.call=MC.peer=null;if(MC.n)try{MC.n.src.disconnect()}catch(e){}MC.n=null;if(MC.el){MC.el.srcObject=null}chiudiStream(MC.s);MC.s=null;WL.off('duetel')}};
+
 /* ---- Megafono ---- */
 const MG={s:null,n:null,eff:'normale',vol:4,sempre:false};
 T.megafono={titolo:'Megafono',ic:'📢',desc:'La tua voce forte come una cassa',g:'fun',
  html:()=>`<p>Parli nel telefono e la tua voce esce forte dall'altoparlante, come un megafono. Ancora meglio se colleghi una cassa Bluetooth.</p>
+ <button class="btn oro lungo" data-open="duetel">🎙️🔊 Usa due telefoni: microfono + cassa (niente eco)</button>
  <button class="big-toggle" id="mgP" style="touch-action:none;user-select:none;-webkit-user-select:none">Tieni premuto<br>e parla</button>
  <label class="opz" style="padding:8px 0;border:0;background:none"><span><b>Sempre acceso</b><br><small class="tenue">Senza tenere premuto</small></span><input type="checkbox" id="mgS"></label>
  <label class="sl"><span>Potenza <output id="mgVv">${MG.vol*50}%</output></span><input type="range" id="mgV" min="1" max="8" value="${MG.vol}"></label>
