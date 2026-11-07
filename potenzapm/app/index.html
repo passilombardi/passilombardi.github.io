@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1c1c1c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Potenza PM">
+<meta name="description" content="Potenza PM: volume potenziato fino al 300% per la tua musica, torcia, luce schermo, modo notte, batteria, bussola, livella e tanti altri strumenti per il telefono.">
+<title>Potenza PM</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;800&display=swap">
+<style>
+/* Layout: in alto il marchio, al centro la pagina scelta (Strumenti / Aiuto / Opzioni), in basso la barra con le tre pagine.
+   Ogni strumento si apre a tutto schermo sopra, con «Indietro». Sempre scuro, nero e oro. */
+:root{--fondo:#121110;--nero:#1c1c1c;--scheda:#24221f;--scheda2:#2c2925;--linea:#3a362f;--oro:#d4a017;--oro2:#f0c75e;--crema:#f6f3ea;--tenue:#a59f90;--rosso:#e5484d;--verde:#3fb950;
+ --f:'Sora',system-ui,-apple-system,'Segoe UI',sans-serif;color-scheme:dark}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{background:var(--fondo);color:var(--crema);font:16px/1.45 var(--f);overflow:hidden}
+body.grande{font-size:18.5px}
+#app{height:100%;display:flex;flex-direction:column}
+header.top{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:calc(10px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));background:var(--nero);border-bottom:1px solid var(--linea)}
+header.top img{width:40px;height:40px;border-radius:10px}
+header.top b{font:800 1.2em/1 var(--f);letter-spacing:-.01em}
+header.top b span{color:var(--oro)}
+header.top small{display:block;color:var(--tenue);font-size:.72em;margin-top:3px}
+header.top .bat{margin-left:auto;font-size:.8em;color:var(--tenue);font-variant-numeric:tabular-nums}
+main{flex:1;overflow:auto;min-height:0;padding:16px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+.pag{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.pag[hidden]{display:none}
+h1{font:800 1.6em/1.15 var(--f);margin:0;letter-spacing:-.02em;text-wrap:balance}
+h2{font:800 .78em var(--f);text-transform:uppercase;letter-spacing:.12em;color:var(--oro);margin:10px 0 0}
+p{margin:0}
+.tenue{color:var(--tenue)}
+.hero{background:linear-gradient(135deg,#2a2210,#1c1c1c 60%);border:1px solid #5a4613;border-radius:20px;padding:18px;display:flex;gap:14px;align-items:center;cursor:pointer;color:inherit;font:inherit;text-align:left;width:100%}
+.hero .num{font:800 2.4em/1 var(--f);color:var(--oro2);font-variant-numeric:tabular-nums}
+.hero p{font-size:.92em;color:var(--tenue)}
+.hero b{display:block;font-size:1.1em}
+.griglia{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (min-width:560px){.griglia{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:760px){.griglia{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.t{background:var(--scheda);border:1px solid var(--linea);border-radius:16px;padding:14px 12px;display:flex;flex-direction:column;gap:8px;align-items:flex-start;text-align:left;color:inherit;font:inherit;cursor:pointer;min-height:118px}
+.t:active{transform:scale(.98)}
+.t .ic{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:22px;background:#1a1814;border:1px solid #5a4613}
+.t b{font-weight:800;font-size:.98em;line-height:1.2}
+.t small{color:var(--tenue);font-size:.78em;line-height:1.3}
+nav.barra{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,1fr);background:var(--nero);border-top:1px solid var(--linea);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav.barra button{border:0;background:none;color:var(--tenue);font:600 .78em var(--f);padding:9px 4px 10px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+nav.barra button span{font-size:1.45em;line-height:1}
+nav.barra button[aria-current="page"]{color:var(--oro2)}
+/* strumento aperto */
+#tool{position:fixed;inset:0;background:var(--fondo);z-index:20;display:flex;flex-direction:column}
+#tool[hidden]{display:none}
+#tool header{display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) 10px max(12px,env(safe-area-inset-left,0px));background:var(--nero);border-bottom:1px solid var(--linea)}
+#tool header button{border:0;background:var(--scheda2);color:var(--crema);border-radius:999px;padding:8px 14px;font:700 .9em var(--f);cursor:pointer}
+#tool header b{font-weight:800;font-size:1.1em}
+#tbody{flex:1;overflow:auto;min-height:0;padding:16px max(16px,env(safe-area-inset-right,0px)) calc(28px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+#tbody>div{max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.box{background:var(--scheda);border:1px solid var(--linea);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.btn{border:0;border-radius:999px;padding:13px 20px;font:700 1em var(--f);cursor:pointer;background:var(--scheda2);color:var(--crema);border:1px solid var(--linea)}
+.btn.oro{background:var(--oro);color:#1c1c1c;border-color:var(--oro)}
+.btn.lungo{width:100%}
+.btn:disabled{opacity:.5}
+.btn.on{background:var(--oro);color:#1c1c1c}
+.riga{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{border:1px solid var(--linea);background:var(--scheda2);color:var(--crema);border-radius:999px;padding:8px 13px;font:700 .85em var(--f);cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--oro);color:#1c1c1c;border-color:var(--oro)}
+label.sl{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:.92em}
+label.sl span{display:flex;justify-content:space-between}
+label.sl output{color:var(--oro2);font-variant-numeric:tabular-nums;font-weight:800}
+input[type=range]{width:100%;accent-color:var(--oro);height:30px}
+.grosso{font:800 3.4em/1 var(--f);color:var(--oro2);text-align:center;font-variant-numeric:tabular-nums}
+.grosso small{font-size:.35em;color:var(--tenue);font-weight:600}
+.nota{font-size:.85em;color:var(--tenue);background:#1a1814;border-left:3px solid var(--oro);border-radius:8px;padding:9px 12px}
+.nota.att{border-color:var(--rosso)}
+.vu{height:14px;border-radius:7px;background:#14130f;overflow:hidden;border:1px solid var(--linea)}
+.vu i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--verde),var(--oro) 70%,var(--rosso));transition:width .08s}
+.lista{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;max-height:200px;overflow:auto}
+.lista li{padding:8px 10px;border-radius:10px;background:var(--scheda2);cursor:pointer;font-size:.9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lista li.ora{background:#3b2f10;color:var(--oro2);font-weight:700}
+video.media{width:100%;border-radius:12px;background:#000;max-height:40vh}
+video.cam{width:100%;border-radius:16px;background:#000;aspect-ratio:3/4;object-fit:cover}
+.camwrap{position:relative;overflow:hidden;border-radius:16px;background:#000}
+.dati{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dati div{background:var(--scheda2);border-radius:12px;padding:9px 11px}
+.dati small{display:block;color:var(--tenue);font-size:.72em;text-transform:uppercase;letter-spacing:.06em}
+.dati b{font-weight:800;font-variant-numeric:tabular-nums;word-break:break-word}
+.cerchio{width:min(260px,70vw);aspect-ratio:1;margin:0 auto;border-radius:50%;border:3px solid var(--linea);position:relative;background:radial-gradient(circle,#1e1c18,#121110)}
+.cerchio .bolla{position:absolute;width:44px;height:44px;border-radius:50%;left:50%;top:50%;margin:-22px;background:radial-gradient(circle at 35% 35%,#fff6c8,var(--oro));box-shadow:0 0 18px #d4a01788;transition:transform .08s}
+.cerchio .croce{position:absolute;inset:0;margin:auto;width:56px;height:56px;border:2px dashed var(--tenue);border-radius:50%}
+.cerchio.piatto{border-color:var(--verde)}
+.quadrante{transition:transform .15s linear;width:100%;height:100%}
+.freccia{position:absolute;left:50%;top:-6px;transform:translateX(-50%);width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-top:18px solid var(--rosso);z-index:2}
+.anello{width:170px;height:170px;margin:0 auto;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--oro) calc(var(--p)*1%),#2c2925 0)}
+.anello div{width:136px;height:136px;border-radius:50%;background:var(--scheda);display:grid;place-items:center;font:800 2em var(--f);font-variant-numeric:tabular-nums}
+.help details{background:var(--scheda);border:1px solid var(--linea);border-radius:14px;padding:12px 14px}
+.help summary{font-weight:700;cursor:pointer}
+.help details p,.help details ol,.help details ul{margin:8px 0 0;color:#d9d4c7;font-size:.94em}
+.help li{margin:3px 0}
+.verita{background:linear-gradient(135deg,#2a2210,#1c1c1c);border:1px solid #5a4613;border-radius:16px;padding:14px 16px}
+.verita b{color:var(--oro2)}
+.opz{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--scheda);border:1px solid var(--linea);border-radius:14px;padding:12px 14px}
+.opz input[type=checkbox]{width:24px;height:24px;accent-color:var(--oro)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--oro2);outline-offset:2px}
+/* luce a tutto schermo */
+#luce{position:fixed;inset:0;z-index:50;background:#fff;display:flex;align-items:flex-end;justify-content:center;padding-bottom:calc(30px + env(safe-area-inset-bottom,0px))}
+#luce[hidden]{display:none}
+#luce button{border:0;border-radius:999px;padding:12px 22px;font:700 1em var(--f);background:rgba(0,0,0,.55);color:#fff;transition:opacity .4s}
+#luce .velo{position:absolute;inset:0;background:#000;pointer-events:none}
+#scuro{position:fixed;inset:0;background:#000;pointer-events:none;z-index:100;opacity:0}
+#avviso{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--oro);color:#1c1c1c;font-weight:700;padding:10px 16px;border-radius:999px;z-index:120;max-width:90vw;text-align:center;font-size:.9em}
+#avviso[hidden]{display:none}
+.big-toggle{width:min(220px,60vw);aspect-ratio:1;border-radius:50%;margin:8px auto;border:4px solid var(--linea);background:radial-gradient(circle,#2c2925,#181715);color:var(--crema);font:800 1.4em var(--f);cursor:pointer;display:grid;place-items:center}
+.big-toggle.on{border-color:var(--oro);background:radial-gradient(circle,#fff6c8,var(--oro) 70%);color:#1c1c1c;box-shadow:0 0 50px #d4a01799}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <img src="icon-192.png" alt="">
+    <div><b>Potenza <span>PM</span></b><small>Potenzia il tuo telefono</small></div>
+    <div class="bat" id="topbat"></div>
+  </header>
+  <main id="main">
+    <section class="pag" id="p-strumenti">
+      <button class="hero" data-open="booster">
+        <div class="num" id="heroNum">250%</div>
+        <div><b>Volume potenziato</b><p>Fai suonare la tua musica e i tuoi video molto più forte, fino al 300%.</p></div>
+      </button>
+      <h2>Suono</h2>
+      <div class="griglia" id="g-suono"></div>
+      <h2>Luce e schermo</h2>
+      <div class="griglia" id="g-luce"></div>
+      <h2>Sensori e fotocamera</h2>
+      <div class="griglia" id="g-sensori"></div>
+      <h2>Il telefono</h2>
+      <div class="griglia" id="g-tel"></div>
+    </section>
+
+    <section class="pag help" id="p-aiuto" hidden>
+      <h1>Aiuto</h1>
+      <div class="verita">
+        <p><b>La verità, detta chiara.</b> Nessuna app presa da un sito può alzare il volume di tutto il telefono oltre il massimo, né la luminosità oltre il massimo: quelle le comanda solo il telefono. Chi lo promette ti prende in giro.</p>
+        <p style="margin-top:8px">Potenza PM invece fa cose <b>vere</b>: alza fino al 300% il suono delle canzoni e dei video che apri <b>dentro l'app</b>, accende la torcia, usa lo schermo come lampada, misura il rumore, e tanto altro.</p>
+      </div>
+      <h2>Domande</h2>
+      <details><summary>Come metto l'app sul telefono?</summary>
+        <ol><li><b>Android (Chrome):</b> apri il sito, premi i tre puntini in alto a destra, poi «Installa app» o «Aggiungi a schermata Home».</li>
+        <li><b>iPhone (Safari):</b> premi il quadrato con la freccia in basso, poi «Aggiungi alla schermata Home».</li></ol></details>
+      <details><summary>Come funziona il Volume potenziato?</summary>
+        <p>Premi «Scegli canzoni o video» e prendi i file dal telefono. L'app li fa suonare e li amplifica fino al 300%. La «Protezione» evita che il suono gracchi quando è molto forte. Puoi anche alzare i bassi e gli alti.</p>
+        <p>Funziona con i file che hai sul telefono (mp3, m4a, mp4…). Non può alzare YouTube, Spotify o WhatsApp, perché suonano in altre app.</p></details>
+      <details><summary>Come alzo di più il volume di tutto il telefono?</summary>
+        <ul><li>Alza il volume con i tasti fino in fondo e controlla di alzare quello giusto (suoneria, contenuti multimediali, chiamate).</li>
+        <li><b>Samsung:</b> Impostazioni › Suoni e vibrazione › Qualità e effetti audio: accendi Dolby Atmos e l'equalizzatore.</li>
+        <li><b>Altri Android:</b> Impostazioni › Suono: cerca «Equalizzatore» o «Effetti audio».</li>
+        <li><b>iPhone:</b> Impostazioni › Musica › EQ › «Notte tarda» rende il suono più forte e pieno.</li>
+        <li>Pulisci l'altoparlante: lo trovi tra gli strumenti. Polvere e acqua lo rendono più debole.</li></ul></details>
+      <details><summary>Come rendo lo schermo più luminoso o più scuro?</summary>
+        <ul><li>Più luce: spegni il «Risparmio energetico» e la «Luminosità automatica», poi porta la barra della luminosità al massimo.</li>
+        <li>Più scuro di notte (Android): Impostazioni › Accessibilità › «Luminosità extra ridotta» o «Attenuazione extra».</li>
+        <li>Più scuro di notte (iPhone): Impostazioni › Accessibilità › Schermo e dimensioni testo › «Riduci punto bianco».</li>
+        <li>Dentro l'app: strumento «Più scuro» o Opzioni › «Scurisci l'app».</li></ul></details>
+      <details><summary>La torcia non si accende</summary>
+        <p>Su molti Android funziona: la prima volta il telefono chiede il permesso della fotocamera, rispondi «Consenti». Su iPhone il browser non lascia accendere la torcia: usa «Luce schermo», che fa diventare lo schermo una lampada.</p></details>
+      <details><summary>La bussola o la livella non si muovono</summary>
+        <p>Su iPhone premi «Attiva sensori» e rispondi «Consenti». Se la bussola sbaglia, muovi il telefono disegnando un 8 nell'aria. Sul computer questi sensori non ci sono.</p></details>
+      <details><summary>L'orecchio potenziato fischia</summary>
+        <p>Usa sempre le cuffie o gli auricolari. Con l'altoparlante il suono torna nel microfono e fischia. Abbassa la potenza se senti fischi.</p></details>
+      <details><summary>Ascoltare forte fa male?</summary>
+        <p>Sì, se dura tanto. Con le cuffie non stare a lungo sopra il 150%, e fai delle pause. Se senti fischi nelle orecchie, abbassa subito.</p></details>
+      <details><summary>Funziona senza internet?</summary>
+        <p>Sì. Dopo la prima apertura l'app si salva sul telefono e funziona anche senza rete. Solo la «Prova velocità internet» ha bisogno della rete.</p></details>
+      <details><summary>L'app mi spia o costa qualcosa?</summary>
+        <p>No. È gratis, non ha pubblicità e non manda niente a nessuno. Fotocamera e microfono si usano solo mentre tieni aperto lo strumento, e si spengono quando torni indietro.</p></details>
+    </section>
+
+    <section class="pag" id="p-opzioni" hidden>
+      <h1>Opzioni</h1>
+      <div class="box">
+        <label class="sl"><span>Scurisci l'app <output id="oScuroV">0%</output></span><input type="range" id="oScuro" min="0" max="85" value="0"></label>
+        <p class="tenue" style="font-size:.85em">Rende tutta l'app più scura, per usarla di notte senza abbagliarti.</p>
+      </div>
+      <label class="opz"><span><b>Testo grande</b><br><small class="tenue">Scritte più grandi, più facili da leggere</small></span><input type="checkbox" id="oGrande"></label>
+      <label class="opz"><span><b>Vibra quando tocchi</b><br><small class="tenue">Un piccolo colpo a ogni pulsante (solo Android)</small></span><input type="checkbox" id="oVibra"></label>
+      <label class="opz"><span><b>Schermo sempre acceso</b><br><small class="tenue">Lo schermo non si spegne finché l'app è aperta</small></span><input type="checkbox" id="oAcceso"></label>
+      <button class="btn" id="oReset">Rimetti tutto come all'inizio</button>
+      <p class="tenue" style="font-size:.8em;text-align:center">Potenza PM · versione 1.0 · gratis e senza pubblicità</p>
+    </section>
+  </main>
+  <nav class="barra">
+    <button data-p="strumenti" aria-current="page"><span>⚡</span>Strumenti</button>
+    <button data-p="aiuto"><span>❔</span>Aiuto</button>
+    <button data-p="opzioni"><span>⚙️</span>Opzioni</button>
+  </nav>
+</div>
+
+<div id="tool" hidden>
+  <header><button id="tBack">‹ Indietro</button><b id="tTitle"></b></header>
+  <div id="tbody"><div id="tIn"></div></div>
+</div>
+
+<div id="luce" hidden><div class="velo" id="luceVelo"></div><button id="luceX" style="position:relative">Tocca qui per chiudere</button></div>
+<div id="scuro"></div>
+<div id="avviso" hidden></div>
+<video id="media" class="media" playsinline hidden></video>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const LS={get(k,d){try{const v=localStorage.getItem('potenzapm-'+k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('potenzapm-'+k,JSON.stringify(v))}catch(e){}}};
+let AC=null;
+function ac(){if(!AC){const C=window.AudioContext||window.webkitAudioContext;AC=new C()}if(AC.state==='suspended')AC.resume();return AC}
+function avviso(t,ms=2600){const a=$('#avviso');a.textContent=t;a.hidden=false;clearTimeout(avviso.t);avviso.t=setTimeout(()=>a.hidden=true,ms)}
+function vibra(p){try{if(navigator.vibrate)return navigator.vibrate(p)}catch(e){}return false}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+
+/* ---------- schermo acceso (Wake Lock) ---------- */
+const WL={lock:null,want:new Set(),async upd(){
+  if(this.want.size&&!this.lock&&'wakeLock' in navigator&&document.visibilityState==='visible'){try{this.lock=await navigator.wakeLock.request('screen');this.lock.addEventListener('release',()=>{this.lock=null})}catch(e){}}
+  else if(!this.want.size&&this.lock){try{await this.lock.release()}catch(e){}this.lock=null}},
+  on(k){this.want.add(k);this.upd()},off(k){this.want.delete(k);this.upd()}};
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')WL.upd()});
+
+/* ---------- fotocamera ---------- */
+async function apriCamera(facing,video){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('nocam');
+  const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facing},width:{ideal:1280},height:{ideal:960}},audio:false});
+  if(video){video.srcObject=s;video.muted=true;video.setAttribute('playsinline','');await video.play().catch(()=>{})}
+  return s;
+}
+function chiudiStream(s){if(s)s.getTracks().forEach(t=>t.stop())}
+function erroreCam(e){return e&&e.name==='NotAllowedError'?'Hai detto di no al permesso della fotocamera. Puoi cambiarlo nelle impostazioni del browser (il lucchetto vicino all\'indirizzo).':'Non riesco ad aprire la fotocamera su questo telefono.'}
+async function apriMicro(opts){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('nomic');
+  return navigator.mediaDevices.getUserMedia({audio:Object.assign({echoCancellation:false,noiseSuppression:false,autoGainControl:false},opts||{}),video:false});
+}
+function erroreMic(e){return e&&e.name==='NotAllowedError'?'Hai detto di no al permesso del microfono. Puoi cambiarlo nelle impostazioni del browser.':'Non riesco ad aprire il microfono.'}
+
+/* ---------- luce a tutto schermo ---------- */
+const Luce={timer:null,colore:'#ffffff',apri(colore,veloOp,modo){
+  const L=$('#luce');this.colore=colore;L.style.background=colore;$('#luceVelo').style.opacity=veloOp||0;L.hidden=false;
+  try{if(document.documentElement.requestFullscreen&&!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{})}catch(e){}
+  WL.on('luce');this.modo(modo||'fissa');if(!(history.state&&history.state.luce))history.pushState({luce:1,tool:attivo},'');
+  const x=$('#luceX');x.style.opacity=1;clearTimeout(this.hx);this.hx=setTimeout(()=>x.style.opacity=.25,2500);
+ },modo(m){clearInterval(this.timer);clearTimeout(this.timer);const L=$('#luce');L.style.background=this.colore;
+  if(m==='lampeggia'){let on=true;this.timer=setInterval(()=>{on=!on;L.style.background=on?this.colore:'#000'},Luce.vel||150)}
+  else if(m==='sos'){const seq=sosSeq();let i=0;const step=()=>{const [on,d]=seq[i%seq.length];L.style.background=on?this.colore:'#000';i++;this.timer=setTimeout(step,d)};step()}
+  else if(m==='arcobaleno'){let h=0;this.timer=setInterval(()=>{h=(h+4)%360;L.style.background='hsl('+h+',100%,55%)'},40)}
+ },chiudi(){clearInterval(this.timer);clearTimeout(this.timer);$('#luce').hidden=true;WL.off('luce');try{if(document.fullscreenElement)document.exitFullscreen().catch(()=>{})}catch(e){}}};
+$('#luceX').onclick=e=>{e.stopPropagation();Luce.chiudi();if(history.state&&history.state.luce)history.back()};
+$('#luce').onclick=()=>{const x=$('#luceX');x.style.opacity=1;clearTimeout(Luce.hx);Luce.hx=setTimeout(()=>x.style.opacity=.25,2500)};
+function sosSeq(u=200){const a=[];const dot=()=>{a.push([1,u],[0,u])},dash=()=>{a.push([1,u*3],[0,u])};for(let i=0;i<3;i++)dot();a.push([0,u*2]);for(let i=0;i<3;i++)dash();a.push([0,u*2]);for(let i=0;i<3;i++)dot();a.push([0,u*6]);return a}
+
+/* ================== STRUMENTI ================== */
+const T={};
+let attivo=null;
+
+/* ---- 1. Volume potenziato ---- */
+const B={el:$('#media'),g:null,files:[],i:-1,url:null,boost:LS.get('boost',250),bass:LS.get('bass',4),treble:LS.get('treble',2),prot:LS.get('prot',true),raf:0};
+function bGraph(){if(B.g)return B.g;const c=ac();const src=c.createMediaElementSource(B.el);
+  const bass=c.createBiquadFilter();bass.type='lowshelf';bass.frequency.value=120;
+  const tre=c.createBiquadFilter();tre.type='highshelf';tre.frequency.value=3500;
+  const gain=c.createGain();const comp=c.createDynamicsCompressor();const an=c.createAnalyser();an.fftSize=1024;
+  src.connect(bass);bass.connect(tre);tre.connect(gain);gain.connect(comp);comp.connect(an);an.connect(c.destination);
+  B.g={bass,tre,gain,comp,an};bApply();return B.g}
+function bApply(){$('#heroNum').textContent=B.boost+'%';if(!B.g)return;const t=AC.currentTime;
+  B.g.gain.gain.setTargetAtTime(B.boost/100,t,.05);B.g.bass.gain.setTargetAtTime(B.bass,t,.05);B.g.tre.gain.setTargetAtTime(B.treble,t,.05);
+  const c=B.g.comp;if(B.prot){c.threshold.value=-12;c.knee.value=8;c.ratio.value=12;c.attack.value=.003;c.release.value=.25}else{c.threshold.value=0;c.knee.value=0;c.ratio.value=1}}
+function bLoad(i,play=true){if(i<0||i>=B.files.length)return;B.i=i;const f=B.files[i];if(B.url)URL.revokeObjectURL(B.url);B.url=URL.createObjectURL(f);
+  B.el.src=B.url;B.el.hidden=!f.type.startsWith('video');bGraph();if(play)B.el.play().catch(()=>{});bList()}
+function bList(){const ul=$('#bList');if(!ul)return;ul.innerHTML=B.files.map((f,i)=>'<li data-i="'+i+'" class="'+(i===B.i?'ora':'')+'">'+(i+1)+'. '+esc(f.name)+'</li>').join('');
+  $('#bNome').textContent=B.i>=0?B.files[B.i].name:'Nessun brano scelto';$('#bPlay').textContent=B.el.paused?'▶ Suona':'⏸ Pausa'}
+B.el.addEventListener('ended',()=>{if(B.i<B.files.length-1)bLoad(B.i+1)});
+['play','pause'].forEach(ev=>B.el.addEventListener(ev,()=>{const b=$('#bPlay');if(b)b.textContent=B.el.paused?'▶ Suona':'⏸ Pausa'}));
+B.el.addEventListener('timeupdate',()=>{const s=$('#bSeek');if(s&&B.el.duration&&!s.matches(':active')){s.value=B.el.currentTime/B.el.duration*1000;$('#bTempo').textContent=mmss(B.el.currentTime)+' / '+mmss(B.el.duration)}});
+function mmss(s){s=Math.floor(s||0);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+T.booster={titolo:'Volume potenziato',ic:'🔊',desc:'La tua musica fino al 300%',g:'suono',
+ html:()=>`
+ <div class="grosso"><span id="bVal">${B.boost}</span><small>%</small></div>
+ <label class="sl"><span>Potenza del volume <output>100% → 300%</output></span><input type="range" id="bBoost" min="100" max="300" step="5" value="${B.boost}"></label>
+ <div class="chips" id="bPre"><button data-v="100">Normale</button><button data-v="160">Forte</button><button data-v="220">Super</button><button data-v="300">Massimo</button></div>
+ <div class="vu"><i id="bVu"></i></div>
+ <div class="box">
+  <input type="file" id="bFile" accept="audio/*,video/*" multiple hidden>
+  <button class="btn oro lungo" id="bScegli">🎵 Scegli canzoni o video</button>
+  <b id="bNome" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Nessun brano scelto</b>
+  <div id="bVid"></div>
+  <input type="range" id="bSeek" min="0" max="1000" value="0" aria-label="Posizione">
+  <div class="riga" style="justify-content:space-between"><small class="tenue" id="bTempo">0:00 / 0:00</small>
+   <div class="riga"><button class="btn" id="bPrev" aria-label="Precedente">⏮</button><button class="btn oro" id="bPlay">▶ Suona</button><button class="btn" id="bNext" aria-label="Successivo">⏭</button></div></div>
+  <ul class="lista" id="bList"></ul>
+ </div>
+ <div class="box">
+  <label class="sl"><span>Bassi <output id="bBassV">${B.bass>0?'+':''}${B.bass} dB</output></span><input type="range" id="bBass" min="-10" max="15" value="${B.bass}"></label>
+  <label class="sl"><span>Alti <output id="bTreV">${B.treble>0?'+':''}${B.treble} dB</output></span><input type="range" id="bTre" min="-10" max="12" value="${B.treble}"></label>
+  <div class="chips"><span class="tenue" style="font-size:.85em;align-self:center">Velocità:</span><span class="chips" id="bVel"><button data-v="0.75">0,75×</button><button data-v="1" aria-pressed="true">1×</button><button data-v="1.25">1,25×</button><button data-v="1.5">1,5×</button></span></div>
+  <label class="opz" style="padding:8px 0;border:0;background:none"><span><b>Protezione</b><br><small class="tenue">Il suono forte non gracchia</small></span><input type="checkbox" id="bProt" ${B.prot?'checked':''}></label>
+ </div>
+ <p class="nota">Funziona con le canzoni e i video che hai sul telefono e apri qui. Non può alzare il volume di tutto il telefono o di altre app (YouTube, Spotify): nessuna app lo può fare. La musica continua anche se torni agli altri strumenti.</p>
+ <p class="nota att">Con le cuffie non tenere a lungo il volume molto alto: le orecchie si stancano.</p>`,
+ start(){const vid=$('#bVid');vid.appendChild(B.el);
+  const setB=v=>{B.boost=+v;LS.set('boost',B.boost);$('#bVal').textContent=B.boost;$('#bBoost').value=B.boost;$$('#bPre button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.v===B.boost));bApply()};
+  setB(B.boost);$('#bBoost').oninput=e=>setB(e.target.value);$$('#bPre button').forEach(b=>b.onclick=()=>setB(b.dataset.v));
+  $('#bScegli').onclick=()=>$('#bFile').click();
+  $('#bFile').onchange=e=>{const fs=[...e.target.files];if(!fs.length)return;const start=B.files.length;B.files.push(...fs);bLoad(start)};
+  $('#bPlay').onclick=()=>{if(B.i<0){$('#bFile').click();return}ac();B.el.paused?B.el.play().catch(()=>{}):B.el.pause()};
+  $('#bPrev').onclick=()=>{if(B.el.currentTime>3)B.el.currentTime=0;else bLoad(Math.max(0,B.i-1))};
+  $('#bNext').onclick=()=>bLoad(Math.min(B.files.length-1,B.i+1));
+  $('#bList').onclick=e=>{const li=e.target.closest('li');if(li)bLoad(+li.dataset.i)};
+  $('#bSeek').oninput=e=>{if(B.el.duration)B.el.currentTime=e.target.value/1000*B.el.duration};
+  $('#bBass').oninput=e=>{B.bass=+e.target.value;LS.set('bass',B.bass);$('#bBassV').textContent=(B.bass>0?'+':'')+B.bass+' dB';bApply()};
+  $('#bTre').oninput=e=>{B.treble=+e.target.value;LS.set('treble',B.treble);$('#bTreV').textContent=(B.treble>0?'+':'')+B.treble+' dB';bApply()};
+  $('#bProt').onchange=e=>{B.prot=e.target.checked;LS.set('prot',B.prot);bApply()};
+  $$('#bVel button').forEach(b=>{b.setAttribute('aria-pressed',+b.dataset.v===B.el.playbackRate);b.onclick=()=>{B.el.playbackRate=+b.dataset.v;$$('#bVel button').forEach(x=>x.setAttribute('aria-pressed',x===b))}});
+  bList();const d=new Uint8Array(1024);
+  const loop=()=>{if(B.g&&!B.el.paused){B.g.an.getByteTimeDomainData(d);let m=0;for(const v of d)m=Math.max(m,Math.abs(v-128));$('#bVu').style.width=Math.min(100,m/128*100)+'%'}else $('#bVu').style.width='0';B.raf=requestAnimationFrame(loop)};loop();
+ },stop(){cancelAnimationFrame(B.raf);B.el.hidden=true;document.body.appendChild(B.el)}};
+
+/* ---- 2. Orecchio potenziato (microfono → cuffie) ---- */
+const O={s:null,n:null,g:5,raf:0};
+T.orecchio={titolo:'Orecchio potenziato',ic:'👂',desc:'Senti meglio i suoni intorno',g:'suono',
+ html:()=>`<p>Il microfono ascolta i suoni intorno a te e li manda più forti nelle tue cuffie. Utile per sentire meglio una persona che parla piano o la TV.</p>
+ <p class="nota att">Metti prima le cuffie o gli auricolari, se no fischia.</p>
+ <button class="big-toggle" id="oTog">Accendi</button>
+ <label class="sl"><span>Potenza <output id="oGv">${O.g*50}%</output></span><input type="range" id="oG" min="1" max="10" value="${O.g}"></label>
+ <label class="opz" style="padding:8px 0;border:0;background:none"><span><b>Togli il rumore di fondo</b></span><input type="checkbox" id="oNs" checked></label>
+ <div class="vu"><i id="oVu"></i></div>
+ <p class="nota">Si spegne da solo quando torni indietro.</p>`,
+ start(){const tog=$('#oTog');
+  $('#oG').oninput=e=>{O.g=+e.target.value;$('#oGv').textContent=O.g*50+'%';if(O.n)O.n.gain.gain.setTargetAtTime(O.g/2,AC.currentTime,.05)};
+  const off=()=>{chiudiStream(O.s);O.s=null;if(O.n){try{O.n.src.disconnect();O.n.comp.disconnect()}catch(e){}O.n=null}cancelAnimationFrame(O.raf);tog.classList.remove('on');tog.textContent='Accendi';$('#oVu').style.width=0;WL.off('orecchio')};
+  const on=async()=>{try{const c=ac();O.s=await apriMicro({noiseSuppression:$('#oNs').checked});
+    const src=c.createMediaStreamSource(O.s),hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=180;
+    const pk=c.createBiquadFilter();pk.type='peaking';pk.frequency.value=2500;pk.Q.value=.8;pk.gain.value=6;
+    const gain=c.createGain();gain.gain.value=O.g/2;const comp=c.createDynamicsCompressor();comp.threshold.value=-18;comp.ratio.value=10;
+    const an=c.createAnalyser();src.connect(hp);hp.connect(pk);pk.connect(gain);gain.connect(comp);comp.connect(an);comp.connect(c.destination);
+    O.n={src,gain,comp};tog.classList.add('on');tog.textContent='Spegni';WL.on('orecchio');const d=new Uint8Array(an.fftSize);
+    const loop=()=>{an.getByteTimeDomainData(d);let m=0;for(const v of d)m=Math.max(m,Math.abs(v-128));$('#oVu').style.width=Math.min(100,m/128*140)+'%';O.raf=requestAnimationFrame(loop)};loop();
+   }catch(e){off();avviso(erroreMic(e),5000)}};
+  tog.onclick=()=>O.s?off():on();$('#oNs').onchange=()=>{if(O.s){off();on()}};O.off=off;
+ },stop(){O.off&&O.off()}};
+
+/* ---- 3. Pulisci altoparlante ---- */
+const P={osc:null,t:0};
+T.pulisci={titolo:'Pulisci altoparlante',ic:'💧',desc:'Butta fuori acqua e polvere',g:'suono',
+ html:()=>`<p>Un suono basso e forte fa vibrare l'altoparlante e spinge fuori l'acqua e un po' di polvere. Il volume del telefono torna più forte e pulito.</p>
+ <ol class="tenue" style="margin:0;padding-left:20px"><li>Alza il volume del telefono al massimo.</li><li>Tieni l'altoparlante rivolto verso il basso.</li><li>Premi «Pulisci» e aspetta 30 secondi.</li></ol>
+ <button class="big-toggle" id="pTog">Pulisci</button>
+ <div class="vu"><i id="pBar"></i></div>
+ <h2>Prova le casse</h2>
+ <div class="riga"><button class="btn" data-pan="-1">◀ Sinistra</button><button class="btn" data-pan="0">Tutte e due</button><button class="btn" data-pan="1">Destra ▶</button></div>
+ <p class="nota">Per una pulizia vera, se l'altoparlante è sporco, usa anche una spazzolina morbida e asciutta.</p>`,
+ start(){const tog=$('#pTog');
+  const stop=()=>{if(P.osc){try{P.osc.stop()}catch(e){}P.osc=null}clearInterval(P.t);tog.classList.remove('on');tog.textContent='Pulisci';$('#pBar').style.width=0};
+  tog.onclick=()=>{if(P.osc){stop();return}const c=ac();const o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.value=165;g.gain.value=0;g.gain.setTargetAtTime(.95,c.currentTime,.1);
+   const lfo=c.createOscillator(),lg=c.createGain();lfo.frequency.value=2;lg.gain.value=25;lfo.connect(lg);lg.connect(o.frequency);lfo.start();
+   o.connect(g);g.connect(c.destination);o.start();o.onended=()=>{try{lfo.stop()}catch(e){}};P.osc=o;tog.classList.add('on');tog.textContent='Ferma';const t0=Date.now();
+   P.t=setInterval(()=>{const p=(Date.now()-t0)/30000;$('#pBar').style.width=Math.min(100,p*100)+'%';if(p>=1){stop();avviso('Fatto! Altoparlante pulito.');vibra(200)}},200)};
+  $$('[data-pan]').forEach(b=>b.onclick=()=>{const c=ac();const o=c.createOscillator(),g=c.createGain();o.frequency.value=440;g.gain.value=.4;
+   g.gain.setTargetAtTime(0,c.currentTime+.6,.1);let n=g;if(c.createStereoPanner){const p=c.createStereoPanner();p.pan.value=+b.dataset.pan;g.connect(p);n=p}
+   o.connect(g);n.connect(c.destination);o.start();o.stop(c.currentTime+1.2)});
+  P.off=stop},stop(){P.off&&P.off()}};
+
+/* ---- 4. Suoni per dormire ---- */
+const R={src:null,g:null,tipo:null,vol:LS.get('rvol',50),fine:0,t:0};
+function rumore(c,tipo){const len=c.sampleRate*4,buf=c.createBuffer(2,len,c.sampleRate);
+  for(let ch=0;ch<2;ch++){const d=buf.getChannelData(ch);let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,last=0;
+   for(let i=0;i<len;i++){const w=Math.random()*2-1;
+    if(tipo==='bianco')d[i]=w*.35;
+    else if(tipo==='rosa'||tipo==='pioggia'){b0=.99886*b0+w*.0555179;b1=.99332*b1+w*.0750759;b2=.969*b2+w*.153852;b3=.8665*b3+w*.3104856;b4=.55*b4+w*.5329522;b5=-.7616*b5-w*.016898;d[i]=(b0+b1+b2+b3+b4+b5+w*.5362)*.11}
+    else{last=(last+.02*w)/1.02;d[i]=last*3.2}}}
+  return buf}
+T.rumore={titolo:'Suoni per dormire',ic:'🌙',desc:'Rumore bianco, pioggia, mare',g:'suono',
+ html:()=>`<p>Suoni dolci e continui che coprono i rumori e aiutano a dormire o a concentrarsi. Continuano anche se torni agli altri strumenti.</p>
+ <div class="chips" id="rTipi"><button data-t="bianco">Rumore bianco</button><button data-t="rosa">Rumore rosa</button><button data-t="marrone">Rumore profondo</button><button data-t="pioggia">Pioggia</button><button data-t="mare">Onde del mare</button></div>
+ <label class="sl"><span>Volume <output id="rVolV">${R.vol}%</output></span><input type="range" id="rVol" min="5" max="100" value="${R.vol}"></label>
+ <div class="chips" id="rTimer"><span class="tenue" style="font-size:.85em;align-self:center">Spegni dopo:</span><button data-m="0" aria-pressed="true">Mai</button><button data-m="15">15 min</button><button data-m="30">30 min</button><button data-m="60">1 ora</button></div>
+ <p class="tenue" id="rStato" style="text-align:center">Scegli un suono</p>
+ <button class="btn lungo" id="rStop">⏹ Ferma</button>`,
+ start(){const mark=()=>{$$('#rTipi button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t===R.tipo));$('#rStato').textContent=R.tipo?('Sta suonando'+(R.fine?' · si spegne alle '+new Date(R.fine).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}):'')):'Scegli un suono'};
+  const stop=()=>{if(R.src){const c=ac(),g=R.g,s=R.src;g.gain.setTargetAtTime(0,c.currentTime,.4);setTimeout(()=>{try{s.stop();s.lfo&&s.lfo.stop()}catch(e){}},1500)}R.src=null;R.tipo=null;R.fine=0;clearInterval(R.t);mark()};
+  const play=t=>{if(R.src){try{R.src.stop();R.src.lfo&&R.src.lfo.stop()}catch(e){}}const c=ac();const s=c.createBufferSource();s.buffer=rumore(c,t==='mare'?'marrone':t);s.loop=true;
+   const g=c.createGain();g.gain.value=0;g.gain.setTargetAtTime(R.vol/100,c.currentTime,.5);let last=s;
+   if(t==='pioggia'){const f=c.createBiquadFilter();f.type='highpass';f.frequency.value=900;s.connect(f);last=f}
+   if(t==='mare'){const amp=c.createGain();amp.gain.value=.55;const lfo=c.createOscillator(),lg=c.createGain();lfo.frequency.value=.11;lg.gain.value=.45;lfo.connect(lg);lg.connect(amp.gain);lfo.start();s.connect(amp);last=amp;s.lfo=lfo}
+   last.connect(g);g.connect(c.destination);s.start();R.src=s;R.g=g;R.tipo=t;mark()};
+  $$('#rTipi button').forEach(b=>b.onclick=()=>play(b.dataset.t));
+  $('#rVol').oninput=e=>{R.vol=+e.target.value;LS.set('rvol',R.vol);$('#rVolV').textContent=R.vol+'%';if(R.g)R.g.gain.setTargetAtTime(R.vol/100,ac().currentTime,.1)};
+  $$('#rTimer button').forEach(b=>b.onclick=()=>{$$('#rTimer button').forEach(x=>x.setAttribute('aria-pressed',x===b));const m=+b.dataset.m;clearInterval(R.t);R.fine=m?Date.now()+m*60000:0;
+   if(m)R.t=setInterval(()=>{if(Date.now()>=R.fine)stop()},5000);mark()});
+  $('#rStop').onclick=stop;mark()},stop(){}};
+
+/* ---- 5. Misura rumore ---- */
+const F={s:null,raf:0};
+T.fonometro={titolo:'Misura il rumore',ic:'📈',desc:'Quanti decibel ci sono?',g:'suono',
+ html:()=>`<div class="grosso"><span id="fDb">--</span><small> dB</small></div>
+ <p id="fCosa" style="text-align:center;font-weight:700">Premi Inizia</p>
+ <div class="vu"><i id="fBar"></i></div>
+ <div class="dati"><div><small>Massimo</small><b id="fMax">--</b></div><div><small>Media</small><b id="fMed">--</b></div></div>
+ <button class="btn oro lungo" id="fTog">Inizia</button>
+ <p class="nota">È una stima: il microfono del telefono non è uno strumento da laboratorio. Serve per capire se un posto è tranquillo o troppo rumoroso.</p>`,
+ start(){const cosa=d=>d<30?'🤫 Silenzio quasi totale':d<45?'🍃 Molto tranquillo':d<60?'🗣️ Si parla normale':d<75?'🚗 Rumoroso, come il traffico':d<90?'⚠️ Molto forte':'🚨 Pericoloso per le orecchie!';
+  const off=()=>{chiudiStream(F.s);F.s=null;cancelAnimationFrame(F.raf);$('#fTog').textContent='Inizia'};
+  $('#fTog').onclick=async()=>{if(F.s){off();return}try{const c=ac();F.s=await apriMicro();const src=c.createMediaStreamSource(F.s),an=c.createAnalyser();an.fftSize=2048;src.connect(an);
+   const d=new Float32Array(an.fftSize);let max=0,sum=0,n=0,sm=0,last=0;$('#fTog').textContent='Ferma';
+   const loop=t=>{an.getFloatTimeDomainData(d);let s=0;for(const v of d)s+=v*v;const rms=Math.sqrt(s/d.length);const db=Math.max(0,Math.min(130,20*Math.log10(rms||1e-9)+96));
+    sm=sm?sm*.85+db*.15:db;if(t-last>200){last=t;max=Math.max(max,sm);sum+=sm;n++;$('#fDb').textContent=Math.round(sm);$('#fCosa').textContent=cosa(sm);$('#fMax').textContent=Math.round(max)+' dB';$('#fMed').textContent=Math.round(sum/n)+' dB';$('#fBar').style.width=Math.min(100,sm/120*100)+'%'}
+    F.raf=requestAnimationFrame(loop)};F.raf=requestAnimationFrame(loop)}catch(e){off();avviso(erroreMic(e),5000)}};F.off=off},stop(){F.off&&F.off()}};
+
+/* ---- 6. Torcia ---- */
+const TO={s:null,track:null,on:false,timer:null,modo:'fissa',vel:6};
+T.torcia={titolo:'Torcia',ic:'🔦',desc:'Accendi il flash, anche SOS',g:'luce',
+ html:()=>`<button class="big-toggle" id="toTog">Accendi</button>
+ <div class="chips" id="toModi"><button data-m="fissa" aria-pressed="true">Fissa</button><button data-m="lampeggia">Lampeggia</button><button data-m="sos">SOS</button></div>
+ <label class="sl" id="toVelBox"><span>Velocità lampeggio <output id="toVelV">${TO.vel}</output></span><input type="range" id="toVel" min="1" max="15" value="${TO.vel}"></label>
+ <p class="nota" id="toNota">Usa il flash della fotocamera. La prima volta il telefono chiede il permesso: rispondi «Consenti».</p>
+ <button class="btn lungo" id="toSchermo">💡 Usa lo schermo come luce</button>
+ <video id="toVid" playsinline muted style="width:1px;height:1px;opacity:0;position:absolute"></video>`,
+ start(){const tog=$('#toTog');
+  const set=async v=>{if(!TO.track)return false;try{await TO.track.applyConstraints({advanced:[{torch:v}]});return true}catch(e){return false}};
+  const ferma=()=>{clearInterval(TO.timer);clearTimeout(TO.timer)};
+  const avvia=async()=>{ferma();if(TO.modo==='fissa'){await set(true)}
+   else if(TO.modo==='lampeggia'){let on=true;TO.timer=setInterval(()=>{on=!on;set(on)},Math.round(1000/TO.vel))}
+   else{const seq=sosSeq(250);let i=0;const step=()=>{const [on,d]=seq[i%seq.length];set(!!on);i++;TO.timer=setTimeout(step,d)};step()}};
+  const off=async()=>{ferma();await set(false);chiudiStream(TO.s);TO.s=null;TO.track=null;TO.on=false;tog.classList.remove('on');tog.textContent='Accendi'};
+  const nonVa=msg=>{$('#toNota').textContent=msg;$('#toNota').classList.add('att')};
+  tog.onclick=async()=>{if(TO.on){off();return}
+   try{TO.s=await apriCamera('environment',$('#toVid'));TO.track=TO.s.getVideoTracks()[0];await new Promise(r=>setTimeout(r,350));
+    const caps=TO.track.getCapabilities?TO.track.getCapabilities():{};
+    if(!caps.torch){await off();nonVa(isIOS?'Su iPhone il browser non lascia accendere il flash. Premi «Usa lo schermo come luce» qui sotto.':'Questo telefono non lascia accendere il flash dal browser. Premi «Usa lo schermo come luce» qui sotto.');return}
+    TO.on=true;tog.classList.add('on');tog.textContent='Spegni';await avvia()}
+   catch(e){await off();nonVa(erroreCam(e)+' Intanto puoi usare lo schermo come luce.')}};
+  $$('#toModi button').forEach(b=>b.onclick=()=>{TO.modo=b.dataset.m;$$('#toModi button').forEach(x=>x.setAttribute('aria-pressed',x===b));if(TO.on)avvia()});
+  $('#toVel').oninput=e=>{TO.vel=+e.target.value;$('#toVelV').textContent=TO.vel;if(TO.on&&TO.modo==='lampeggia')avvia()};
+  $('#toSchermo').onclick=()=>Luce.apri('#ffffff',0,TO.modo);TO.off=off},stop(){TO.off&&TO.off()}};
+
+/* ---- 7. Luce schermo ---- */
+const LZ={col:'#ffffff',int:100,modo:'fissa'};
+T.schermo={titolo:'Luce schermo',ic:'💡',desc:'Lo schermo diventa una lampada',g:'luce',
+ html:()=>`<p>Tutto lo schermo diventa una luce colorata. Per avere più luce, porta anche la luminosità del telefono al massimo.</p>
+ <div class="chips" id="lzCol">${[['#ffffff','Bianco'],['#ffe7b8','Caldo'],['#d4a017','Oro'],['#ff2a2a','Rosso'],['#2a7bff','Blu'],['#2adf5a','Verde'],['#ff4fd8','Rosa']].map(([c,n])=>`<button data-c="${c}"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${c};margin-right:6px;vertical-align:-1px"></span>${n}</button>`).join('')}</div>
+ <label class="sl"><span>Forza della luce <output id="lzIntV">${LZ.int}%</output></span><input type="range" id="lzInt" min="5" max="100" value="${LZ.int}"></label>
+ <div class="chips" id="lzModi"><button data-m="fissa">Fissa</button><button data-m="lampeggia">Lampeggia</button><button data-m="sos">SOS</button><button data-m="arcobaleno">Festa arcobaleno</button></div>
+ <button class="btn oro lungo" id="lzVai">Accendi la luce</button>
+ <p class="nota">Per chiudere la luce tocca il pulsante in basso.</p>`,
+ start(){const mark=()=>{$$('#lzCol button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.c===LZ.col));$$('#lzModi button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===LZ.modo))};mark();
+  $$('#lzCol button').forEach(b=>b.onclick=()=>{LZ.col=b.dataset.c;mark()});$$('#lzModi button').forEach(b=>b.onclick=()=>{LZ.modo=b.dataset.m;mark()});
+  $('#lzInt').oninput=e=>{LZ.int=+e.target.value;$('#lzIntV').textContent=LZ.int+'%'};
+  $('#lzVai').onclick=()=>Luce.apri(LZ.col,1-LZ.int/100,LZ.modo)},stop(){}};
+
+/* ---- 8. Più scuro ---- */
+T.notte={titolo:'Più scuro',ic:'🌑',desc:'Modo notte, luce rossa',g:'luce',
+ html:()=>`<div class="box"><label class="sl"><span>Scurisci l'app <output id="nV">${LS.get('scuro',0)}%</output></span><input type="range" id="nS" min="0" max="85" value="${LS.get('scuro',0)}"></label>
+ <p class="tenue" style="font-size:.85em">Tutta Potenza PM diventa più scura, anche più del minimo del telefono.</p></div>
+ <div class="box"><b>Luce notte rossa</b><p class="tenue" style="font-size:.9em">Una luce rossa molto debole: vedi dove metti i piedi senza svegliare nessuno e senza abbagliarti.</p>
+ <button class="btn oro" id="nRossa">Accendi la luce rossa</button></div>
+ <div class="box"><b>Lettura al buio</b><p class="tenue" style="font-size:.9em">Uno schermo color ambra scurissimo, che stanca poco gli occhi.</p><button class="btn" id="nAmbra">Accendi</button></div>
+ <p class="nota">Per scurire tutto il telefono, anche le altre app: su Android vai in Impostazioni › Accessibilità › «Luminosità extra ridotta». Su iPhone: Impostazioni › Accessibilità › Schermo e dimensioni testo › «Riduci punto bianco». Un'app dal browser non può farlo al posto tuo.</p>`,
+ start(){$('#nS').oninput=e=>setScuro(+e.target.value);$('#nRossa').onclick=()=>Luce.apri('#ff1a00',.82,'fissa');$('#nAmbra').onclick=()=>Luce.apri('#ff9a1a',.9,'fissa')},stop(){}};
+function setScuro(v){LS.set('scuro',v);$('#scuro').style.opacity=v/100;['#nV','#oScuroV'].forEach(s=>{const e=$(s);if(e)e.textContent=v+'%'});['#nS','#oScuro'].forEach(s=>{const e=$(s);if(e)e.value=v})}
+
+/* ---- 9. Schermo sempre acceso ---- */
+T.acceso={titolo:'Schermo acceso',ic:'☀️',desc:'Lo schermo non si spegne',g:'luce',
+ html:()=>`<p>Quando è acceso, lo schermo non si spegne da solo finché Potenza PM è aperta. Comodo per leggere una ricetta, seguire una mappa o guardare un video.</p>
+ <button class="big-toggle" id="aTog">Accendi</button>
+ <p class="nota" id="aNota">Se chiudi l'app o cambi app, il telefono torna normale.</p>`,
+ start(){const tog=$('#aTog');const mark=()=>{const on=WL.want.has('opz');tog.classList.toggle('on',on);tog.textContent=on?'Acceso ✓':'Accendi'};
+  if(!('wakeLock' in navigator)){tog.disabled=true;$('#aNota').textContent='Questo browser non permette di tenere lo schermo acceso. Prova ad aggiornarlo.';$('#aNota').classList.add('att')}
+  tog.onclick=()=>{const on=!WL.want.has('opz');on?WL.on('opz'):WL.off('opz');LS.set('acceso',on);$('#oAcceso').checked=on;mark()};mark()},stop(){}};
+
+/* ---- sensori (permesso iPhone) ---- */
+async function permessoSensori(){try{if(window.DeviceOrientationEvent&&typeof DeviceOrientationEvent.requestPermission==='function'){const r=await DeviceOrientationEvent.requestPermission();return r==='granted'}}catch(e){return false}return true}
+const serveBottone=()=>window.DeviceOrientationEvent&&typeof DeviceOrientationEvent.requestPermission==='function';
+
+/* ---- 10. Livella ---- */
+const LV={h:null,piatto:false};
+T.livella={titolo:'Livella',ic:'📐',desc:'Il quadro è dritto?',g:'sensori',
+ html:()=>`<p>Appoggia il telefono sul mobile o sul quadro: quando la bolla è al centro e il cerchio diventa verde, è dritto.</p>
+ <div class="cerchio" id="lvC"><div class="croce"></div><div class="bolla" id="lvB"></div></div>
+ <div class="dati"><div><small>Avanti / indietro</small><b id="lvX">--</b></div><div><small>Destra / sinistra</small><b id="lvY">--</b></div></div>
+ ${serveBottone()?'<button class="btn oro lungo" id="lvP">Attiva sensori</button>':''}
+ <p class="nota" id="lvN">Se la bolla non si muove, questo apparecchio non ha il sensore (per esempio un computer).</p>`,
+ start(){const h=e=>{if(e.beta==null)return;let b=e.beta,g=e.gamma;if(b>90)b=180-b;if(b<-90)b=-180-b;const lim=v=>Math.max(-45,Math.min(45,v));const r=$('#lvC').clientWidth/2-26;
+   $('#lvB').style.transform=`translate(${-lim(g)/45*r}px,${-lim(b)/45*r}px)`;$('#lvX').textContent=b.toFixed(1)+'°';$('#lvY').textContent=g.toFixed(1)+'°';
+   const p=Math.abs(b)<.8&&Math.abs(g)<.8;$('#lvC').classList.toggle('piatto',p);if(p&&!LV.piatto)vibra(40);LV.piatto=p};
+  LV.h=h;const go=()=>addEventListener('deviceorientation',h);if(serveBottone())$('#lvP').onclick=async()=>{if(await permessoSensori()){go();$('#lvP').remove()}else avviso('Serve il permesso dei sensori')};else go()},
+ stop(){removeEventListener('deviceorientation',LV.h)}};
+
+/* ---- 11. Bussola ---- */
+const BU={h:null,ev:null};
+T.bussola={titolo:'Bussola',ic:'🧭',desc:'Dov\'è il nord?',g:'sensori',
+ html:()=>`<div style="position:relative;width:min(280px,74vw);margin:10px auto"><div class="freccia"></div>
+ <svg class="quadrante" id="buQ" viewBox="0 0 200 200"><circle cx="100" cy="100" r="96" fill="#1c1a16" stroke="#d4a017" stroke-width="3"/>
+ ${Array.from({length:72},(_,i)=>{const a=i*5*Math.PI/180,l=i%18===0?14:i%2===0?8:4;return `<line x1="${100+92*Math.sin(a)}" y1="${100-92*Math.cos(a)}" x2="${100+(92-l)*Math.sin(a)}" y2="${100-(92-l)*Math.cos(a)}" stroke="${i%18===0?'#f0c75e':'#6d665a'}" stroke-width="${i%18===0?2.5:1.2}"/>`}).join('')}
+ <text x="100" y="40" fill="#e5484d" font-size="22" font-weight="800" text-anchor="middle" font-family="Sora,sans-serif">N</text>
+ <text x="166" y="108" fill="#f6f3ea" font-size="18" font-weight="800" text-anchor="middle" font-family="Sora,sans-serif">E</text>
+ <text x="100" y="174" fill="#f6f3ea" font-size="18" font-weight="800" text-anchor="middle" font-family="Sora,sans-serif">S</text>
+ <text x="34" y="108" fill="#f6f3ea" font-size="18" font-weight="800" text-anchor="middle" font-family="Sora,sans-serif">O</text>
+ <polygon points="100,58 108,100 100,96 92,100" fill="#e5484d"/><polygon points="100,142 108,100 100,104 92,100" fill="#a59f90"/><circle cx="100" cy="100" r="6" fill="#d4a017"/></svg></div>
+ <div class="grosso"><span id="buG">--</span><small>°</small></div><p style="text-align:center;font-weight:700" id="buD">&nbsp;</p>
+ ${serveBottone()?'<button class="btn oro lungo" id="buP">Attiva sensori</button>':''}
+ <p class="nota">Tieni il telefono piatto, lontano da calamite e metalli. Se sbaglia, muovilo disegnando un 8 nell'aria.</p>`,
+ start(){let rot=0;const nomi=['Nord','Nord-Est','Est','Sud-Est','Sud','Sud-Ovest','Ovest','Nord-Ovest'];
+  const show=hd=>{hd=(hd+360)%360;let d=-hd-rot;d=((d+540)%360)-180;rot+=d;$('#buQ').style.transform=`rotate(${rot}deg)`;$('#buG').textContent=Math.round(hd);$('#buD').textContent=nomi[Math.round(hd/45)%8]};
+  const h=e=>{let hd=null;if(e.webkitCompassHeading!=null)hd=e.webkitCompassHeading;else if(e.absolute&&e.alpha!=null)hd=360-e.alpha;if(hd!=null)show(hd)};
+  BU.h=h;BU.ev='ondeviceorientationabsolute' in window?'deviceorientationabsolute':'deviceorientation';
+  const go=()=>addEventListener(BU.ev,h);if(serveBottone())$('#buP').onclick=async()=>{if(await permessoSensori()){go();$('#buP').remove()}else avviso('Serve il permesso dei sensori')};else go()},
+ stop(){removeEventListener(BU.ev,BU.h)}};
+
+/* ---- 12. Lente d'ingrandimento ---- */
+const LE={s:null,track:null,zoom:1,torch:false,ferma:false};
+T.lente={titolo:'Lente',ic:'🔍',desc:'Ingrandisci le scritte piccole',g:'sensori',
+ html:()=>`<div class="camwrap"><video class="cam" id="leV" playsinline muted></video></div>
+ <label class="sl"><span>Ingrandimento <output id="leZv">1×</output></span><input type="range" id="leZ" min="1" max="8" step="0.1" value="1"></label>
+ <div class="riga"><button class="btn" id="leT">🔦 Luce</button><button class="btn" id="leF">⏸ Ferma immagine</button></div>
+ <p class="nota" id="leN">Avvicina il telefono al foglio. Con «Ferma immagine» puoi leggere con calma.</p>`,
+ async start(){const v=$('#leV');try{LE.s=await apriCamera('environment',v);LE.track=LE.s.getVideoTracks()[0]}catch(e){$('#leN').textContent=erroreCam(e);$('#leN').classList.add('att');return}
+  await new Promise(r=>setTimeout(r,300));const caps=LE.track.getCapabilities?LE.track.getCapabilities():{};
+  if(caps.zoom){$('#leZ').min=caps.zoom.min;$('#leZ').max=Math.min(caps.zoom.max,10);$('#leZ').step=caps.zoom.step||.1}
+  if(!caps.torch)$('#leT').hidden=true;
+  $('#leZ').oninput=async e=>{const z=+e.target.value;$('#leZv').textContent=z.toFixed(1).replace('.0','').replace('.',',')+'×';
+   if(caps.zoom){try{await LE.track.applyConstraints({advanced:[{zoom:z}]});v.style.transform=''}catch(_){v.style.transform=`scale(${z})`}}else v.style.transform=`scale(${z})`};
+  $('#leT').onclick=async()=>{LE.torch=!LE.torch;try{await LE.track.applyConstraints({advanced:[{torch:LE.torch}]})}catch(e){}$('#leT').classList.toggle('on',LE.torch)};
+  $('#leF').onclick=()=>{LE.ferma=!LE.ferma;LE.ferma?v.pause():v.play();$('#leF').textContent=LE.ferma?'▶ Riprendi':'⏸ Ferma immagine'}},
+ stop(){chiudiStream(LE.s);LE.s=null;LE.torch=false;LE.ferma=false}};
+
+/* ---- 13. Specchio ---- */
+const SP={s:null};
+T.specchio={titolo:'Specchio',ic:'🪞',desc:'Specchio con luce intorno',g:'sensori',
+ html:()=>`<div class="camwrap" id="spW" style="border:22px solid #fff;border-radius:28px"><video class="cam" id="spV" playsinline muted style="transform:scaleX(-1);border-radius:6px"></video></div>
+ <label class="sl"><span>Cornice di luce <output id="spLv">22</output></span><input type="range" id="spL" min="0" max="60" value="22"></label>
+ <div class="chips" id="spC"><button data-c="#ffffff" aria-pressed="true">Bianca</button><button data-c="#ffe2b0">Calda</button><button data-c="#ffd6ec">Rosa</button></div>
+ <p class="nota" id="spN">La cornice bianca illumina il viso come la luce di un camerino. Alza la luminosità del telefono per avere più luce.</p>`,
+ async start(){try{SP.s=await apriCamera('user',$('#spV'))}catch(e){$('#spN').textContent=erroreCam(e);$('#spN').classList.add('att')}
+  $('#spL').oninput=e=>{$('#spLv').textContent=e.target.value;$('#spW').style.borderWidth=e.target.value+'px'};
+  $$('#spC button').forEach(b=>b.onclick=()=>{$('#spW').style.borderColor=b.dataset.c;$$('#spC button').forEach(x=>x.setAttribute('aria-pressed',x===b))});WL.on('specchio')},
+ stop(){chiudiStream(SP.s);SP.s=null;WL.off('specchio')}};
+
+/* ---- 14. Batteria ---- */
+let BAT=null;
+async function prendiBatteria(){if(BAT)return BAT;if(!navigator.getBattery)return null;try{BAT=await navigator.getBattery();['levelchange','chargingchange'].forEach(ev=>BAT.addEventListener(ev,topBat));return BAT}catch(e){return null}}
+function topBat(){if(!BAT)return;$('#topbat').textContent=(BAT.charging?'⚡':'🔋')+' '+Math.round(BAT.level*100)+'%';if(attivo==='batteria')T.batteria.upd()}
+function durata(s){if(!isFinite(s)||s<=0)return'--';const h=Math.floor(s/3600),m=Math.round(s%3600/60);return(h?h+' h ':'')+m+' min'}
+T.batteria={titolo:'Batteria',ic:'🔋',desc:'Carica, tempo e consigli',g:'tel',
+ html:()=>`<div class="anello" id="baA" style="--p:0"><div id="baP">--</div></div>
+ <p id="baS" style="text-align:center;font-weight:700">&nbsp;</p>
+ <div class="dati"><div><small>Piena tra</small><b id="baF">--</b></div><div><small>Dura ancora</small><b id="baD">--</b></div></div>
+ <h2>Consigli per farla durare di più</h2>
+ <div class="box" style="font-size:.92em;color:#d9d4c7"><span>🌙 Usa il tema scuro: sugli schermi OLED consuma meno.</span><span>☀️ Abbassa un po' la luminosità.</span><span>📍 Spegni posizione e Bluetooth se non li usi.</span><span>🔋 Accendi il «Risparmio energetico» sotto il 20%.</span><span>🔌 Per la salute della batteria, meglio stare tra il 20% e l'80%.</span><span>🥶 Non lasciare il telefono al sole o in auto d'estate.</span></div>
+ <p class="nota" id="baN" hidden></p>`,
+ async start(){const b=await prendiBatteria();if(!b){$('#baN').hidden=false;$('#baN').textContent=isIOS?'Su iPhone il browser non fa vedere la batteria alle app. Guarda la percentuale in alto sullo schermo del telefono.':'Questo browser non fa vedere la batteria.';$('#baS').textContent='Non disponibile';return}this.upd()},
+ upd(){if(!BAT||!$('#baA'))return;const p=Math.round(BAT.level*100);$('#baA').style.setProperty('--p',p);$('#baP').textContent=p+'%';
+  $('#baS').textContent=BAT.charging?(p>=100?'✅ Carica completa':'⚡ In carica'):(p<=15?'🪫 Quasi scarica: mettila in carica':'🔋 Non in carica');
+  $('#baF').textContent=BAT.charging?durata(BAT.chargingTime):'--';$('#baD').textContent=BAT.charging?'--':durata(BAT.dischargingTime)},stop(){}};
+
+/* ---- 15. Il mio telefono + velocità internet ---- */
+function sistema(){const u=navigator.userAgent;let m;if(m=u.match(/Android\s([\d.]+)/))return'Android '+m[1];if(m=u.match(/OS (\d+)_(\d+)/))return(isIOS?'iOS ':'')+m[1]+'.'+m[2];if(/Windows/.test(u))return'Windows';if(/Mac OS X/.test(u))return'Mac';if(/Linux/.test(u))return'Linux';return'Sconosciuto'}
+function browser(){const u=navigator.userAgent;if(/SamsungBrowser/.test(u))return'Samsung Internet';if(/Edg\//.test(u))return'Edge';if(/OPR\//.test(u))return'Opera';if(/Firefox|FxiOS/.test(u))return'Firefox';if(/CriOS|Chrome/.test(u))return'Chrome';if(/Safari/.test(u))return'Safari';return'Altro'}
+T.info={titolo:'Il mio telefono',ic:'📱',desc:'Dati e velocità internet',g:'tel',
+ html:()=>{const cn=navigator.connection||{};const inst=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+  return `<div class="dati">
+  <div><small>Sistema</small><b>${esc(sistema())}</b></div><div><small>Browser</small><b>${browser()}</b></div>
+  <div><small>Schermo</small><b>${screen.width}×${screen.height}</b></div><div><small>Nitidezza</small><b>${Math.round(devicePixelRatio*10)/10}× pixel</b></div>
+  <div><small>Processore</small><b>${navigator.hardwareConcurrency||'--'} nuclei</b></div><div><small>Memoria</small><b>${navigator.deviceMemory?'circa '+navigator.deviceMemory+' GB':'--'}</b></div>
+  <div><small>Internet</small><b id="inOn">${navigator.onLine?'✅ Collegato':'❌ Non collegato'}</b></div><div><small>Tipo di rete</small><b>${cn.effectiveType?cn.effectiveType.toUpperCase():'--'}</b></div>
+  <div><small>Tocco</small><b>${navigator.maxTouchPoints||0} dita</b></div><div><small>App installata</small><b>${inst?'✅ Sì':'Non ancora'}</b></div></div>
+  <h2>Velocità internet</h2>
+  <div class="box"><div class="grosso"><span id="spd">--</span><small> Mbit/s</small></div>
+  <div class="dati"><div><small>Risposta (ping)</small><b id="png">--</b></div><div><small>Giudizio</small><b id="giu">--</b></div></div>
+  <button class="btn oro lungo" id="spGo">Prova la velocità</button>
+  <p class="tenue" style="font-size:.82em">Scarica circa 3 MB. Se hai pochi giga, usala col Wi-Fi.</p></div>`},
+ start(){const FILES=['C2','C3','C4','C1','L15','L0','C5','L12','L56','L13','L7','L32','L59','L31','L35','L91','L86','L9','L16','L18','L41','L2','L45','L67','L68','L3','L30','L5','L37','L48','L53','L55','L73','L85','L89','L90','L92','L94','L100','L104'];
+  $('#spGo').onclick=async()=>{const b=$('#spGo');b.disabled=true;b.textContent='Sto provando…';$('#spd').textContent='…';
+   try{const base=new URL('../../a/',location.href).href;const q=()=>'?speedtest='+Date.now()+Math.random();
+    let t=performance.now();await fetch(base+'Feser.mp3'+q(),{cache:'no-store',method:'HEAD'});const ping=performance.now()-t;
+    t=performance.now();let bytes=0;const go=async n=>{const r=await fetch(base+n+'.mp3'+q(),{cache:'no-store'});if(!r.ok)throw new Error('http');const bl=await r.arrayBuffer();bytes+=bl.byteLength};
+    for(let i=0;i<FILES.length;i+=8)await Promise.all(FILES.slice(i,i+8).map(go));
+    const sec=(performance.now()-t)/1000,mbps=bytes*8/sec/1e6;$('#spd').textContent=mbps>=10?Math.round(mbps):mbps.toFixed(1).replace('.',',');$('#png').textContent=Math.round(ping)+' ms';
+    $('#giu').textContent=mbps<2?'🐢 Lenta':mbps<10?'🙂 Normale':mbps<40?'🚀 Veloce':'⚡ Velocissima'}
+   catch(e){$('#spd').textContent='--';avviso('Non riesco: controlla di essere collegato a internet')}
+   b.disabled=false;b.textContent='Prova di nuovo'}},stop(){}};
+
+/* ---- 16. Vibrazione ---- */
+let VIB=null;
+T.vibra={titolo:'Vibrazione',ic:'📳',desc:'Prova e massaggio',g:'tel',
+ html:()=>`<p>Fai vibrare il telefono in tanti modi. Utile per controllare che la vibrazione funzioni, o per un piccolo massaggio.</p>
+ <div class="griglia" style="grid-template-columns:repeat(2,minmax(0,1fr))" id="viB">
+ <button class="btn" data-p="80">Colpetto</button><button class="btn" data-p="700">Lunga</button><button class="btn" data-p="90,120,90,600">Battito del cuore</button><button class="btn" data-p="sos">SOS</button>
+ <button class="btn" data-p="40,60,40,60,40,60,40,60,40">Ronzio</button><button class="btn" data-p="300,200,300,200,300">Telefono</button></div>
+ <button class="big-toggle" id="viM" style="width:min(180px,50vw)">Massaggio</button>
+ <p class="nota" id="viN">${'vibrate' in navigator?'Se non senti niente, controlla che la vibrazione sia accesa nelle impostazioni del telefono.':'Questo telefono non lascia vibrare le app dal browser (succede su iPhone).'}</p>`,
+ start(){$$('#viB button').forEach(b=>b.onclick=()=>{const p=b.dataset.p==='sos'?sosSeq(150).map(x=>x[1]):b.dataset.p.split(',').map(Number);if(!vibra(p)&&!('vibrate' in navigator))avviso('Vibrazione non disponibile qui')});
+  const m=$('#viM');m.onclick=()=>{if(VIB){clearInterval(VIB);VIB=null;vibra(0);m.classList.remove('on');m.textContent='Massaggio';return}vibra([900,100]);VIB=setInterval(()=>vibra([900,100]),1000);m.classList.add('on');m.textContent='Ferma'}},
+ stop(){if(VIB){clearInterval(VIB);VIB=null;vibra(0)}}};
+
+/* ================== NAVIGAZIONE ================== */
+const GR={suono:'#g-suono',luce:'#g-luce',sensori:'#g-sensori',tel:'#g-tel'};
+for(const [id,t] of Object.entries(T)){const b=document.createElement('button');b.className='t';b.dataset.open=id;b.innerHTML=`<span class="ic" aria-hidden="true">${t.ic}</span><b>${t.titolo}</b><small>${t.desc}</small>`;$(GR[t.g]).appendChild(b)}
+document.addEventListener('click',e=>{const o=e.target.closest('[data-open]');if(o){apri(o.dataset.open);return}
+  if(LS.get('vibra',false)&&e.target.closest('button'))vibra(12)});
+function apri(id,push=true){if(attivo)chiudi(false);const t=T[id];attivo=id;$('#tTitle').textContent=t.titolo;$('#tIn').innerHTML=t.html();$('#tool').hidden=false;$('#tbody').scrollTop=0;
+  if(push)history.pushState({tool:id},'','#'+id);try{t.start()}catch(e){console.error(e)}}
+function chiudi(back=true){if(!attivo)return;try{T[attivo].stop()}catch(e){}attivo=null;$('#tool').hidden=true;$('#tIn').innerHTML='';if(back&&history.state&&history.state.tool)history.back()}
+$('#tBack').onclick=()=>chiudi();
+addEventListener('popstate',()=>{if(!$('#luce').hidden){Luce.chiudi();return}if(attivo&&!(history.state&&history.state.tool===attivo))chiudi(false)});
+$$('nav.barra button').forEach(b=>b.onclick=()=>{$$('nav.barra button').forEach(x=>x.removeAttribute('aria-current'));b.setAttribute('aria-current','page');$$('.pag').forEach(p=>p.hidden=p.id!=='p-'+b.dataset.p);$('#main').scrollTop=0});
+addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('#luce').hidden)$('#luceX').click();else chiudi()}});
+
+/* ---- opzioni ---- */
+setScuro(LS.get('scuro',0));$('#oScuro').oninput=e=>setScuro(+e.target.value);
+$('#oGrande').checked=LS.get('grande',false);document.body.classList.toggle('grande',$('#oGrande').checked);$('#oGrande').onchange=e=>{LS.set('grande',e.target.checked);document.body.classList.toggle('grande',e.target.checked)};
+$('#oVibra').checked=LS.get('vibra',false);$('#oVibra').onchange=e=>LS.set('vibra',e.target.checked);
+$('#oAcceso').checked=LS.get('acceso',false);if($('#oAcceso').checked)WL.on('opz');$('#oAcceso').onchange=e=>{LS.set('acceso',e.target.checked);e.target.checked?WL.on('opz'):WL.off('opz')};
+$('#oReset').onclick=()=>{try{Object.keys(localStorage).filter(k=>k.startsWith('potenzapm-')).forEach(k=>localStorage.removeItem(k))}catch(e){}location.reload()};
+$('#heroNum').textContent=B.boost+'%';
+prendiBatteria().then(topBat);
+addEventListener('online',()=>{const e=$('#inOn');if(e)e.textContent='✅ Collegato'});addEventListener('offline',()=>{const e=$('#inOn');if(e)e.textContent='❌ Non collegato'});
+if(location.hash&&T[location.hash.slice(1)]){history.replaceState(null,'',location.pathname);}
+
+/* ---- aggiornamento automatico + offline ---- */
+if('serviceWorker' in navigator){let reloaded=false;const had=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!reloaded&&!attivo&&B.el.paused&&!R.src){reloaded=true;location.reload()}});
+  addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(reg=>{const c=()=>reg.update().catch(()=>{});setInterval(c,10*60*1000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')c()})}).catch(()=>{}))}
+</script>
+</body>
+</html>
