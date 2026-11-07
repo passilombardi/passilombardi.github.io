@@ -134,6 +134,8 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid
         <div class="num" id="heroNum">250%</div>
         <div><b>Volume potenziato</b><p>Fai suonare la tua musica e i tuoi video molto più forte, fino al 300%.</p></div>
       </button>
+      <h2>Divertimento</h2>
+      <div class="griglia" id="g-fun"></div>
       <h2>Suono</h2>
       <div class="griglia" id="g-suono"></div>
       <h2>Luce e schermo</h2>
@@ -172,6 +174,10 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid
         <p>Su molti Android funziona: la prima volta il telefono chiede il permesso della fotocamera, rispondi «Consenti». Su iPhone il browser non lascia accendere la torcia: usa «Luce schermo», che fa diventare lo schermo una lampada.</p></details>
       <details><summary>La bussola o la livella non si muovono</summary>
         <p>Su iPhone premi «Attiva sensori» e rispondi «Consenti». Se la bussola sbaglia, muovi il telefono disegnando un 8 nell'aria. Sul computer questi sensori non ci sono.</p></details>
+      <details><summary>Come uso il Megafono?</summary>
+        <p>Tieni premuto il cerchio grande e parla: la voce esce forte dall'altoparlante. Se lasci il dito si spegne, così non fischia. Con una cassa Bluetooth diventa fortissimo: tieni il telefono lontano dalla cassa. Gli effetti Stadio, Eco, Robot e Radio cambiano la voce.</p></details>
+      <details><summary>Come funziona la Gara di rutti?</summary>
+        <p>Scrivi il nome e premi «Tocca a me». Dopo il 3, 2, 1 hai 5 secondi per il rutto. L'app misura la forza (in decibel) e quanto dura, e dà i punti. La classifica resta salvata sul telefono. Tenete tutti il telefono alla stessa distanza dalla bocca, se no non vale!</p></details>
       <details><summary>L'orecchio potenziato fischia</summary>
         <p>Usa sempre le cuffie o gli auricolari. Con l'altoparlante il suono torna nel microfono e fischia. Abbassa la potenza se senti fischi.</p></details>
       <details><summary>Ascoltare forte fa male?</summary>
@@ -192,7 +198,7 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid
       <label class="opz"><span><b>Vibra quando tocchi</b><br><small class="tenue">Un piccolo colpo a ogni pulsante (solo Android)</small></span><input type="checkbox" id="oVibra"></label>
       <label class="opz"><span><b>Schermo sempre acceso</b><br><small class="tenue">Lo schermo non si spegne finché l'app è aperta</small></span><input type="checkbox" id="oAcceso"></label>
       <button class="btn" id="oReset">Rimetti tutto come all'inizio</button>
-      <p class="tenue" style="font-size:.8em;text-align:center">Potenza PM · versione 1.0 · gratis e senza pubblicità</p>
+      <p class="tenue" style="font-size:.8em;text-align:center">Potenza PM · versione 1.1 · gratis e senza pubblicità</p>
     </section>
   </main>
   <nav class="barra">
@@ -602,8 +608,147 @@ T.vibra={titolo:'Vibrazione',ic:'📳',desc:'Prova e massaggio',g:'tel',
   const m=$('#viM');m.onclick=()=>{if(VIB){clearInterval(VIB);VIB=null;vibra(0);m.classList.remove('on');m.textContent='Massaggio';return}vibra([900,100]);VIB=setInterval(()=>vibra([900,100]),1000);m.classList.add('on');m.textContent='Ferma'}},
  stop(){if(VIB){clearInterval(VIB);VIB=null;vibra(0)}}};
 
+/* ================== DIVERTIMENTO ================== */
+let USC=null;
+function uscita(){const c=ac();if(!USC){const comp=c.createDynamicsCompressor();comp.threshold.value=-8;comp.ratio.value=8;comp.connect(c.destination);USC=comp}return USC}
+function impulso(c,sec,dec){const n=Math.floor(c.sampleRate*sec),b=c.createBuffer(2,n,c.sampleRate);for(let ch=0;ch<2;ch++){const d=b.getChannelData(ch);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,dec)}return b}
+function bufRumore(c,sec){const n=Math.floor(c.sampleRate*sec),b=c.createBuffer(1,n,c.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1;return b}
+function dbOra(an,d){an.getFloatTimeDomainData(d);let s=0;for(const v of d)s+=v*v;return Math.max(0,Math.min(130,20*Math.log10(Math.sqrt(s/d.length)||1e-9)+96))}
+/* rutto finto, fatto col suono */
+function ruttoFinto(forza=1){const c=ac(),t=c.currentTime,dur=.5+forza*.7,out=uscita();
+  const o=c.createOscillator();o.type='sawtooth';o.frequency.setValueAtTime(95-forza*18,t);o.frequency.linearRampToValueAtTime(70-forza*15,t+dur);
+  const vib=c.createOscillator(),vg=c.createGain();vib.frequency.value=7;vg.gain.value=9;vib.connect(vg);vg.connect(o.frequency);
+  const n=c.createBufferSource();n.buffer=bufRumore(c,dur+.2);const nf=c.createBiquadFilter();nf.type='bandpass';nf.frequency.value=260;nf.Q.value=1.2;const ng=c.createGain();ng.gain.value=.5;n.connect(nf);nf.connect(ng);
+  const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=650;f.Q.value=6;
+  const flut=c.createOscillator(),fg=c.createGain(),am=c.createGain();flut.type='square';flut.frequency.value=24+forza*6;fg.gain.value=.35;am.gain.value=.65;flut.connect(fg);fg.connect(am.gain);
+  const env=c.createGain();env.gain.setValueAtTime(0,t);env.gain.linearRampToValueAtTime(1,t+.04);env.gain.setValueAtTime(1,t+dur*.7);env.gain.exponentialRampToValueAtTime(.001,t+dur);
+  o.connect(f);ng.connect(f);f.connect(am);am.connect(env);env.connect(out);[o,vib,n,flut].forEach(x=>{x.start(t);x.stop(t+dur+.05)});vibra(Math.round(dur*1000))}
+
+/* ---- Megafono ---- */
+const MG={s:null,n:null,eff:'normale',vol:4,sempre:false};
+T.megafono={titolo:'Megafono',ic:'📢',desc:'La tua voce forte come una cassa',g:'fun',
+ html:()=>`<p>Parli nel telefono e la tua voce esce forte dall'altoparlante, come un megafono. Ancora meglio se colleghi una cassa Bluetooth.</p>
+ <button class="big-toggle" id="mgP" style="touch-action:none;user-select:none;-webkit-user-select:none">Tieni premuto<br>e parla</button>
+ <label class="opz" style="padding:8px 0;border:0;background:none"><span><b>Sempre acceso</b><br><small class="tenue">Senza tenere premuto</small></span><input type="checkbox" id="mgS"></label>
+ <label class="sl"><span>Potenza <output id="mgVv">${MG.vol*50}%</output></span><input type="range" id="mgV" min="1" max="8" value="${MG.vol}"></label>
+ <div class="chips" id="mgE"><button data-e="normale">Normale</button><button data-e="stadio">Stadio</button><button data-e="eco">Eco</button><button data-e="robot">Robot</button><button data-e="radio">Radio</button></div>
+ <div class="vu"><i id="mgVu"></i></div>
+ <div class="riga"><button class="btn" id="mgSir">🚨 Sirena</button><button class="btn" id="mgDin">🔔 Din don</button></div>
+ <p class="nota att">Se fischia: allontana il telefono dalla cassa, abbassa la potenza o usa «Tieni premuto». Il fischio arriva quando il microfono sente la sua stessa voce.</p>`,
+ start(){const P=$('#mgP');let attivo=false;
+  const mark=()=>$$('#mgE button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.e===MG.eff));mark();
+  const costruisci=async()=>{if(MG.n)return true;try{const c=ac();MG.s=await apriMicro({echoCancellation:false,noiseSuppression:true});
+    const src=c.createMediaStreamSource(MG.s),hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=220;
+    const pk=c.createBiquadFilter();pk.type='peaking';pk.frequency.value=2200;pk.Q.value=.9;pk.gain.value=7;
+    const g=c.createGain();g.gain.value=MG.vol/2;const porta=c.createGain();porta.gain.value=0;const comp=c.createDynamicsCompressor();comp.threshold.value=-20;comp.ratio.value=12;
+    const an=c.createAnalyser();src.connect(hp);hp.connect(pk);pk.connect(g);
+    MG.n={c,src,g,porta,comp,an,ins:null};g.connect(porta);porta.connect(comp);comp.connect(an);an.connect(c.destination);effetto();
+    const d=new Uint8Array(an.fftSize);const loop=()=>{if(!MG.n)return;an.getByteTimeDomainData(d);let m=0;for(const v of d)m=Math.max(m,Math.abs(v-128));const e=$('#mgVu');if(e)e.style.width=Math.min(100,m/128*130)+'%';MG.raf=requestAnimationFrame(loop)};loop();
+    return true}catch(e){avviso(erroreMic(e),5000);return false}};
+  const effetto=()=>{const n=MG.n;if(!n)return;const c=n.c;try{n.g.disconnect()}catch(e){}if(n.ins)n.ins.forEach(x=>{try{x.stop&&x.stop()}catch(e){}try{x.disconnect()}catch(e){}});n.ins=[];
+   if(MG.eff==='normale'){n.g.connect(n.porta)}
+   else if(MG.eff==='stadio'){const cv=c.createConvolver();cv.buffer=impulso(c,2.2,3);const w=c.createGain();w.gain.value=.6;n.g.connect(n.porta);n.g.connect(cv);cv.connect(w);w.connect(n.porta);n.ins.push(cv,w)}
+   else if(MG.eff==='eco'){const dl=c.createDelay(1);dl.delayTime.value=.3;const fb=c.createGain();fb.gain.value=.45;n.g.connect(n.porta);n.g.connect(dl);dl.connect(fb);fb.connect(dl);dl.connect(n.porta);n.ins.push(dl,fb)}
+   else if(MG.eff==='robot'){const rm=c.createGain();rm.gain.value=0;const o=c.createOscillator();o.frequency.value=55;o.connect(rm.gain);o.start();n.g.connect(rm);rm.connect(n.porta);n.ins.push(o,rm)}
+   else if(MG.eff==='radio'){const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1600;bp.Q.value=1.4;const ws=c.createWaveShaper();const k=new Float32Array(256);for(let i=0;i<256;i++){const x=i/128-1;k[i]=Math.tanh(x*4)}ws.curve=k;n.g.connect(bp);bp.connect(ws);ws.connect(n.porta);n.ins.push(bp,ws)}};
+  const apriPorta=v=>{if(!MG.n)return;MG.n.porta.gain.setTargetAtTime(v?1:0,MG.n.c.currentTime,.03);P.classList.toggle('on',v);WL[v?'on':'off']('megafono')};
+  P.onpointerdown=async e=>{e.preventDefault();if(MG.sempre)return;attivo=true;if(await costruisci()&&attivo)apriPorta(true)};
+  const su=()=>{attivo=false;if(!MG.sempre)apriPorta(false)};P.onpointerup=su;P.onpointerleave=su;P.onpointercancel=su;P.oncontextmenu=e=>e.preventDefault();
+  $('#mgS').onchange=async e=>{MG.sempre=e.target.checked;P.innerHTML=MG.sempre?'Acceso':'Tieni premuto<br>e parla';if(MG.sempre){if(await costruisci())apriPorta(true)}else apriPorta(false)};
+  $('#mgV').oninput=e=>{MG.vol=+e.target.value;$('#mgVv').textContent=MG.vol*50+'%';if(MG.n)MG.n.g.gain.setTargetAtTime(MG.vol/2,MG.n.c.currentTime,.05)};
+  $$('#mgE button').forEach(b=>b.onclick=()=>{MG.eff=b.dataset.e;mark();effetto()});
+  $('#mgSir').onclick=()=>SUONI.sirena();$('#mgDin').onclick=()=>SUONI.dindon();
+  MG.off=()=>{cancelAnimationFrame(MG.raf);if(MG.n){try{MG.n.src.disconnect();MG.n.an.disconnect()}catch(e){}if(MG.n.ins)MG.n.ins.forEach(x=>{try{x.stop&&x.stop()}catch(e){}})}MG.n=null;chiudiStream(MG.s);MG.s=null;MG.sempre=false;WL.off('megafono')}},
+ stop(){MG.off&&MG.off()}};
+
+/* ---- Gara di rutti ---- */
+const GA={s:null,url:null,corre:false};
+function gCommento(p){return p<300?'🐣 Ruttino da pulcino':p<700?'🐷 Rutto da maialino':p<1200?'🦁 Ruggito da leone!':p<1800?'🐻 Rutto da orso!!':'🐉 RUTTO DA DRAGO!!!'}
+T.rutti={titolo:'Gara di rutti',ic:'🤢',desc:'Chi fa il rutto più potente?',g:'fun',
+ html:()=>`<p>Scrivi il tuo nome, premi «Tocca a me» e dopo il 3, 2, 1 fai il rutto più potente che puoi vicino al telefono. Contano la forza e quanto dura!</p>
+ <div class="riga"><input id="gaN" placeholder="Il tuo nome" maxlength="16" style="flex:1;min-width:0;padding:12px 14px;border-radius:12px;border:1px solid var(--linea);background:var(--scheda2);color:var(--crema);font:inherit"><button class="btn oro" id="gaGo">Tocca a me!</button></div>
+ <div class="box" style="text-align:center"><div class="grosso" id="gaBig" style="font-size:3em">🎤</div><p id="gaMsg" style="font-weight:700">Pronto per la sfida?</p><div class="vu"><i id="gaVu"></i></div>
+ <div class="dati" style="text-align:left"><div><small>Forza</small><b id="gaDb">--</b></div><div><small>Durata</small><b id="gaSec">--</b></div></div>
+ <button class="btn" id="gaRe" hidden>▶ Riascolta il rutto</button></div>
+ <h2>🏆 Classifica</h2>
+ <ol class="lista" id="gaCl" style="max-height:none"></ol>
+ <div class="riga"><button class="btn" id="gaFinto">🤖 Rutto del telefono</button><button class="btn" id="gaDrago">🐉 Rutto del drago</button><button class="btn" id="gaZero">Azzera classifica</button></div>
+ <p class="nota">Il punteggio è per ridere: dipende anche da quanto sei vicino al microfono. Per una gara giusta, tenete tutti il telefono alla stessa distanza.</p>`,
+ start(){const cl=()=>{const L=LS.get('rutti',[]).sort((a,b)=>b.p-a.p).slice(0,20);$('#gaCl').innerHTML=L.length?L.map((r,i)=>`<li style="white-space:normal">${['🥇','🥈','🥉'][i]||(i+1)+'.'} <b>${esc(r.n)}</b> · ${r.p} punti <small class="tenue">(${r.db} dB, ${String(r.s).replace('.',',')} s)</small></li>`).join(''):'<li class="tenue">Ancora nessun rutto. Comincia tu!</li>'};cl();
+  $('#gaN').value=LS.get('ultimoNome','');
+  $('#gaGo').onclick=async()=>{if(GA.corre)return;const nome=($('#gaN').value.trim()||'Senza nome');LS.set('ultimoNome',nome);GA.corre=true;$('#gaGo').disabled=true;$('#gaRe').hidden=true;
+   try{const c=ac();GA.s=await apriMicro();const src=c.createMediaStreamSource(GA.s),an=c.createAnalyser();an.fftSize=2048;src.connect(an);const d=new Float32Array(an.fftSize);
+    let base=0,nb=0;for(const k of ['3','2','1']){$('#gaBig').textContent=k;$('#gaMsg').textContent='Preparati…';vibra(60);const t0=performance.now();while(performance.now()-t0<900){base+=dbOra(an,d);nb++;await new Promise(r=>requestAnimationFrame(r))}}
+    base=nb?base/nb:40;let rec=null,pezzi=[];try{rec=new MediaRecorder(GA.s);rec.ondataavailable=e=>pezzi.push(e.data);rec.start()}catch(e){rec=null}
+    $('#gaBig').textContent='💨';$('#gaMsg').textContent='VAI! RUTTA ORA!';let max=0,sopra=0,last=performance.now();const t0=performance.now();
+    while(performance.now()-t0<5000){const db=dbOra(an,d),now=performance.now(),dt=(now-last)/1000;last=now;max=Math.max(max,db);if(db>base+12)sopra+=dt;$('#gaVu').style.width=Math.min(100,db/120*100)+'%';$('#gaDb').textContent=Math.round(db)+' dB';await new Promise(r=>requestAnimationFrame(r))}
+    if(rec){await new Promise(r=>{rec.onstop=r;rec.stop()});if(GA.url)URL.revokeObjectURL(GA.url);GA.url=URL.createObjectURL(new Blob(pezzi,{type:rec.mimeType||'audio/webm'}));$('#gaRe').hidden=false}
+    chiudiStream(GA.s);GA.s=null;const sec=Math.round(sopra*10)/10,forza=Math.max(0,max-base);const p=Math.round(forza*25+sec*200);
+    $('#gaVu').style.width=0;$('#gaDb').textContent=Math.round(max)+' dB';$('#gaSec').textContent=String(sec).replace('.',',')+' s';
+    if(forza<6){$('#gaBig').textContent='🤔';$('#gaMsg').textContent='Non ho sentito niente! Riprova più vicino.'}
+    else{const L=LS.get('rutti',[]);const rec1=!L.length||p>Math.max(...L.map(r=>r.p));L.push({n:nome,p,db:Math.round(max),s:sec});LS.set('rutti',L);
+     $('#gaBig').textContent=p+' punti';$('#gaMsg').textContent=gCommento(p)+(rec1&&L.length>1?' · NUOVO RECORD! 🏆':'');if(rec1)vibra([100,60,100,60,300]);cl()}}
+   catch(e){chiudiStream(GA.s);GA.s=null;avviso(erroreMic(e),5000);$('#gaBig').textContent='🎤';$('#gaMsg').textContent='Pronto per la sfida?'}
+   GA.corre=false;const b=$('#gaGo');if(b)b.disabled=false};
+  $('#gaRe').onclick=()=>{if(GA.url){const a=new Audio(GA.url);a.play().catch(()=>{})}};
+  $('#gaFinto').onclick=()=>ruttoFinto(1);$('#gaDrago').onclick=()=>ruttoFinto(2.2);
+  $('#gaZero').onclick=()=>{if(confirm('Vuoi cancellare tutta la classifica?')){LS.set('rutti',[]);cl()}}},
+ stop(){chiudiStream(GA.s);GA.s=null}};
+
+/* ---- Cambia voce ---- */
+const CV={s:null,rec:null,buf:null,src:null};
+T.voce={titolo:'Cambia voce',ic:'🎭',desc:'Scoiattolo, mostro, robot…',g:'fun',
+ html:()=>`<p>Registra una frase e poi ascoltala con una voce diversa. Fai ridere gli amici!</p>
+ <button class="big-toggle" id="cvR">🎙️ Registra</button>
+ <p class="tenue" id="cvS" style="text-align:center">Puoi registrare fino a 15 secondi</p>
+ <div class="griglia" style="grid-template-columns:repeat(2,minmax(0,1fr))" id="cvE">
+  <button class="btn" data-e="normale">🙂 Normale</button><button class="btn" data-e="scoiattolo">🐿️ Scoiattolo</button>
+  <button class="btn" data-e="mostro">👹 Mostro</button><button class="btn" data-e="robot">🤖 Robot</button>
+  <button class="btn" data-e="alieno">👽 Alieno</button><button class="btn" data-e="grotta">🕳️ Grotta</button>
+  <button class="btn" data-e="eco">🏔️ Eco montagna</button><button class="btn" data-e="contrario">🔄 Al contrario</button></div>
+ <p class="nota">Le registrazioni restano solo sul telefono e spariscono quando chiudi lo strumento.</p>`,
+ start(){const R=$('#cvR');const fine=()=>{R.classList.remove('on');R.textContent='🎙️ Registra'};
+  R.onclick=async()=>{if(CV.rec&&CV.rec.state==='recording'){CV.rec.stop();return}
+   try{CV.s=await apriMicro({echoCancellation:true,noiseSuppression:true});const pezzi=[];CV.rec=new MediaRecorder(CV.s);CV.rec.ondataavailable=e=>pezzi.push(e.data);
+    CV.rec.onstop=async()=>{clearTimeout(CV.t);chiudiStream(CV.s);CV.s=null;fine();try{const ab=await new Blob(pezzi).arrayBuffer();CV.buf=await ac().decodeAudioData(ab);$('#cvS').textContent='Fatto! Ora scegli una voce qui sotto 👇'}catch(e){$('#cvS').textContent='Non riesco a leggere la registrazione, riprova.'}};
+    CV.rec.start();R.classList.add('on');R.textContent='⏹ Ferma';$('#cvS').textContent='Sto registrando… parla!';CV.t=setTimeout(()=>{if(CV.rec.state==='recording')CV.rec.stop()},15000)}
+   catch(e){fine();avviso(typeof MediaRecorder==='undefined'?'Questo browser non sa registrare':erroreMic(e),5000)}};
+  $$('#cvE button').forEach(b=>b.onclick=()=>{if(!CV.buf){avviso('Prima registra una frase');return}const c=ac();try{CV.src&&CV.src.stop()}catch(e){}
+   const e=b.dataset.e,s=c.createBufferSource();let buf=CV.buf;
+   if(e==='contrario'){buf=c.createBuffer(CV.buf.numberOfChannels,CV.buf.length,CV.buf.sampleRate);for(let ch=0;ch<buf.numberOfChannels;ch++){const a=CV.buf.getChannelData(ch).slice();a.reverse();buf.copyToChannel(a,ch)}}
+   s.buffer=buf;const g=c.createGain();g.gain.value=1.6;let ultimo=s;
+   if(e==='scoiattolo')s.playbackRate.value=1.7;
+   if(e==='mostro'){s.playbackRate.value=.62;const lp=c.createBiquadFilter();lp.type='lowshelf';lp.frequency.value=200;lp.gain.value=8;s.connect(lp);ultimo=lp}
+   if(e==='robot'||e==='alieno'){const rm=c.createGain();rm.gain.value=0;const o=c.createOscillator();o.frequency.value=e==='robot'?50:30;o.connect(rm.gain);o.start();s.connect(rm);ultimo=rm;s.onended=()=>o.stop();
+    if(e==='alieno'){s.playbackRate.value=1.25;const l=c.createOscillator(),lg=c.createGain();l.frequency.value=6;lg.gain.value=60;l.connect(lg);lg.connect(s.detune);l.start();const prev=s.onended;s.onended=()=>{prev();l.stop()}}}
+   if(e==='grotta'){const cv=c.createConvolver();cv.buffer=impulso(c,3,2.5);const m=c.createGain();s.connect(m);s.connect(cv);cv.connect(m);ultimo=m}
+   if(e==='eco'){const dl=c.createDelay(1);dl.delayTime.value=.42;const fb=c.createGain();fb.gain.value=.5;const m=c.createGain();s.connect(m);s.connect(dl);dl.connect(fb);fb.connect(dl);dl.connect(m);ultimo=m}
+   ultimo.connect(g);g.connect(uscita());s.start();CV.src=s})},
+ stop(){try{CV.rec&&CV.rec.state==='recording'&&CV.rec.stop()}catch(e){}chiudiStream(CV.s);CV.s=null;try{CV.src&&CV.src.stop()}catch(e){}CV.buf=null}};
+
+/* ---- Suoni potenti ---- */
+const SUONI={
+ _o(tipo,f,t,dur,vol=.6){const c=ac(),o=c.createOscillator(),g=c.createGain();o.type=tipo;o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(vol,t);g.gain.setValueAtTime(vol,t+dur-.03);g.gain.linearRampToValueAtTime(0,t+dur);o.connect(g);g.connect(uscita());o.start(t);o.stop(t+dur);return o},
+ clacson(){const t=ac().currentTime;this._o('sawtooth',415,t,.7,.35);this._o('sawtooth',523,t,.7,.35)},
+ sirena(){const c=ac(),t=c.currentTime,o=this._o('sawtooth',650,t,3,.4);for(let i=0;i<6;i++){o.frequency.linearRampToValueAtTime(i%2?650:1250,t+(i+1)*.5)}},
+ allarme(){const t=ac().currentTime;for(let i=0;i<8;i++)this._o('square',i%2?880:660,t+i*.22,.2,.3)},
+ stadio(){const c=ac(),t=c.currentTime,o=this._o('sawtooth',233,t,1.6,.45);o.frequency.linearRampToValueAtTime(240,t+1.6);const o2=this._o('sawtooth',466,t,1.6,.2)},
+ dindon(){const t=ac().currentTime;this._o('sine',988,t,.9,.5);this._o('sine',784,t+.45,1.2,.5)},
+ laser(){const c=ac(),t=c.currentTime;for(let i=0;i<3;i++){const o=this._o('square',1800,t+i*.18,.16,.25);o.frequency.exponentialRampToValueAtTime(200,t+i*.18+.16)}},
+ boom(){const c=ac(),t=c.currentTime,n=c.createBufferSource();n.buffer=bufRumore(c,2);const f=c.createBiquadFilter();f.type='lowpass';f.frequency.setValueAtTime(900,t);f.frequency.exponentialRampToValueAtTime(60,t+1.8);const g=c.createGain();g.gain.setValueAtTime(1.6,t);g.gain.exponentialRampToValueAtTime(.001,t+2);n.connect(f);f.connect(g);g.connect(uscita());n.start(t);const o=this._o('sine',80,t,1,.9);o.frequency.exponentialRampToValueAtTime(30,t+1);vibra(500)},
+ fischio(){const c=ac(),t=c.currentTime;[0,.35].forEach((d,i)=>{const o=this._o('sine',2900,t+d,i?.8:.25,.35);const l=c.createOscillator(),lg=c.createGain();l.frequency.value=38;lg.gain.value=180;l.connect(lg);lg.connect(o.frequency);l.start(t+d);l.stop(t+d+.8)})},
+ applausi(){const c=ac(),t=c.currentTime;for(let i=0;i<70;i++){const s=c.createBufferSource();s.buffer=bufRumore(c,.05);const f=c.createBiquadFilter();f.type='bandpass';f.frequency.value=1200+Math.random()*1500;const g=c.createGain();const st=t+Math.random()*2.5;g.gain.setValueAtTime(.7,st);g.gain.exponentialRampToValueAtTime(.01,st+.05);s.connect(f);f.connect(g);g.connect(uscita());s.start(st)}},
+ tamburo(){const c=ac(),t=c.currentTime;for(let i=0;i<24;i++){const s=c.createBufferSource();s.buffer=bufRumore(c,.08);const f=c.createBiquadFilter();f.type='bandpass';f.frequency.value=300;const g=c.createGain();const st=t+i*.06;g.gain.setValueAtTime(.3+i*.03,st);g.gain.exponentialRampToValueAtTime(.01,st+.07);s.connect(f);f.connect(g);g.connect(uscita());s.start(st)}
+  const k=this._o('sine',120,t+1.5,.5,1);k.frequency.exponentialRampToValueAtTime(40,t+2);const s=c.createBufferSource();s.buffer=bufRumore(c,1);const g=c.createGain();g.gain.setValueAtTime(.8,t+1.5);g.gain.exponentialRampToValueAtTime(.01,t+2.4);const f=c.createBiquadFilter();f.type='highpass';f.frequency.value=5000;s.connect(f);f.connect(g);g.connect(uscita());s.start(t+1.5)},
+ rutto(){ruttoFinto(1.4)}};
+T.suoni={titolo:'Suoni potenti',ic:'🎺',desc:'Clacson, sirena, applausi…',g:'fun',
+ html:()=>`<p>Tocca un pulsante e il telefono fa un suono forte. Alza il volume del telefono al massimo!</p>
+ <div class="griglia" style="grid-template-columns:repeat(2,minmax(0,1fr))" id="suG">
+ ${[['clacson','📯','Clacson'],['sirena','🚓','Sirena'],['allarme','🚨','Allarme'],['stadio','🏟️','Trombetta stadio'],['applausi','👏','Applausi'],['tamburo','🥁','Rullo di tamburi'],['fischio','🏁','Fischio arbitro'],['dindon','🔔','Campanello'],['laser','🔫','Laser spaziale'],['boom','💥','Esplosione'],['rutto','🤢','Rutto']].map(([k,i,n])=>`<button class="t" style="min-height:96px" data-s="${k}"><span class="ic">${i}</span><b>${n}</b></button>`).join('')}</div>`,
+ start(){$$('#suG [data-s]').forEach(b=>b.onclick=e=>{e.stopPropagation();SUONI[b.dataset.s]()})},stop(){}};
+
 /* ================== NAVIGAZIONE ================== */
-const GR={suono:'#g-suono',luce:'#g-luce',sensori:'#g-sensori',tel:'#g-tel'};
+const GR={fun:'#g-fun',suono:'#g-suono',luce:'#g-luce',sensori:'#g-sensori',tel:'#g-tel'};
 for(const [id,t] of Object.entries(T)){const b=document.createElement('button');b.className='t';b.dataset.open=id;b.innerHTML=`<span class="ic" aria-hidden="true">${t.ic}</span><b>${t.titolo}</b><small>${t.desc}</small>`;$(GR[t.g]).appendChild(b)}
 document.addEventListener('click',e=>{const o=e.target.closest('[data-open]');if(o){apri(o.dataset.open);return}
   if(LS.get('vibra',false)&&e.target.closest('button'))vibra(12)});
