@@ -106,6 +106,10 @@ main{flex:1;min-width:0;display:flex;flex-direction:column;height:100%}
 #inp{flex:1;border:0;background:transparent;resize:none;outline:0;font-size:17px;line-height:1.45;max-height:160px;padding:6px 0}
 #send{width:40px;height:40px;border-radius:12px;border:0;background:var(--acc);color:var(--on-acc);font-size:20px;flex:none;display:grid;place-items:center}
 #send:disabled{opacity:.35}
+#mic{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:transparent;font-size:19px;flex:none;display:grid;place-items:center}
+#mic.on{background:var(--bad);border-color:var(--bad);color:#fff;animation:pulse 1.2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(180,55,46,.5)}100%{box-shadow:0 0 0 12px rgba(180,55,46,0)}}
+.m-u .v{font-size:13px;opacity:.6;margin-right:4px}
 .hint{max-width:720px;margin:6px auto 0;text-align:center;font-size:12px;color:var(--soft)}
 
 /* card anteprima nel chat */
@@ -228,9 +232,10 @@ main{flex:1;min-width:0;display:flex;flex-direction:column;height:100%}
         <div class="composer">
           <div class="cbox">
             <textarea id="inp" rows="1" placeholder="Scrivi qui…"></textarea>
+            <button id="mic" aria-label="Manda un vocale" title="Manda un vocale">🎤</button>
             <button id="send" aria-label="Invia" disabled>↑</button>
           </div>
-          <div class="hint">Crea App prepara l'idea. L'app vera la costruisce Claude quando gli incolli il testo finale.</div>
+          <div class="hint">Tocca 🎤 per mandare un vocale. Crea App prepara l'idea. L'app vera la costruisce Claude quando gli incolli il testo finale.</div>
         </div>
       </div>
       <section id="prev">
@@ -340,7 +345,8 @@ function title(p){return p.d.name||(p.d.idea?p.d.idea.slice(0,40):"Nuova app")}
 
 /* ================= CONVERSAZIONE ================= */
 function say(t,k){cur.msgs.push({r:"a",t,k:k||null})}
-function said(t){cur.msgs.push({r:"u",t})}
+let viaVoice=false;
+function said(t){const m={r:"u",t};if(viaVoice)m.v=1;cur.msgs.push(m)}
 function chipsFor(p){
   const d=p.d;
   switch(p.step){
@@ -506,7 +512,7 @@ function renderChat(typing){
   if(cur.msgs.length<=1&&cur.step==="idea"){
     el.insertAdjacentHTML("beforeend",`<div class="hello"><div class="mark"></div><h1>Che app creiamo, ${esc(user)}?</h1><p>Raccontami la tua idea. Io ti faccio qualche domanda e ti mostro come viene.</p></div>`);
   }else cur.msgs.forEach((m,i)=>{
-    if(m.r==="u"){el.insertAdjacentHTML("beforeend",`<div class="m-u">${esc(m.t)}</div>`);return}
+    if(m.r==="u"){el.insertAdjacentHTML("beforeend",`<div class="m-u">${m.v?'<span class="v">🎤</span>':""}${esc(m.t)}</div>`);return}
     let extra="";
     if(m.k==="preview"){const pal=PALETTES[cur.d.color]||PALETTES["Blu mare"];
       extra=`<button class="pcard" data-open="1"><span class="ico" style="background:${pal[0]};color:#fff">${esc(cur.d.icon||"🌟")}</span><span><b>${esc(cur.d.name||"La tua app")}</b><small>Tocca per vedere l'anteprima</small></span></button>`}
@@ -530,10 +536,11 @@ async function copyPrompt(b){
     const ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();try{ok=document.execCommand("copy")}catch(_){}ta.remove()}
   const old=b.textContent;b.textContent=ok?"✓ Copiato!":"Tieni premuto sul testo per copiarlo";setTimeout(()=>b.textContent=old,2200);
 }
-function send(t){
+function send(t,voice){
   if(busy||!t.trim())return;
+  viaVoice=!!voice;
   busy=true;$("#inp").value="";autosize();$("#send").disabled=true;
-  answer(t);
+  answer(t);viaVoice=false;
   renderList();renderChat(true);
   setTimeout(()=>{busy=false;renderChat();renderPrev()},550);
 }
@@ -585,6 +592,22 @@ function autosize(){inp.style.height="auto";inp.style.height=Math.min(inp.scroll
 inp.addEventListener("input",autosize);
 inp.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&innerWidth>760){e.preventDefault();send(inp.value)}});
 $("#send").onclick=()=>send(inp.value);
+
+/* ---- vocali: parli e l'app scrive ---- */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec=null,recText="";
+$("#mic").onclick=()=>{
+  if(!SR){alert("Su questo telefono i vocali non funzionano qui. Prova con Chrome (Android) o Safari (iPhone).");return}
+  if(rec){rec.stop();return}
+  rec=new SR();rec.lang="it-IT";rec.interimResults=true;rec.continuous=false;recText="";
+  const before=inp.value?inp.value.trim()+" ":"";
+  $("#mic").classList.add("on");inp.placeholder="Ti ascolto… parla pure";
+  rec.onresult=e=>{let t="";for(const r of e.results)t+=r[0].transcript;recText=t;inp.value=before+t;autosize()};
+  rec.onerror=e=>{if(e.error==="not-allowed"||e.error==="service-not-allowed")alert("Devi dare il permesso al microfono per mandare i vocali.");else if(e.error==="no-speech")alert("Non ho sentito niente. Riprova parlando un po' più forte.")};
+  rec.onend=()=>{rec=null;$("#mic").classList.remove("on");renderChat();inp.value=before+recText;autosize();
+    if(recText.trim())send(inp.value,true)};
+  try{rec.start()}catch(e){rec=null;$("#mic").classList.remove("on")}
+};
 $("#newBtn").onclick=()=>{$("#app").classList.remove("menu");const empty=projects.find(p=>p.step==="idea"&&p.msgs.length<=1);if(empty){cur=empty;renderAll()}else newProject()};
 $("#menuBtn").onclick=()=>$("#app").classList.add("menu");
 $("#scrim").onclick=()=>$("#app").classList.remove("menu");
