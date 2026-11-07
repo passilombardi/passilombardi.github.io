@@ -110,8 +110,8 @@ function chair(k, seatH = .46){
 /* ---------- catalogo ---------- */
 // mount: floor | wall | ceiling ; main: [finitura, colore] ; sec: finitura struttura ; light: luce che si accende di sera
 export const CATS = [
-  ['salotto', 'Salotto', '🛋️'], ['camera', 'Camera', '🛏️'], ['cucina', 'Cucina', '🍳'], ['pranzo', 'Pranzo', '🍽️'], ['bagno', 'Bagno', '🛁'],
-  ['studio', 'Studio', '💻'], ['luci', 'Luci', '💡'], ['deco', 'Decorazioni', '🖼️'], ['piante', 'Piante', '🪴'], ['giardino', 'Giardino', '🌳'], ['struttura', 'Porte e pareti', '🚪'],
+  ['salotto', 'Salotto', '<svg class="i" aria-hidden="true"><use href="#i-sofa"/></svg>'], ['camera', 'Camera', '<svg class="i" aria-hidden="true"><use href="#i-bed"/></svg>'], ['cucina', 'Cucina', '<svg class="i" aria-hidden="true"><use href="#i-pan"/></svg>'], ['pranzo', 'Pranzo', '<svg class="i" aria-hidden="true"><use href="#i-dish"/></svg>'], ['bagno', 'Bagno', '<svg class="i" aria-hidden="true"><use href="#i-bath"/></svg>'],
+  ['studio', 'Studio', '<svg class="i" aria-hidden="true"><use href="#i-laptop"/></svg>'], ['luci', 'Luci', '<svg class="i" aria-hidden="true"><use href="#i-bulb"/></svg>'], ['deco', 'Decorazioni', '<svg class="i" aria-hidden="true"><use href="#i-frame"/></svg>'], ['piante', 'Piante', '<svg class="i" aria-hidden="true"><use href="#i-plant"/></svg>'], ['giardino', 'Giardino', '<svg class="i" aria-hidden="true"><use href="#i-tree"/></svg>'], ['struttura', 'Porte e pareti', '<svg class="i" aria-hidden="true"><use href="#i-door"/></svg>'],
 ];
 export const ITEMS = [
   // SALOTTO
