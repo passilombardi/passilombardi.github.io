@@ -50,10 +50,21 @@ input,textarea{font:inherit;color:inherit}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:12px;padding:12px 18px;background:var(--acc);color:var(--on-acc);font-weight:700;font-size:16px}
 .btn.wide{width:100%;margin-top:6px}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
-#setBox{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px}
+#setBox{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.35);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto}
+#setForm{margin:auto 0}
 #setBox h1{font-family:var(--f-read);font-weight:500;font-size:28px;text-align:center;margin:0 0 6px}
 .opt{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;font-size:17px;font-weight:500;cursor:pointer}
 .opt input{width:22px;height:22px;accent-color:var(--acc)}
+.seq{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:6px;counter-reset:s}
+.seq li{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;font-weight:500;counter-increment:s}
+.seq li:before{content:counter(s);width:24px;height:24px;border-radius:50%;background:var(--acc);color:var(--on-acc);display:grid;place-items:center;font-size:13px;flex:none}
+.seq li span{flex:1}
+.seq li button{border:0;background:transparent;font-size:16px;width:30px;height:30px;border-radius:8px}
+.seq li button:hover{background:rgba(127,120,100,.15)}
+.seqadd{display:flex;flex-wrap:wrap;gap:6px}
+.seqadd button{border:1px dashed var(--acc);background:transparent;color:var(--acc);border-radius:999px;padding:7px 12px;font-size:14px;font-weight:500}
+.fpbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;border:1px solid var(--line);border-radius:12px;background:var(--bg);font-size:16px;font-weight:500}
+.fpbtn.ok{border-color:var(--ok);color:var(--ok)}
 .err{color:var(--bad);font-size:14px;min-height:20px;margin:6px 0 0;text-align:center}
 .note{font-size:13px;color:var(--soft);margin-top:16px;text-align:center}
 
@@ -217,9 +228,7 @@ main{flex:1;min-width:0;display:flex;flex-direction:column;height:100%}
     <h1 id="gTitle">Crea App</h1>
     <p class="sub" id="gSub"></p>
     <label class="fld"><span>Email o nome dell'account</span><div class="row"><input id="gName" autocomplete="username" required></div></label>
-    <label class="fld" id="gF1"><span>Password 1</span><div class="row"><input id="gP1" type="password"><button type="button" class="eye" aria-label="Mostra">👁</button></div></label>
-    <label class="fld" id="gF2"><span>Password 2</span><div class="row"><input id="gP2" type="password"><button type="button" class="eye" aria-label="Mostra">👁</button></div></label>
-    <label class="fld" id="gF3"><span>Password 3</span><div class="row"><input id="gP3" type="password"><button type="button" class="eye" aria-label="Mostra">👁</button></div></label>
+    <div id="gSteps"></div>
     <button class="btn wide" id="gBtn">Entra</button>
     <p class="err" id="gErr"></p>
     <p class="note" id="gNote"></p>
@@ -238,10 +247,13 @@ main{flex:1;min-width:0;display:flex;flex-direction:column;height:100%}
   <div id="scrim"></div>
   <div id="setBox" hidden><form class="gate-box" id="setForm">
     <h1>Impostazioni</h1>
-    <p class="sub">Quali password vuoi scrivere per entrare con l'account <b id="setWho"></b>?</p>
-    <label class="opt"><input type="checkbox" id="sR1"> Password 1</label>
-    <label class="opt"><input type="checkbox" id="sR2"> Password 2</label>
-    <label class="opt"><input type="checkbox" id="sR3"> Password 3</label>
+    <p class="sub">Come si entra con l'account <b id="setWho"></b>? Metti i passi nell'ordine che vuoi.</p>
+    <ol class="seq" id="seqList"></ol>
+    <div class="seqadd">
+      <button type="button" data-add="p1">+ Password 1</button><button type="button" data-add="p2">+ Password 2</button>
+      <button type="button" data-add="p3">+ Password 3</button><button type="button" data-add="fp">+ 👆 Impronta</button>
+    </div>
+    <p class="note" style="text-align:left;margin-top:8px">L'impronta usa lo sblocco del telefono. Su un iPhone con Face ID sarebbe il viso: lì non metterla.</p>
     <div class="keyrow">
       <h2>Claude vero</h2>
       <p>Metti qui la chiave API di Anthropic e la chat parla con Claude. Senza chiave usa le domande guidate gratis. La chiave la prendi su <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.</p>
@@ -304,57 +316,104 @@ async function hashPw(pw,i){
 }
 function showGate(){
   $("#gate").hidden=false;$("#app").hidden=true;
-  ["#gP1","#gP2","#gP3"].forEach(s=>$(s).value="");
   $("#gTitle").textContent="Crea App";
-
   $("#gBtn").textContent="Entra";
   $("#gNote").textContent="";
   $("#gName").value=store.get("creaapp-lastname","");
   $("#gErr").textContent="";
   updateGate();
 }
-/* quali password chiede ogni account (si sceglie in Impostazioni) */
+/* la sequenza per entrare (si sceglie in Impostazioni): p1,p2,p3 = password; fp = impronta */
 const norm=s=>String(s).trim().toLowerCase();
-const reqKey=n=>"creaapp-req:"+norm(n);
-const getReq=n=>{const r=store.get(reqKey(n),null);return Array.isArray(r)&&r.length===3&&r.some(Boolean)?r:[true,true,true]};
+const seqKey=n=>"creaapp-seq:"+norm(n), fpKey=n=>"creaapp-fp:"+norm(n);
+function getSeq(n){
+  const q=store.get(seqKey(n),null);
+  if(Array.isArray(q)&&q.length&&q.every(x=>/^(p[123]|fp)$/.test(x))&&!(q.includes("fp")&&!store.get(fpKey(n),null)))return q;
+  const r=store.get("creaapp-req:"+norm(n),null);   // vecchie impostazioni
+  if(Array.isArray(r)&&r.some(Boolean))return r.map((on,i)=>on?"p"+(i+1):null).filter(Boolean);
+  return ["p1","p2","p3"];
+}
+const LBL={p1:"Password 1",p2:"Password 2",p3:"Password 3",fp:"👆 Impronta"};
+const b64=buf=>btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const unb64=s=>Uint8Array.from(atob(s.replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0));
+async function askFinger(n){
+  const id=store.get(fpKey(n),null);if(!id)throw new Error("noreg");
+  await navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),allowCredentials:[{type:"public-key",id:unb64(id),transports:["internal"]}],userVerification:"required",timeout:60000}});
+}
+async function registerFinger(n){
+  if(!window.PublicKeyCredential||!(await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().catch(()=>false)))throw new Error("nofp");
+  const c=await navigator.credentials.create({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rp:{name:"Crea App PM"},
+    user:{id:crypto.getRandomValues(new Uint8Array(16)),name:n,displayName:n},pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],
+    authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required",residentKey:"discouraged"},timeout:60000}});
+  store.set(fpKey(n),b64(c.rawId));
+}
+let gSeq=[],fpDone=[];
 function updateGate(){
-  const r=getReq($("#gName").value);
-  r.forEach((on,i)=>$("#gF"+(i+1)).hidden=!on);
-  const list=r.map((on,i)=>on?i+1:0).filter(Boolean);
-  $("#gSub").textContent=list.length===3?"Scrivi l'email o il nome e le 3 password. Si entra solo se sono tutte giuste."
-    :list.length===1?"Scrivi l'email o il nome e la password "+list[0]+".":"Scrivi l'email o il nome e le password "+list.join(" e ")+".";
+  const n=$("#gName").value;gSeq=getSeq(n);fpDone=gSeq.map(()=>false);
+  const box=$("#gSteps");box.innerHTML="";
+  gSeq.forEach((st,i)=>{
+    if(st==="fp"){
+      const b=document.createElement("button");b.type="button";b.className="fpbtn";b.innerHTML="👆 Tocca e usa l'impronta";
+      b.onclick=async()=>{try{await askFinger(n);fpDone[i]=true;b.classList.add("ok");b.innerHTML="✓ Impronta giusta"}catch(e){$("#gErr").textContent=e.message==="noreg"?"L'impronta non è registrata su questo telefono.":"Impronta non riconosciuta. Riprova."}};
+      const w=document.createElement("div");w.className="fld";w.appendChild(b);box.appendChild(w);
+    }else{
+      box.insertAdjacentHTML("beforeend",`<label class="fld"><span>${LBL[st]}</span><div class="row"><input type="password" data-i="${i}" autocomplete="off"><button type="button" class="eye" aria-label="Mostra">👁</button></div></label>`);
+    }
+  });
+  box.querySelectorAll(".eye").forEach(b=>b.onclick=()=>{const i=b.previousElementSibling;i.type=i.type==="password"?"text":"password"});
+  const pw=gSeq.filter(x=>x!=="fp").length,fp=gSeq.filter(x=>x==="fp").length;
+  $("#gSub").textContent="Scrivi l'email o il nome, poi fai i passi qui sotto, in ordine"+(fp?": "+(pw?"password e impronta":"l'impronta")+".":".");
 }
 $("#gName").addEventListener("input",updateGate);
-document.querySelectorAll(".eye").forEach(b=>b.onclick=()=>{const i=b.previousElementSibling;i.type=i.type==="password"?"text":"password"});
 $("#gateForm").onsubmit=async e=>{
   e.preventDefault();
   const err=$("#gErr");err.textContent="";
-  const name=$("#gName").value.trim(), pw=[$("#gP1").value,$("#gP2").value,$("#gP3").value];
+  const name=$("#gName").value.trim();
   if(name.length<2){err.textContent="Scrivi l'email o il nome dell'account.";return}
-  const req=getReq(name);
   if(!window.crypto||!crypto.subtle){err.textContent="Apri l'app dal sito (https) per usare le password.";return}
   const wait=store.get("creaapp-wait",0);
   if(Date.now()<wait){err.textContent="Troppi tentativi. Riprova tra "+Math.ceil((wait-Date.now())/1000)+" secondi.";return}
+  const missing=gSeq.findIndex((st,i)=>st==="fp"&&!fpDone[i]);
+  if(missing>=0){err.textContent="Prima tocca il pulsante dell'impronta.";return}
   $("#gBtn").disabled=true;$("#gBtn").textContent="Controllo…";
-  const h=await Promise.all(pw.map((p,i)=>req[i]?hashPw(p,i):null));
+  const checks=await Promise.all(gSeq.map(async(st,i)=>{if(st==="fp")return true;
+    const v=($(`#gSteps input[data-i="${i}"]`)||{}).value||"";const k=+st[1]-1;return (await hashPw(v,k))===HASHES[k]}));
   $("#gBtn").disabled=false;$("#gBtn").textContent="Entra";
-  if(h.every((x,i)=>!req[i]||x===HASHES[i])){
+  if(checks.every(Boolean)){
     store.set("creaapp-fails",0);store.set("creaapp-lastname",name);sess.set("creaapp-in",name);enterApp();
   }else{
     const f=store.get("creaapp-fails",0)+1;store.set("creaapp-fails",f);
     if(f>=5){store.set("creaapp-wait",Date.now()+60000);store.set("creaapp-fails",0)}
-    err.textContent="Le password non sono giuste.";
+    err.textContent="Le password non sono giuste.";updateGate();
   }
 };
-$("#setBtn").onclick=()=>{const r=getReq(user);[1,2,3].forEach(i=>$("#sR"+i).checked=r[i-1]);$("#sKey").value=getKey();$("#setWho").textContent=user;$("#sErr").textContent="";$("#setBox").hidden=false;$("#app").classList.remove("menu")};
+let editSeq=[];
+function drawSeq(){
+  const ol=$("#seqList");ol.innerHTML="";
+  editSeq.forEach((st,i)=>{const li=document.createElement("li");
+    li.innerHTML=`<span>${LBL[st]}</span><button type="button" data-u aria-label="Su">↑</button><button type="button" data-x aria-label="Togli">✕</button>`;
+    li.querySelector("[data-u]").onclick=()=>{if(i>0){[editSeq[i-1],editSeq[i]]=[editSeq[i],editSeq[i-1]];drawSeq()}};
+    li.querySelector("[data-x]").onclick=()=>{editSeq.splice(i,1);drawSeq()};ol.appendChild(li)});
+  if(!editSeq.length)ol.innerHTML='<li><span style="color:var(--soft)">Aggiungi almeno un passo</span></li>';
+}
+document.querySelectorAll("[data-add]").forEach(b=>b.onclick=async()=>{
+  const st=b.dataset.add;$("#sErr").textContent="";
+  if(st==="fp"&&!store.get(fpKey(user),null)){
+    try{await registerFinger(user)}catch(e){$("#sErr").textContent=e.message==="nofp"?"Su questo telefono non c'è l'impronta (o il browser non la permette).":"Impronta non registrata. Riprova.";return}
+  }
+  if(editSeq.length>=8){$("#sErr").textContent="Massimo 8 passi.";return}
+  editSeq.push(st);drawSeq();
+});
+$("#setBtn").onclick=()=>{editSeq=getSeq(user).slice();drawSeq();$("#sKey").value=getKey();$("#setWho").textContent=user;$("#sErr").textContent="";$("#setBox").hidden=false;$("#app").classList.remove("menu")};
+$("#setBox").querySelectorAll(".eye").forEach(b=>b.onclick=()=>{const i=b.previousElementSibling;i.type=i.type==="password"?"text":"password"});
 $("#setCancel").onclick=()=>$("#setBox").hidden=true;
-$("#setForm").onsubmit=e=>{e.preventDefault();const r=[1,2,3].map(i=>$("#sR"+i).checked);
-  if(!r.some(Boolean)){$("#sErr").textContent="Scegli almeno una password.";return}
+$("#setForm").onsubmit=e=>{e.preventDefault();
+  if(!editSeq.length){$("#sErr").textContent="Aggiungi almeno un passo.";return}
   const k=$("#sKey").value.trim();
   if(k&&!/^sk-ant-/.test(k)){$("#sErr").textContent="La chiave deve cominciare con sk-ant-";return}
   const hadKey=!!getKey();store.set(keyKey(),k);
-  store.set(reqKey(user),r);$("#setBox").hidden=true;
-  alert("Salvato! La prossima volta che entri con «"+user+"» ti chiedo: password "+r.map((on,i)=>on?i+1:0).filter(Boolean).join(", ")+"."+(k&&!hadKey?"\n\nClaude è collegato: tocca «Nuova app» per parlare con lui.":!k&&hadKey?"\n\nChiave tolta: le nuove app usano le domande guidate.":""));
+  store.set(seqKey(user),editSeq.slice());$("#setBox").hidden=true;
+  alert("Salvato! La prossima volta che entri con «"+user+"» ti chiedo: "+editSeq.map(x=>LBL[x]).join(", poi ")+"."+(k&&!hadKey?"\n\nClaude è collegato: tocca «Nuova app» per parlare con lui.":!k&&hadKey?"\n\nChiave tolta: le nuove app usano le domande guidate.":""));
   if(cur&&cur.msgs.length<=1&&(!cur.api||!cur.api.length)&&(cur.mode==="ai")!==!!getKey()){projects.splice(projects.indexOf(cur),1);newProject()}else renderChat()};
 const keyKey=()=>"creaapp-key:"+norm(user);
 const getKey=()=>store.get(keyKey(),"")||"";
