@@ -451,6 +451,12 @@ function chiudiFoglio(silenzioso){
   if (f && !silenzioso) f();
 }
 
+// domanda sì/no dentro il gioco (le finestre del browser in alcune app non si aprono)
+function chiedi(testo, si){
+  foglio(`<h2>Sei sicuro?</h2><p>${esc(testo)}</p><div class="riga-btn"><button class="btn rosso" id="chiediSi">Sì</button><button class="btn sec" data-a="chiudi">No</button></div>`);
+  $('#chiediSi').onclick = () => { chiudiFoglio(true); si(); };
+}
+
 // ---------- disegno delle schermate ----------
 const coloreVal = (v) => v >= 80 ? 'v5' : v >= 68 ? 'v4' : v >= 54 ? 'v3' : v >= 40 ? 'v2' : 'v1';
 const badgeVal = (v) => `<span class="val ${coloreVal(v)}">${v}</span>`;
@@ -915,9 +921,9 @@ document.addEventListener('click', (e) => {
     case 'chiudi': chiudiFoglio(); break;
     case 'giocatore': schedaGiocatore(b.dataset.id); break;
     case 'compra': compra(b.dataset.id); if ($('#velo')) chiudiFoglio(true); break;
-    case 'vendi': if (confirm('Vuoi davvero venderlo?')) vendi(b.dataset.id); break;
+    case 'vendi': chiedi('Vuoi davvero venderlo?', () => { vendi(b.dataset.id); }); break;
     case 'ingaggia': ingaggia(b.dataset.id); break;
-    case 'licenzia': if (confirm('Vuoi davvero licenziarlo?')) licenzia(b.dataset.k); break;
+    case 'licenzia': chiedi('Vuoi davvero licenziarlo?', () => { licenzia(b.dataset.k); }); break;
     case 'squadraPronta': squadraPronta(); break;
     case 'ricerca': { const c = costoRicerca(); if (S.soldi < c) return avviso('Non hai abbastanza soldi'); S.soldi -= c; genMercato(); salva(); disegna(); avviso('Nuovi giocatori al mercato!'); break; }
     case 'costruisci': costruisci(b.dataset.k); break;
@@ -935,7 +941,7 @@ document.addEventListener('click', (e) => {
     case 'suono': S.opz.suono = !S.opz.suono; Suono.on = S.opz.suono; salva(); menu(); break;
     case 'comeSiGioca': comeSiGioca(); break;
     case 'installa': foglio(`<h2>Metti l’app sul telefono</h2><div class="guida"><p><b>Android (Chrome):</b> tocca i tre puntini in alto a destra e poi «Installa app» o «Aggiungi a schermata Home».</p><p><b>iPhone (Safari):</b> tocca il quadrato con la freccia in basso e poi «Aggiungi alla schermata Home».</p><p>Così Calciomania PM si apre come una vera app, a schermo intero.</p></div><button class="btn largo" data-a="chiudi">Ok</button>`); break;
-    case 'ricomincia': if (confirm('Vuoi cancellare la tua società e ricominciare da capo?')){ if (S.lega.online && window.Online) Online.esci().catch(() => {}); localStorage.removeItem(CHIAVE); S = null; chiudiFoglio(true); schermataIniziale(); } break;
+    case 'ricomincia': chiedi('Vuoi cancellare la tua società e ricominciare da capo?', () => { if (S.lega.online && window.Online) Online.esci().catch(() => {}); try { localStorage.removeItem(CHIAVE); } catch (e) {} S = null; chiudiFoglio(true); schermataIniziale(); }); break;
     case 'modClub': chiudiFoglio(true); fondazione(true); break;
     case 'continua': S = carica(); migra(); Suono.on = S.opz.suono; schermo = 'casa'; disegna(); if (S.lega.online && window.Online) Online.riprendi(); mostraPendenti(); break;
     case 'fonda': fondazione(false); break;
@@ -948,8 +954,8 @@ document.addEventListener('click', (e) => {
     case 'loginGoogle': caricaOnline().then(() => Online.loginGoogle()).catch((er) => avviso(er.message || 'Non riesco ad entrare')); break;
     case 'loginEmail': case 'introLogin': caricaOnline().then(() => Online.finestraLogin()).catch((er) => avviso(er.message || 'Non riesco a collegarmi')); break;
     case 'logout': if (S.lega.online) return avviso('Prima torna a giocare da solo'); Online.logout(); chiudiFoglio(true); disegna(); avviso('Sei uscito dall’account'); break;
-    case 'vaiOnline': if (confirm('La stagione in corso ricomincia in un girone online. Va bene?')){ chiudiFoglio(true); Online.vaiOnline(); } break;
-    case 'esciOnline': if (confirm('Vuoi lasciare il girone online? Il tuo posto torna a un bot.')){ chiudiFoglio(true); Online.esci().then(() => { nuovaLegaLocale(S.tier); salva(true); disegna(); avviso('Ora giochi da solo'); }).catch((er) => avviso(er.message || 'Errore')); } break;
+    case 'vaiOnline': chiedi('La stagione in corso ricomincia in un girone online. Va bene?', () => { chiudiFoglio(true); Online.vaiOnline(); }); break;
+    case 'esciOnline': chiedi('Vuoi lasciare il girone online? Il tuo posto torna a un bot.', () => { chiudiFoglio(true); Online.esci().then(() => { nuovaLegaLocale(S.tier); salva(true); disegna(); avviso('Ora giochi da solo'); }).catch((er) => avviso(er.message || 'Errore')); }); break;
   }
 });
 
