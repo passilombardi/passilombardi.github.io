@@ -315,6 +315,7 @@ function toast(m){let t=$("#toast");if(!t){t=document.createElement("div");t.id=
   t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,5000)}
 /* dentro Claude il microfono del browser non è permesso: lì si nasconde il pulsante */
 const inClaude=!!(window.claude&&typeof window.claude.use==="function");
+const CLAUDE_APP="https://claude.ai/artifact/CqekDzoHx9CGBX6Rxgt7ri";
 const CLAUDE_URL="https://claude.ai/code/project/chan_01VhuotjDzX7YpC46qdd9veK";
 
 /* ================= ACCESSO: 1 account + 3 password diverse ================= */
@@ -482,9 +483,7 @@ function said(t){const m={r:"u",t};if(viaVoice)m.v=1;cur.msgs.push(m)}
 function chipsFor(p){
   const d=p.d;
   if(p.mode==="ai"){
-    if(p.api.length===0&&d.mod)return ["Cambia i colori","Aggiungi una pagina","Pulsanti più grandi","C'è un errore da sistemare"];
-    if(p.api.length===0)return ["Un gioco per Pietro","Un'app per i compiti","Una lista della spesa","Una guida della città"];
-    return p.ai.app?[{t:"Mi piace! Dammi il testo per Claude",main:true},"Cambia i colori","Aggiungi una cosa"]:[];
+    return p.ai.app&&p.step!=="done"?[{t:"Mi piace! Dammi il testo per Claude",main:true}]:[];
   }
   switch(p.step){
     case "idea":return ["Un gioco per Pietro","Un'app per i compiti","Una lista della spesa","Una guida della città"];
@@ -684,7 +683,7 @@ function fmt(t){
 function renderChat(typing){
   const el=$("#inner");el.innerHTML="";
   if(cur.msgs.length<=1&&cur.step==="idea"){
-    el.insertAdjacentHTML("beforeend",`<div class="hello"><div class="mark"></div><h1>Che app creiamo, ${esc(user)}?</h1><p>${cur.mode==="ai"?"Sono collegato a Claude: scrivi o manda un vocale, capisco tutto.":"Raccontami la tua idea. Io ti faccio qualche domanda e ti mostro come viene."}</p></div>`);
+    el.insertAdjacentHTML("beforeend",`<div class="hello"><div class="mark"></div><h1>Che app creiamo, ${esc(user)}?</h1><p>${cur.mode==="ai"?"Dimmi cosa vuoi, anche con un vocale. Ti preparo subito l'app vera da provare.":"Questa è la versione semplice, con le domande già pronte."}</p>${cur.mode==="ai"?"":`<p style="margin-top:18px"><a class="btn" href="${CLAUDE_APP}" target="_blank" rel="noopener">Apri Crea App con Claude vero →</a></p><p style="font-size:14px;margin-top:8px">Lì ragiona come Claude e usa il tuo abbonamento, senza pagare altro.</p>`}</div>`);
   }else cur.msgs.forEach((m,i)=>{
     if(m.r==="u"){el.insertAdjacentHTML("beforeend",`<div class="m-u">${m.v?'<span class="v">🎤</span>':""}${esc(m.t)}</div>`);return}
     let extra="";
@@ -728,20 +727,22 @@ function send(t,voice){
 }
 
 /* ================= CLAUDE VERO (con la chiave) ================= */
-const SYSTEM=`Sei «Crea App», un assistente che aiuta una famiglia italiana (Daniela e suo figlio Pietro, un bambino) a progettare app per il telefono, ciascuna con il suo sito di presentazione. Parli sempre in italiano semplice, caldo e breve, come in una chat: frasi corte, niente parole tecniche, al massimo una o due domande per volta.
+const SYSTEM=`Sei «Crea App», e sei Claude: lavori esattamente come Claude quando crea app e giochi per qualcuno. Aiuti una famiglia italiana (Daniela e suo figlio Pietro, un ragazzo) a creare app e giochi per il telefono, ciascuno con il suo sito di presentazione. Parli in italiano semplice e caldo, come in una chat vera: rispondi davvero a quello che ti dicono, con entusiasmo e idee tue. Non rispondere mai solo «ok» o «va bene»: ogni risposta porta qualcosa di nuovo (un'idea, una proposta, un pezzo di app). Se ti fanno una domanda qualsiasi, rispondi bene come faresti tu.
 
 Come lavori:
-1. Capisci l'idea: a cosa serve l'app, per chi è, cosa deve fare, colori e stile che piacciono. Se l'idea è già chiara non fare domande inutili: proponi tu.
-2. Appena hai abbastanza idea (di solito dopo 1-3 messaggi) disegna l'anteprima, e ridisegnala ogni volta che si cambia qualcosa che si vede. Se il messaggio non cambia niente che si vede, non ridisegnare.
+1. Appena capisci l'idea, anche dal primo messaggio, costruisci SUBITO una prima versione completa e bella dell'app, senza fare prima tante domande. Scegli tu quello che manca (nome, colori, schermate) e dillo in una frase. Poi al massimo una domanda per migliorarla.
+2. Ogni volta che l'utente chiede un cambiamento, rifai l'anteprima con il cambiamento fatto davvero. Se il messaggio non cambia niente che si vede, non ridisegnare.
+
+Qualità: l'app dell'anteprima deve essere vera e bella, come quelle che fai tu, non un disegno finto. Deve funzionare davvero dentro il telefono: si tocca, risponde, cambia schermata, salva i dati nella memoria della pagina, saluta l'utente. Grafica curata e moderna: palette di colori pensata, tipografia grande e leggibile, spazi giusti, angoli, ombre, piccole animazioni fluide, icone in SVG o emoji, schermata iniziale accogliente. Se è un gioco deve essere giocabile davvero: comandi a tocco grandi, canvas o DOM animato con requestAnimationFrame, punteggio, livelli o difficoltà che crescono, schermata di inizio e di fine partita con «Gioca ancora», suoni fatti con Web Audio dopo il primo tocco. Pensa prima a come renderla speciale e divertente per un ragazzo.
 3. Quando l'utente dice che gli piace (per esempio «mi piace», «va bene così», «dammi il testo per Claude»), scrivi il testo finale.
 
 Formato dell'anteprima (l'app legge questi blocchi e li mostra nel pannello Anteprima; tu non nominarli mai, di' solo «guarda l'anteprima»):
 <app_name>Nome dell'app</app_name>
 <app_html>
-un documento HTML completo e autonomo (<!doctype html> … </html>) che mostra l'app vera su uno schermo di telefono largo circa 360px: CSS e JavaScript dentro il file, nessun file o link esterno, nessuna libreria, nessuna immagine esterna (usa emoji, SVG e CSS). Deve funzionare: i pulsanti portano alle varie schermate con JavaScript, con dati di esempio realistici. Niente localStorage. Stai sotto le 300 righe.
+un documento HTML completo e autonomo (<!doctype html> … </html>) che mostra l'app vera su uno schermo di telefono largo circa 360px: CSS e JavaScript dentro il file, nessun file o link esterno, nessuna libreria, nessuna immagine esterna (usa emoji, SVG e CSS). Deve funzionare: i pulsanti portano alle varie schermate con JavaScript, con dati di esempio realistici. Niente localStorage. Può essere lunga quanto serve per essere bella e completa (anche 600-900 righe), ma deve essere sempre un file intero e funzionante.
 </app_html>
 <site_html>
-un documento HTML completo e autonomo per il sito che presenta l'app: nome, icona, a cosa serve, cosa fa, il pulsante «Apri l'app», con lo stesso stile e gli stessi colori. Stesse regole, sotto le 200 righe.
+un documento HTML completo e autonomo per il sito che presenta l'app: nome, icona, a cosa serve, cosa fa, il pulsante «Apri l'app», con lo stesso stile e gli stessi colori. Stesse regole, curato e bello come una vera pagina di lancio, sotto le 300 righe.
 </site_html>
 
 Testo finale, quando l'utente è contento:
@@ -795,7 +796,7 @@ async function aiSend(t){
   let lastDraw=0;const draw=()=>{const now=Date.now();if(now-lastDraw>120&&p===cur){lastDraw=now;renderChat(true)}};
   if(fn){
     try{
-      const r=await fn(sampleTurns(p),{cache:false,onText:({text})=>{live=text;draw()}});
+      const r=await fn(sampleTurns(p),{cache:false,modelTier:"complex",onText:({text})=>{live=text;draw()}});
       p.api.push({role:"assistant",content:r.text});
       readReply(p,r.text,r.truncated);
     }catch(e){
@@ -902,18 +903,38 @@ $("#send").onclick=()=>send(inp.value);
 /* ---- vocali: parli e l'app scrive ---- */
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 let rec=null,recText="";
+/* parli finché vuoi: il vocale si ferma solo quando tocchi di nuovo il microfono, poi si manda */
+let recStop=false,recParts=[];
+function joinParts(){return recParts.join(" ").replace(/\s+/g," ").trim()}
 $("#mic").onclick=()=>{
   if(!SR){toast("Su questo telefono i vocali non funzionano qui. Prova con Chrome (Android) o Safari (iPhone).");return}
-  if(rec){rec.stop();return}
-  rec=new SR();rec.lang="it-IT";rec.interimResults=true;rec.continuous=true;recText="";
-  let quiet=null;const arm=ms=>{clearTimeout(quiet);quiet=setTimeout(()=>{if(rec)rec.stop()},ms)};arm(8000);
+  if(rec){recStop=true;rec.stop();return}
+  recStop=false;recParts=[];
   const before=inp.value?inp.value.trim()+" ":"";
-  $("#mic").classList.add("on");inp.placeholder="Ti ascolto… parla pure";
-  rec.onresult=e=>{let t="";for(const r of e.results)t+=r[0].transcript;recText=t;inp.value=before+t;autosize();arm(1800)};
-  rec.onerror=e=>{if(e.error==="not-allowed"||e.error==="service-not-allowed")toast("Devi dare il permesso al microfono per mandare i vocali.");else if(e.error==="no-speech")toast("Non ho sentito niente. Riprova parlando un po' più forte.")};
-  rec.onend=()=>{clearTimeout(quiet);rec=null;$("#mic").classList.remove("on");renderChat();inp.value=before+recText;autosize();
-    if(recText.trim())send(inp.value,true)};
-  try{rec.start()}catch(e){rec=null;$("#mic").classList.remove("on")}
+  const startRec=()=>{
+    rec=new SR();rec.lang="it-IT";rec.interimResults=true;rec.continuous=true;
+    let base=recParts.slice();
+    rec.onresult=e=>{
+      /* alcuni telefoni ripetono la frase intera a ogni pezzo: teniamo solo la versione più lunga */
+      const out=base.slice();
+      for(let i=0;i<e.results.length;i++){const t=e.results[i][0].transcript.trim();if(!t)continue;
+        const last=out.length>base.length?out[out.length-1]:null;
+        if(last&&(t.toLowerCase().startsWith(last.toLowerCase())))out[out.length-1]=t;
+        else if(last&&last.toLowerCase().startsWith(t.toLowerCase())){}
+        else out.push(t)}
+      recParts=out;inp.value=before+joinParts();autosize();
+    };
+    rec.onerror=e=>{if(e.error==="not-allowed"||e.error==="service-not-allowed"){recStop=true;toast("Devi dare il permesso al microfono per mandare i vocali.")}};
+    rec.onend=()=>{
+      if(!recStop){try{startRec();return}catch(_){}}   // il telefono si è fermato da solo: riparte
+      rec=null;$("#mic").classList.remove("on");$("#mic").textContent="🎤";renderChat();
+      inp.value=before+joinParts();autosize();
+      if(joinParts())send(inp.value,true);
+    };
+    rec.start();
+  };
+  try{startRec();$("#mic").classList.add("on");$("#mic").textContent="■";inp.placeholder="Ti ascolto… tocca ■ quando hai finito";toast("Parla pure. Quando hai finito tocca ■.")}
+  catch(e){rec=null;$("#mic").classList.remove("on")}
 };
 $("#newBtn").onclick=()=>{$("#app").classList.remove("menu");const empty=projects.find(p=>p.step==="idea"&&p.msgs.length<=1&&(p.mode==="ai")===hasAI());if(empty){cur=empty;renderAll()}else newProject()};
 $("#menuBtn").onclick=()=>$("#app").classList.add("menu");
