@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" content="#f5f2ec">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Crea App">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icona-192.png">
+<link rel="apple-touch-icon" href="icona-180.png">
+<title>Crea App PM</title>
+<meta name="description" content="Racconta l'app che vuoi: Crea App ti fa le domande, ti mostra l'anteprima e prepara il testo da dare a Claude.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap">
+<style>
+:root{
+  --bg:#f5f2ec; --side:#ece8e0; --card:#ffffff; --ink:#26241f; --soft:#6d685e; --line:#ddd7cb;
+  --acc:#3f46a8; --acc-soft:#e7e8f7; --on-acc:#fff; --bubble:#e9e4d9; --ok:#1f7a55; --bad:#b4372e;
+  --f-ui:"DM Sans",system-ui,sans-serif; --f-read:"Newsreader",Georgia,serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#262522; --side:#1e1d1b; --card:#302f2b; --ink:#ecebe6; --soft:#a8a397; --line:#3f3d38;
+  --acc:#9aa1ff; --acc-soft:#33355a; --on-acc:#14163a; --bubble:#3a3833; --ok:#62c897; --bad:#ff8a80; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#262522; --side:#1e1d1b; --card:#302f2b; --ink:#ecebe6; --soft:#a8a397; --line:#3f3d38;
+  --acc:#9aa1ff; --acc-soft:#33355a; --on-acc:#14163a; --bubble:#3a3833; --ok:#62c897; --bad:#ff8a80; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:16px;line-height:1.5;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer}
+input,textarea{font:inherit;color:inherit}
+.mark{width:28px;height:28px;flex:none;border-radius:8px;background:url(icona-192.png) center/cover}
+
+/* ---------- accesso ---------- */
+#gate{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.gate-box{width:100%;max-width:420px;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:28px 22px;box-shadow:0 10px 40px rgba(0,0,0,.06)}
+.gate-box .mark{width:56px;height:56px;border-radius:16px;margin:0 auto 14px}
+.gate-box h1{font-family:var(--f-read);font-weight:500;font-size:30px;text-align:center;margin:0 0 4px}
+.gate-box p.sub{text-align:center;color:var(--soft);margin:0 0 20px}
+.fld{display:block;margin-bottom:12px}
+.fld span{display:block;font-size:14px;font-weight:500;margin-bottom:4px}
+.fld .row{display:flex;gap:6px}
+.fld input{flex:1;width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);font-size:17px}
+.fld input:focus{outline:2px solid var(--acc);outline-offset:0;border-color:transparent}
+.eye{border:1px solid var(--line);background:var(--bg);border-radius:12px;width:48px;font-size:18px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:12px;padding:12px 18px;background:var(--acc);color:var(--on-acc);font-weight:700;font-size:16px}
+.btn.wide{width:100%;margin-top:6px}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.err{color:var(--bad);font-size:14px;min-height:20px;margin:6px 0 0;text-align:center}
+.note{font-size:13px;color:var(--soft);margin-top:16px;text-align:center}
+
+/* ---------- app ---------- */
+#app{height:100%;display:flex}
+#side{width:270px;flex:none;background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:14px 10px;padding-top:max(14px,env(safe-area-inset-top))}
+.side-top{display:flex;align-items:center;gap:10px;padding:4px 6px 14px}
+.side-top b{font-family:var(--f-read);font-weight:600;font-size:21px}
+.newbtn{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;padding:10px;border-radius:10px;font-weight:500;text-align:left}
+.newbtn:hover,.plist button:hover{background:rgba(127,120,100,.12)}
+.newbtn i{font-style:normal;width:24px;height:24px;border-radius:50%;background:var(--acc);color:var(--on-acc);display:grid;place-items:center;font-size:18px;line-height:1}
+.side-h{font-size:12px;color:var(--soft);padding:14px 10px 6px;text-transform:uppercase;letter-spacing:.06em}
+.plist{flex:1;overflow:auto;display:flex;flex-direction:column;gap:2px}
+.plist button{border:0;background:transparent;text-align:left;padding:9px 10px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px}
+.plist button.on{background:rgba(127,120,100,.18);font-weight:500}
+.side-foot{border-top:1px solid var(--line);padding-top:10px;display:flex;align-items:center;gap:10px;padding-left:6px}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--acc);color:var(--on-acc);display:grid;place-items:center;font-weight:700;flex:none}
+.side-foot div{flex:1;min-width:0;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.side-foot button{border:1px solid var(--line);background:transparent;border-radius:8px;padding:5px 10px;font-size:13px}
+#scrim{display:none}
+
+main{flex:1;min-width:0;display:flex;flex-direction:column;height:100%}
+.top{display:flex;align-items:center;gap:8px;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));border-bottom:1px solid transparent}
+.top h2{flex:1;margin:0;font-size:16px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ibtn{border:0;background:transparent;width:40px;height:40px;border-radius:10px;font-size:20px;display:grid;place-items:center}
+.ibtn:hover{background:rgba(127,120,100,.12)}
+#menuBtn{display:none}
+.body{flex:1;min-height:0;display:flex}
+.chatcol{flex:1;min-width:0;display:flex;flex-direction:column}
+#msgs{flex:1;overflow:auto;padding:12px 16px 24px}
+.inner{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.m-u{align-self:flex-end;max-width:85%;background:var(--bubble);border-radius:18px;padding:10px 16px;white-space:pre-wrap;word-wrap:break-word}
+.m-a{display:flex;gap:12px;align-items:flex-start}
+.m-a .mark{margin-top:3px}
+.m-a .txt{flex:1;min-width:0;font-family:var(--f-read);font-size:18px;line-height:1.55}
+.m-a .txt p{margin:0 0 10px}.m-a .txt p:last-child{margin:0}
+.m-a .txt ul{margin:6px 0 10px;padding-left:22px}
+.typing span{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--soft);margin-right:4px;animation:b 1s infinite}
+.typing span:nth-child(2){animation-delay:.15s}.typing span:nth-child(3){animation-delay:.3s}
+@keyframes b{0%,80%,100%{opacity:.25}40%{opacity:1}}
+.hello{text-align:center;margin:8vh auto 0;max-width:560px}
+.hello .mark{width:52px;height:52px;border-radius:14px;margin:0 auto 14px}
+.hello h1{font-family:var(--f-read);font-weight:400;font-size:34px;line-height:1.2;margin:0 0 8px}
+.hello p{color:var(--soft);margin:0}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;max-width:720px;margin:0 auto;padding:0 16px 10px}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px;font-size:15px}
+.chip:hover{border-color:var(--acc)}
+.chip.main{background:var(--acc);color:var(--on-acc);border-color:var(--acc);font-weight:700}
+.chip .sw{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin-right:6px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+.composer{padding:0 16px 14px;padding-bottom:max(14px,env(safe-area-inset-bottom))}
+.cbox{max-width:720px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:10px 10px 10px 16px;display:flex;align-items:flex-end;gap:8px;box-shadow:0 4px 20px rgba(0,0,0,.05)}
+.cbox:focus-within{border-color:var(--acc)}
+#inp{flex:1;border:0;background:transparent;resize:none;outline:0;font-size:17px;line-height:1.45;max-height:160px;padding:6px 0}
+#send{width:40px;height:40px;border-radius:12px;border:0;background:var(--acc);color:var(--on-acc);font-size:20px;flex:none;display:grid;place-items:center}
+#send:disabled{opacity:.35}
+.hint{max-width:720px;margin:6px auto 0;text-align:center;font-size:12px;color:var(--soft)}
+
+/* card anteprima nel chat */
+.pcard{margin-top:12px;display:flex;align-items:center;gap:12px;border:1px solid var(--line);background:var(--card);border-radius:14px;padding:12px;font-family:var(--f-ui);font-size:15px;cursor:pointer;width:100%;text-align:left}
+.pcard .ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:24px;flex:none}
+.pcard b{display:block}.pcard small{color:var(--soft)}
+.final{margin-top:12px;border:1px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden;font-family:var(--f-ui)}
+.final .fh{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);font-size:14px;color:var(--soft)}
+.final pre{margin:0;padding:12px 14px;white-space:pre-wrap;word-wrap:break-word;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13.5px;line-height:1.5;max-height:340px;overflow:auto}
+.final .fa{display:flex;flex-wrap:wrap;gap:8px;padding:12px;border-top:1px solid var(--line)}
+.final .fa .btn{flex:1;min-width:150px;text-decoration:none}
+.small-btn{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:4px 10px;font-size:13px}
+
+/* pannello anteprima */
+#prev{width:440px;flex:none;border-left:1px solid var(--line);background:var(--side);display:flex;flex-direction:column}
+.ptabs{display:flex;align-items:center;gap:6px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.ptabs button.t{border:0;background:transparent;padding:7px 14px;border-radius:999px;font-weight:500}
+.ptabs button.t.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.ptabs .sp{flex:1}
+.pbody{flex:1;overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:22px 12px}
+.empty{color:var(--soft);text-align:center;margin-top:30%;padding:0 30px}
+
+/* telefono finto */
+.phone{width:300px;height:600px;border-radius:40px;background:#111;padding:10px;box-shadow:0 20px 50px rgba(0,0,0,.25);flex:none}
+.screen{width:100%;height:100%;border-radius:31px;overflow:hidden;display:flex;flex-direction:column;position:relative;font-family:var(--pf);background:var(--pbg);color:var(--pink)}
+.notch{position:absolute;top:8px;left:50%;transform:translateX(-50%);width:90px;height:22px;border-radius:12px;background:#111;z-index:3}
+.ph-head{background:var(--p1);color:var(--pon);padding:42px 16px 14px;display:flex;align-items:center;gap:10px}
+.ph-head .e{font-size:26px}
+.ph-head b{font-size:18px;line-height:1.2}
+.ph-head .back{border:0;background:rgba(255,255,255,.2);color:inherit;border-radius:10px;width:32px;height:32px;font-size:18px}
+.ph-main{flex:1;overflow:auto;padding:14px}
+.ph-hi{font-size:15px;margin:2px 0 12px;opacity:.85}
+.ph-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ph-tile{border:0;border-radius:var(--pr);background:var(--pcard);color:inherit;padding:14px 10px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.08);display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;font-weight:600;min-height:92px;justify-content:center}
+.ph-tile .e{font-size:28px}
+.ph-tile:first-child{grid-column:1/-1;background:var(--p2);color:var(--pon2);min-height:80px;flex-direction:row;gap:10px;font-size:15px}
+.ph-nav{display:flex;justify-content:space-around;padding:10px 0 18px;background:var(--pcard);border-top:1px solid rgba(127,127,127,.15);font-size:11px}
+.ph-nav span{display:flex;flex-direction:column;align-items:center;opacity:.6}.ph-nav span.on{opacity:1;color:var(--p1)}
+.ph-nav span i{font-style:normal;font-size:18px}
+.ph-scr .big{font-size:56px;text-align:center;margin:16px 0 4px}
+.ph-scr h3{text-align:center;margin:0 0 6px}
+.ph-scr p{text-align:center;font-size:13px;opacity:.75;margin:0 0 14px}
+.ph-line{height:44px;border-radius:var(--pr);background:var(--pcard);margin-bottom:8px;display:flex;align-items:center;padding:0 12px;gap:10px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.ph-line i{width:22px;height:22px;border-radius:50%;background:var(--p2);opacity:.7;flex:none}
+.ph-line s{flex:1;height:8px;border-radius:4px;background:currentColor;opacity:.12;text-decoration:none}
+.ph-cta{display:block;width:100%;border:0;border-radius:var(--pr);padding:12px;background:var(--p1);color:var(--pon);font-weight:700;margin-top:10px}
+.ph-login{padding:30px 22px;text-align:center}
+.ph-login .e{font-size:48px}
+.ph-login .in{height:40px;border-radius:var(--pr);background:var(--pcard);margin:10px 0;box-shadow:inset 0 0 0 1px rgba(127,127,127,.25)}
+
+/* sito finto */
+.site{width:100%;max-width:400px;border-radius:12px;overflow:hidden;box-shadow:0 14px 40px rgba(0,0,0,.18);background:var(--pbg);color:var(--pink);font-family:var(--pf)}
+.site .bar{background:#ddd;padding:8px 10px;display:flex;gap:6px;align-items:center}
+.site .bar i{width:10px;height:10px;border-radius:50%;background:#bbb}
+.site .bar u{flex:1;text-decoration:none;background:#fff;border-radius:6px;font-size:11px;color:#555;padding:3px 8px;margin-left:6px;font-family:var(--f-ui)}
+.site .hero{background:var(--p1);color:var(--pon);padding:34px 20px;text-align:center}
+.site .hero .e{font-size:54px}
+.site .hero h3{margin:6px 0;font-size:24px}
+.site .hero p{margin:0 0 16px;opacity:.9;font-size:14px}
+.site .hero a{display:inline-block;background:var(--pon);color:var(--p1);padding:10px 20px;border-radius:999px;font-weight:700;text-decoration:none;font-size:14px}
+.site .feat{padding:18px;display:grid;gap:10px}
+.site .feat div{background:var(--pcard);border-radius:var(--pr);padding:12px;display:flex;gap:10px;align-items:center;font-size:14px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.site .feat div span{font-size:22px}
+.site .foot{text-align:center;font-size:12px;opacity:.6;padding:0 0 18px}
+
+@media (max-width:1100px){
+  #prev{position:fixed;inset:0;width:auto;z-index:30;background:var(--side)}
+  #prev:not(.open){display:none}
+  .ptabs{padding-top:max(10px,env(safe-area-inset-top))}
+}
+@media (min-width:1101px){#prevClose{display:none}}
+@media (max-width:760px){
+  #side{position:fixed;top:0;bottom:0;left:0;z-index:20;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 30px rgba(0,0,0,.2)}
+  #app.menu #side{transform:none}
+  #app.menu #scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:15}
+  #menuBtn{display:grid}
+  .m-a .txt{font-size:17px}
+  .hello h1{font-size:28px}
+}
+</style>
+</head>
+<body>
+
+<!-- ACCESSO -->
+<section id="gate" hidden>
+  <form class="gate-box" id="gateForm" autocomplete="off">
+    <div class="mark"></div>
+    <h1 id="gTitle">Crea App</h1>
+    <p class="sub" id="gSub"></p>
+    <label class="fld"><span>Nome dell'account</span><div class="row"><input id="gName" autocomplete="username" required></div></label>
+    <label class="fld"><span>Password 1</span><div class="row"><input id="gP1" type="password" required><button type="button" class="eye" aria-label="Mostra">👁</button></div></label>
+    <label class="fld"><span>Password 2</span><div class="row"><input id="gP2" type="password" required><button type="button" class="eye" aria-label="Mostra">👁</button></div></label>
+    <label class="fld"><span>Password 3</span><div class="row"><input id="gP3" type="password" required><button type="button" class="eye" aria-label="Mostra">👁</button></div></label>
+    <button class="btn wide" id="gBtn">Entra</button>
+    <p class="err" id="gErr"></p>
+    <p class="note" id="gNote"></p>
+  </form>
+</section>
+
+<!-- APP -->
+<div id="app" hidden>
+  <aside id="side">
+    <div class="side-top"><div class="mark"></div><b>Crea App</b></div>
+    <button class="newbtn" id="newBtn"><i>+</i> Nuova app</button>
+    <div class="side-h">Le tue app</div>
+    <nav class="plist" id="plist"></nav>
+    <div class="side-foot"><span class="avatar" id="av"></span><div id="who"></div><button id="outBtn">Esci</button></div>
+  </aside>
+  <div id="scrim"></div>
+  <main>
+    <div class="top">
+      <button class="ibtn" id="menuBtn" aria-label="Menu">☰</button>
+      <h2 id="ttl">Nuova app</h2>
+      <button class="ibtn" id="prevBtn" aria-label="Anteprima" title="Anteprima">📱</button>
+    </div>
+    <div class="body">
+      <div class="chatcol">
+        <div id="msgs"><div class="inner" id="inner"></div></div>
+        <div class="chips" id="chips"></div>
+        <div class="composer">
+          <div class="cbox">
+            <textarea id="inp" rows="1" placeholder="Scrivi qui…"></textarea>
+            <button id="send" aria-label="Invia" disabled>↑</button>
+          </div>
+          <div class="hint">Crea App prepara l'idea. L'app vera la costruisce Claude quando gli incolli il testo finale.</div>
+        </div>
+      </div>
+      <section id="prev">
+        <div class="ptabs">
+          <button class="t on" data-v="app">App</button>
+          <button class="t" data-v="site">Sito</button>
+          <span class="sp"></span>
+          <button class="ibtn" id="prevClose" aria-label="Chiudi">✕</button>
+        </div>
+        <div class="pbody" id="pbody"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const sess={get(k){try{return sessionStorage.getItem(k)}catch(e){return null}},set(k,v){try{sessionStorage.setItem(k,v)}catch(e){}},del(k){try{sessionStorage.removeItem(k)}catch(e){}}};
+const CLAUDE_URL="https://claude.ai/code/project/chan_01VhuotjDzX7YpC46qdd9veK";
+
+/* ================= ACCESSO: 1 account + 3 password diverse ================= */
+/* Le 3 password non sono scritte qui: c'è solo il loro codice PBKDF2. */
+const SALT="creaapp-pm-2026";
+const HASHES=["e85dc85e50c77847b491b40cd400d0b743b02d8228165835aa24eb5b8f0f64a9","b19a051469f1a4c76cb47e26ad60e92c678d8728c10c2c60986914b2c06f3f6b","63010a1f585fd938142d5b393a9519775b0b9d67f9f974a5d66e5d6ccca060ea"];
+async function hashPw(pw,i){
+  const enc=new TextEncoder();
+  const key=await crypto.subtle.importKey("raw",enc.encode(pw),"PBKDF2",false,["deriveBits"]);
+  const bits=await crypto.subtle.deriveBits({name:"PBKDF2",salt:enc.encode(SALT+":"+i),iterations:300000,hash:"SHA-256"},key,256);
+  return Array.from(new Uint8Array(bits)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+function showGate(){
+  $("#gate").hidden=false;$("#app").hidden=true;
+  ["#gP1","#gP2","#gP3"].forEach(s=>$(s).value="");
+  $("#gTitle").textContent="Crea App";
+  $("#gSub").textContent="Scrivi il tuo nome e le 3 password. Si entra solo se sono giuste tutte e 3.";
+  $("#gBtn").textContent="Entra";
+  $("#gNote").textContent="";
+  $("#gName").value=store.get("creaapp-lastname","");
+  $("#gErr").textContent="";
+}
+document.querySelectorAll(".eye").forEach(b=>b.onclick=()=>{const i=b.previousElementSibling;i.type=i.type==="password"?"text":"password"});
+$("#gateForm").onsubmit=async e=>{
+  e.preventDefault();
+  const err=$("#gErr");err.textContent="";
+  const name=$("#gName").value.trim(), pw=[$("#gP1").value,$("#gP2").value,$("#gP3").value];
+  if(name.length<2){err.textContent="Scrivi il nome dell'account.";return}
+  if(!window.crypto||!crypto.subtle){err.textContent="Apri l'app dal sito (https) per usare le password.";return}
+  const wait=store.get("creaapp-wait",0);
+  if(Date.now()<wait){err.textContent="Troppi tentativi. Riprova tra "+Math.ceil((wait-Date.now())/1000)+" secondi.";return}
+  $("#gBtn").disabled=true;$("#gBtn").textContent="Controllo…";
+  const h=await Promise.all(pw.map((p,i)=>hashPw(p,i)));
+  $("#gBtn").disabled=false;$("#gBtn").textContent="Entra";
+  if(h.every((x,i)=>x===HASHES[i])){
+    store.set("creaapp-fails",0);store.set("creaapp-lastname",name);sess.set("creaapp-in",name);enterApp();
+  }else{
+    const f=store.get("creaapp-fails",0)+1;store.set("creaapp-fails",f);
+    if(f>=5){store.set("creaapp-wait",Date.now()+60000);store.set("creaapp-fails",0)}
+    err.textContent="Le password non sono giuste.";
+  }
+};
+$("#outBtn").onclick=()=>{sess.del("creaapp-in");location.reload()};
+
+/* ================= DATI ================= */
+const PALETTES={
+  "Blu mare":["#1f5fbf","#3fb6d9","#f3f7fc"],
+  "Verde bosco":["#1f7a4d","#8cc63f","#f3f8f2"],
+  "Rosso fuoco":["#c62828","#ff9f1c","#fff6f2"],
+  "Viola magico":["#6a3fc7","#e06bd8","#f7f3fd"],
+  "Arancione sole":["#e8710a","#ffd23f","#fffaf0"],
+  "Rosa":["#d6457a","#ffb3c7","#fff4f7"],
+  "Nero e oro":["#1c1c1c","#d4a017","#f6f3ea"],
+  "Azzurro cielo":["#2b8fd6","#9bd7ff","#f2f9ff"]
+};
+const STYLES={
+  "Semplice e pulito":{f:"system-ui,sans-serif",r:"14px",dark:false},
+  "Divertente e colorato":{f:"'Comic Sans MS','Chalkboard SE',system-ui,sans-serif",r:"22px",dark:false},
+  "Elegante":{f:"Georgia,'Times New Roman',serif",r:"8px",dark:false},
+  "Scuro, da notte":{f:"system-ui,sans-serif",r:"14px",dark:true}
+};
+const TYPES={
+  "🎮 Gioco":["Punteggio","Livelli","Suoni","Classifica","Personaggi"],
+  "📚 Scuola e studio":["Quiz","Spiegazioni","Esercizi","Voti","Promemoria compiti"],
+  "🗺️ Guida o mappa":["Mappa","Percorsi","Voce che parla","Posti preferiti","Foto dei posti"],
+  "📷 Foto e disegni":["Fare foto","Album","Disegnare","Filtri","Condividere"],
+  "📝 Liste e organizzare":["Lista delle cose","Calendario","Promemoria","Spuntare fatto","Categorie"],
+  "✨ Altro":["Pagina principale","Impostazioni","Aiuto"]
+};
+const GUESS=[[/gioc|partit|livell|vinc|punt|gara|corsa|calcio/i,"🎮 Gioco"],[/compit|scuol|stud|quiz|matemat|ital|ingles|lezion|impar/i,"📚 Scuola e studio"],[/mapp|guid|strad|percors|viagg|città|citta|posti|camminat/i,"🗺️ Guida o mappa"],[/foto|disegn|immag|album|video/i,"📷 Foto e disegni"],[/list|spesa|calendar|agenda|promemor|organizz|cose da fare/i,"📝 Liste e organizzare"]];
+const ICONS=[[/punt|class|vinc|trofe/i,"🏆"],[/livell/i,"🪜"],[/suon|music|canz|voce/i,"🔊"],[/person|eroe|amic/i,"🧑"],[/quiz|domand/i,"❓"],[/spieg|aiut|guid/i,"💡"],[/eserciz|compit/i,"✏️"],[/vot/i,"⭐"],[/promemor|sveglia|avvis/i,"⏰"],[/mapp|posti|percors|strad/i,"🗺️"],[/foto|camera/i,"📷"],[/album/i,"🖼️"],[/disegn|color/i,"🎨"],[/filtr/i,"✨"],[/condivid|invia|manda/i,"📤"],[/list|spesa/i,"📋"],[/calendar|giorn|data/i,"📅"],[/fatto|spunt/i,"✅"],[/categor/i,"🗂️"],[/impostaz/i,"⚙️"],[/account|login|password/i,"🔒"],[/gioc|partit/i,"🎮"],[/cerca/i,"🔎"],[/salv/i,"💾"],[/tempo|meteo/i,"⛅"],[/cucin|ricett|cibo/i,"🍝"],[/sport|calcio|pallon/i,"⚽"],[/animal|cane|gatt/i,"🐾"],[/auto|macchin|moto/i,"🚗"],[/casa/i,"🏠"]];
+const iconFor=t=>{for(const [r,e] of ICONS)if(r.test(t))return e;return "⭐"};
+const EMOJI=["🚀","🎮","📚","🗺️","📷","📝","🎨","⚽","🐾","🏠","🌟","🎵","🧩","🚗","🍕","🦖"];
+
+/* ================= PROGETTI ================= */
+let user=null, projects=[], cur=null, busy=false, pview="app", pscreen=null;
+const PK=()=>"creaapp-projects:"+user.trim().toLowerCase();
+function save(){store.set(PK(),projects)}
+function newProject(){
+  const p={id:Date.now().toString(36),created:Date.now(),step:"idea",d:{feat:[]},msgs:[]};
+  projects.unshift(p);cur=p;
+  say("Ciao "+user+"! Che app vuoi creare oggi?\nRaccontamela con parole tue: a cosa serve, cosa ti piacerebbe che facesse.");
+  save();renderAll();
+}
+function title(p){return p.d.name||(p.d.idea?p.d.idea.slice(0,40):"Nuova app")}
+
+/* ================= CONVERSAZIONE ================= */
+function say(t,k){cur.msgs.push({r:"a",t,k:k||null})}
+function said(t){cur.msgs.push({r:"u",t})}
+function chipsFor(p){
+  const d=p.d;
+  switch(p.step){
+    case "idea":return ["Un gioco per Pietro","Un'app per i compiti","Una lista della spesa","Una guida della città"];
+    case "who":return ["Per Pietro","Per me","Per la famiglia","Per i bambini","Per tutti"];
+    case "type":return Object.keys(TYPES);
+    case "feat":return [...(TYPES[d.type]||TYPES["✨ Altro"]).filter(x=>!d.feat.includes(x)),{t:"Basta così ✓",main:true}];
+    case "color":return Object.keys(PALETTES).map(n=>({t:n,sw:PALETTES[n][0]}));
+    case "style":return Object.keys(STYLES);
+    case "account":return ["Sì, con password","No, si apre subito"];
+    case "name":return [...suggestNames(d),"Lo scrivo io"];
+    case "icon":return EMOJI;
+    case "edit":return [{t:"Mi piace! ✓",main:true},"Cambia i colori","Cambia lo stile","Cambia il nome","Cambia l'icona","Aggiungi una cosa","Togli una cosa"];
+    case "remove":return [...d.feat,"Niente, lascia così"];
+    case "done":return ["Modifica ancora","Nuova app"];
+    default:return [];
+  }
+}
+function suggestNames(d){
+  const w=(d.idea||"").replace(/[^\p{L}\s]/gu," ").split(/\s+/).filter(x=>x.length>3&&!/^(un|una|che|per|con|della|delle|dove|come|voglio|vorrei|app|applicazione|questa|quella|sono|anche|tutte|tutti|fare|deve|possa)$/i.test(x));
+  const cap=s=>s.charAt(0).toUpperCase()+s.slice(1).toLowerCase();
+  const out=[];
+  if(w[0])out.push(cap(w[0])+" PM");
+  if(w[0]&&w[1])out.push(cap(w[0])+" "+cap(w[1]));
+  const base={"🎮 Gioco":"Super Gioco PM","📚 Scuola e studio":"Studio Facile PM","🗺️ Guida o mappa":"Guida PM","📷 Foto e disegni":"Album PM","📝 Liste e organizzare":"Lista Furba PM"}[d.type];
+  if(base)out.push(base);
+  return [...new Set(out)].slice(0,3);
+}
+function guessType(t){for(const [r,k] of GUESS)if(r.test(t))return k;return null}
+function splitFeat(t){return t.split(/\n|,|;| e poi | poi /i).map(s=>s.trim().replace(/^[-•*\d.)\s]+/,"")).filter(s=>s.length>1).map(s=>s.charAt(0).toUpperCase()+s.slice(1))}
+
+function answer(text){
+  const p=cur,d=p.d,t=text.trim();if(!t)return;
+  said(t);
+  const S=p.step;
+  if(S==="idea"){
+    d.idea=t;const g=guessType(t);
+    p.step="who";
+    say("Che bella idea! Mi piace.\nPer chi è questa app? Chi la userà di più?");
+  }else if(S==="who"){
+    d.who=t;const g=guessType(d.idea+" "+t);
+    if(g){d.type=g;p.step="feat";say("Ho capito: è "+lowType(g)+".\nAdesso dimmi le cose che deve fare. Tocca quelle che vuoi qui sotto, oppure scrivile tu, anche più di una separate da virgole. Quando hai finito tocca «Basta così».")}
+    else{p.step="type";say("Perfetto. Che tipo di app è? Scegli quella che le somiglia di più.")}
+  }else if(S==="type"){
+    d.type=TYPES[t]?t:"✨ Altro";if(!TYPES[t])d.typeText=t;
+    p.step="feat";say("Bene! Adesso dimmi le cose che deve fare. Tocca quelle che vuoi qui sotto, oppure scrivile tu, anche più di una separate da virgole. Quando hai finito tocca «Basta così».");
+  }else if(S==="feat"||S==="add"){
+    if(/^basta/i.test(t)&&S==="feat"){
+      if(!d.feat.length){say("Dimmi almeno una cosa che deve fare l'app, così la posso disegnare.");}
+      else{p.step="color";say("Ottimo, ho segnato "+d.feat.length+" cose:\n"+d.feat.map(f=>"• "+f).join("\n")+"\n\nChe colori ti piacciono per l'app?")}
+    }else{
+      const add=splitFeat(t).filter(f=>!d.feat.some(x=>x.toLowerCase()===f.toLowerCase()));
+      d.feat.push(...add);
+      if(S==="add"){p.step="edit";say(add.length?"Fatto! Ho aggiunto: "+add.join(", ")+". Guarda l'anteprima: c'è un pulsante nuovo.\nVuoi cambiare altro?":"C'era già. Vuoi cambiare altro?","preview")}
+      else say(add.length?"Segnato: "+add.join(", ")+". Altro? Se hai finito tocca «Basta così».":"C'era già. Altro?");
+    }
+  }else if(S==="color"){
+    d.color=PALETTES[t]?t:matchPalette(t);
+    if(d.edited){p.step="edit";say("Fatto, colori cambiati in «"+d.color+"». Guarda l'anteprima! Vuoi cambiare altro?","preview")}
+    else{p.step="style";say("Bellissimo. E lo stile? Come deve sembrare l'app?")}
+  }else if(S==="style"){
+    d.style=STYLES[t]?t:"Semplice e pulito";
+    if(d.edited){p.step="edit";say("Fatto, adesso lo stile è «"+d.style+"». Vuoi cambiare altro?","preview")}
+    else{p.step="account";say("Serve un account con la password per entrare nell'app, oppure si apre subito?")}
+  }else if(S==="account"){
+    d.account=/^s[iì]/i.test(t);
+    p.step="name";say("Ci siamo quasi! Come la chiamiamo? Puoi scegliere un nome qui sotto oppure scriverne uno tu.");
+  }else if(S==="name"){
+    if(/^lo scrivo io/i.test(t)){say("Va bene, scrivi il nome qui sotto.");}
+    else{d.name=t.slice(0,40);
+      if(d.edited){p.step="edit";say("Fatto, adesso si chiama «"+d.name+"». Vuoi cambiare altro?","preview")}
+      else{p.step="icon";say("«"+d.name+"», mi piace! Ultima cosa: scegli il disegnino per l'icona.")}}
+  }else if(S==="icon"){
+    d.icon=[...t][0]&&/\p{Extended_Pictographic}/u.test(t)?t.match(/\p{Extended_Pictographic}️?/u)[0]:"🌟";
+    if(d.edited){p.step="edit";say("Fatto, icona cambiata. Vuoi cambiare altro?","preview")}
+    else{d.edited=true;p.step="edit";
+      say("Ecco la tua app! Ho preparato l'anteprima dell'app e anche del sito. Puoi toccare i pulsanti dentro il telefono per vedere le pagine.\n\nSe vuoi cambiare qualcosa dimmelo pure, anche con parole tue. Quando ti piace tocca «Mi piace!».","preview");
+      openPrev(true)}
+  }else if(S==="remove"){
+    const i=d.feat.indexOf(t);
+    if(i>=0){d.feat.splice(i,1);say("Tolto «"+t+"». Vuoi cambiare altro?","preview")}else say("Va bene, lascio così. Vuoi cambiare altro?");
+    p.step="edit";
+  }else if(S==="edit"||S==="done"){
+    if(/mi piace|va bene così|perfett|fatto|finit|basta/i.test(t)&&!/non/i.test(t)){finish();save();return}
+    if(p.step==="done")p.step="edit";
+    else if(/^modifica/i.test(t)){p.step="edit";say("Certo! Cosa vuoi cambiare?")}
+    else if(/^nuova app/i.test(t)){cur.msgs.pop();save();newProject();return}
+    else if(/color/i.test(t)&&!PALETTES[t]){const m=matchPalette(t,true);if(m){d.color=m;say("Fatto, colori «"+m+"». Vuoi cambiare altro?","preview")}else{p.step="color";say("Che colori vuoi?")}}
+    else if(/stile/i.test(t)){p.step="style";say("Che stile vuoi?")}
+    else if(/nome|chiam/i.test(t)){p.step="name";say("Come la vuoi chiamare?")}
+    else if(/icon|disegnin/i.test(t)){p.step="icon";say("Scegli il nuovo disegnino.")}
+    else if(/^aggiungi una cosa$/i.test(t)){p.step="add";say("Cosa vuoi aggiungere? Scrivilo qui sotto.")}
+    else if(/^togli|^toglie|^leva|^elimina/i.test(t)){
+      const hit=d.feat.find(f=>t.toLowerCase().includes(f.toLowerCase()));
+      if(hit){d.feat.splice(d.feat.indexOf(hit),1);say("Tolto «"+hit+"». Vuoi cambiare altro?","preview")}
+      else{p.step="remove";say("Cosa tolgo?")}
+    }
+    else if(/scur|notte|nero/i.test(t)&&!/oro/i.test(t)){d.style="Scuro, da notte";say("Fatto, l'ho fatta scura. Vuoi cambiare altro?","preview")}
+    else{
+      const m=matchPalette(t,true);
+      if(m){d.color=m;say("Fatto, colori «"+m+"». Vuoi cambiare altro?","preview")}
+      else{d.notes=(d.notes||[]);d.notes.push(t);const add=splitFeat(t.replace(/^(aggiungi|metti|voglio|vorrei|anche)\s+/i,""));
+        if(add.length===1&&t.length<60){if(!d.feat.includes(add[0]))d.feat.push(add[0]);d.notes.pop();say("Fatto! Ho aggiunto «"+add[0]+"». Guarda l'anteprima. Vuoi cambiare altro?","preview")}
+        else say("Ho capito, me lo segno e lo dico a Claude quando costruisce l'app:\n«"+t+"»\nVuoi cambiare altro?","preview")}
+    }
+  }
+  save();
+}
+function lowType(g){return {"🎮 Gioco":"un gioco","📚 Scuola e studio":"un'app per la scuola","🗺️ Guida o mappa":"una guida","📷 Foto e disegni":"un'app di foto e disegni","📝 Liste e organizzare":"un'app per organizzare"}[g]||"un'app"}
+function matchPalette(t,strict){
+  const s=t.toLowerCase();
+  const map=[[/blu|mare/,"Blu mare"],[/verd/,"Verde bosco"],[/ross/,"Rosso fuoco"],[/viol/,"Viola magico"],[/arancio|giall/,"Arancione sole"],[/rosa/,"Rosa"],[/oro|ner/,"Nero e oro"],[/azzurr|cielo/,"Azzurro cielo"]];
+  for(const [r,n] of map)if(r.test(s))return n;
+  return strict?null:"Blu mare";
+}
+function finish(){
+  const p=cur;p.step="done";p.d.done=true;
+  say("Evviva, l'app è pronta da costruire! 🎉\n\nAdesso vai su Claude: copia il testo qui sotto, poi incollalo nella chat del progetto. Claude la crea davvero, la mette su GitHub con il suo sito, e ti manda il link per installarla sul telefono.","final");
+}
+function buildPrompt(d){
+  const pal=PALETTES[d.color]||PALETTES["Blu mare"];
+  const L=[];
+  L.push("Ciao Claude! Ho progettato una nuova app con «Crea App». Per favore costruiscila davvero:");
+  L.push("un'app installabile sul telefono (PWA, come le altre app del progetto) e un sito che la presenta, su GitHub.");
+  L.push("");
+  L.push("NOME: "+(d.name||"Da scegliere"));
+  L.push("ICONA: "+(d.icon||"🌟")+" (disegnala come icona vera, non usare l'emoji)");
+  L.push("PER CHI: "+(d.who||"-"));
+  L.push("TIPO: "+(d.typeText||(d.type||"").replace(/^\S+\s/,"")));
+  L.push("L'IDEA: "+(d.idea||"-"));
+  L.push("");
+  L.push("COSA DEVE FARE:");
+  d.feat.forEach((f,i)=>L.push((i+1)+". "+f));
+  if(d.notes&&d.notes.length){L.push("");L.push("ALTRE RICHIESTE:");d.notes.forEach(n=>L.push("- "+n))}
+  L.push("");
+  L.push("COLORI: "+(d.color||"Blu mare")+" (principale "+pal[0]+", secondario "+pal[1]+", sfondo "+pal[2]+")");
+  L.push("STILE: "+(d.style||"Semplice e pulito"));
+  L.push("ACCOUNT CON PASSWORD: "+(d.account?"sì":"no, si apre subito"));
+  L.push("");
+  L.push("IL SITO: una pagina con il nome, l'icona, a cosa serve l'app, le cose che fa e il pulsante «Apri l'app».");
+  L.push("");
+  L.push("Mettila su GitHub (passilombardi.github.io o guidapm.github.io) in una cartella sua, provala bene, e poi mandami il link per aprirla e installarla.");
+  return L.join("\n");
+}
+
+/* ================= RENDER ================= */
+function renderAll(){renderList();renderChat();renderPrev()}
+function renderList(){
+  const el=$("#plist");el.innerHTML="";
+  projects.forEach(p=>{const b=document.createElement("button");b.textContent=(p.d.icon?p.d.icon+" ":"")+title(p);if(p===cur)b.className="on";
+    b.onclick=()=>{cur=p;pscreen=null;$("#app").classList.remove("menu");renderAll()};el.appendChild(b)});
+  $("#ttl").textContent=title(cur);
+}
+function fmt(t){
+  const parts=esc(t).split(/\n\n/);
+  return parts.map(par=>{const lines=par.split("\n");
+    if(lines.some(l=>l.startsWith("• "))){const head=lines.filter(l=>!l.startsWith("• "));const items=lines.filter(l=>l.startsWith("• "));
+      return (head.length?"<p>"+head.join("<br>")+"</p>":"")+"<ul>"+items.map(i=>"<li>"+i.slice(2)+"</li>").join("")+"</ul>"}
+    return "<p>"+lines.join("<br>")+"</p>"}).join("");
+}
+function renderChat(typing){
+  const el=$("#inner");el.innerHTML="";
+  if(cur.msgs.length<=1&&cur.step==="idea"){
+    el.insertAdjacentHTML("beforeend",`<div class="hello"><div class="mark"></div><h1>Che app creiamo, ${esc(user)}?</h1><p>Raccontami la tua idea. Io ti faccio qualche domanda e ti mostro come viene.</p></div>`);
+  }else cur.msgs.forEach((m,i)=>{
+    if(m.r==="u"){el.insertAdjacentHTML("beforeend",`<div class="m-u">${esc(m.t)}</div>`);return}
+    let extra="";
+    if(m.k==="preview"){const pal=PALETTES[cur.d.color]||PALETTES["Blu mare"];
+      extra=`<button class="pcard" data-open="1"><span class="ico" style="background:${pal[0]};color:#fff">${esc(cur.d.icon||"🌟")}</span><span><b>${esc(cur.d.name||"La tua app")}</b><small>Tocca per vedere l'anteprima</small></span></button>`}
+    if(m.k==="final"){
+      extra=`<div class="final"><div class="fh"><span>Testo da dare a Claude</span><button class="small-btn" data-copy="1">Copia</button></div><pre>${esc(buildPrompt(cur.d))}</pre>
+      <div class="fa"><button class="btn" data-copy="1">📋 Copia il testo</button><a class="btn ghost" href="${CLAUDE_URL}" target="_blank" rel="noopener">Vai su Claude →</a></div></div>`}
+    el.insertAdjacentHTML("beforeend",`<div class="m-a"><div class="mark"></div><div class="txt">${fmt(m.t)}${extra}</div></div>`);
+  });
+  if(typing)el.insertAdjacentHTML("beforeend",`<div class="m-a"><div class="mark"></div><div class="txt typing"><span></span><span></span><span></span></div></div>`);
+  el.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openPrev(true));
+  el.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>copyPrompt(b));
+  const ch=$("#chips");ch.innerHTML="";
+  if(!typing)chipsFor(cur).forEach(c=>{const o=typeof c==="string"?{t:c}:c;const b=document.createElement("button");b.className="chip"+(o.main?" main":"");
+    b.innerHTML=(o.sw?`<span class="sw" style="background:${o.sw}"></span>`:"")+esc(o.t);b.onclick=()=>send(o.t);ch.appendChild(b)});
+  $("#inp").placeholder={idea:"Descrivi l'app che vuoi…",feat:"Scrivi le cose che deve fare…",name:"Scrivi il nome…",edit:"Dimmi cosa cambiare…",add:"Cosa aggiungo?"}[cur.step]||"Scrivi qui…";
+  const ms=$("#msgs");requestAnimationFrame(()=>ms.scrollTop=ms.scrollHeight);
+}
+async function copyPrompt(b){
+  const t=buildPrompt(cur.d);let ok=false;
+  try{await navigator.clipboard.writeText(t);ok=true}catch(e){
+    const ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();try{ok=document.execCommand("copy")}catch(_){}ta.remove()}
+  const old=b.textContent;b.textContent=ok?"✓ Copiato!":"Tieni premuto sul testo per copiarlo";setTimeout(()=>b.textContent=old,2200);
+}
+function send(t){
+  if(busy||!t.trim())return;
+  busy=true;$("#inp").value="";autosize();$("#send").disabled=true;
+  answer(t);
+  renderList();renderChat(true);
+  setTimeout(()=>{busy=false;renderChat();renderPrev()},550);
+}
+
+/* ---- anteprima ---- */
+function vars(d){
+  const pal=PALETTES[d.color]||PALETTES["Blu mare"],st=STYLES[d.style]||STYLES["Semplice e pulito"];
+  const dark=st.dark;
+  const lum=h=>{const n=parseInt(h.slice(1),16);return (0.299*(n>>16)+0.587*(n>>8&255)+0.114*(n&255))/255};
+  return `--p1:${pal[0]};--p2:${pal[1]};--pbg:${dark?"#14161c":pal[2]};--pcard:${dark?"#22252e":"#ffffff"};--pink:${dark?"#eef0f5":"#1d1f24"};--pon:${lum(pal[0])>.6?"#111":"#fff"};--pon2:${lum(pal[1])>.6?"#111":"#fff"};--pf:${st.f};--pr:${st.r}`;
+}
+function renderPrev(){
+  document.querySelectorAll(".ptabs .t").forEach(b=>b.classList.toggle("on",b.dataset.v===pview));
+  const el=$("#pbody"),d=cur.d;
+  if(!d.feat||!d.feat.length){el.innerHTML=`<div class="empty">Qui vedrai la tua app mentre la prepariamo insieme.<br><br>Prima raccontami l'idea nella chat.</div>`;return}
+  const name=esc(d.name||"La tua app"),ic=esc(d.icon||"🌟");
+  if(pview==="site"){
+    el.innerHTML=`<div class="site" style="${vars(d)}"><div class="bar"><i></i><i></i><i></i><u>passilombardi.github.io/${esc(slug(d.name||"app"))}/</u></div>
+      <div class="hero"><div class="e">${ic}</div><h3>${name}</h3><p>${esc(d.idea||"")}</p><a href="#" onclick="return false">Apri l'app</a></div>
+      <div class="feat">${d.feat.map(f=>`<div><span>${iconFor(f)}</span>${esc(f)}</div>`).join("")}</div>
+      <div class="foot">Si installa sul telefono come una vera app</div></div>`;return}
+  let inner;
+  if(d.account&&pscreen==="login"){
+    inner=`<div class="ph-main ph-login"><div class="e">${ic}</div><h3>${name}</h3><div class="in"></div><div class="in"></div><button class="ph-cta" data-s="home">Entra</button></div>`;
+  }else if(pscreen!=null&&pscreen!=="login"&&d.feat[pscreen]!=null){
+    const f=d.feat[pscreen];
+    inner=`<div class="ph-head"><button class="back" data-s="home">‹</button><b>${esc(f)}</b></div><div class="ph-main ph-scr"><div class="big">${iconFor(f)}</div><h3>${esc(f)}</h3><p>Qui ci sarà la pagina «${esc(f)}».</p>
+      <div class="ph-line"><i></i><s></s></div><div class="ph-line"><i></i><s></s></div><div class="ph-line"><i></i><s></s></div><button class="ph-cta">Inizia</button></div>`;
+  }else{
+    inner=`<div class="ph-head"><span class="e">${ic}</span><b>${name}</b></div><div class="ph-main"><p class="ph-hi">Ciao! Cosa vuoi fare?</p><div class="ph-grid">
+      ${d.feat.map((f,i)=>`<button class="ph-tile" data-s="${i}"><span class="e">${iconFor(f)}</span>${esc(f)}</button>`).join("")}</div></div>
+      <div class="ph-nav"><span class="on"><i>🏠</i>Home</span><span><i>${iconFor(d.feat[1]||"")}</i>${esc((d.feat[1]||"Cerca").slice(0,10))}</span><span><i>⚙️</i>Opzioni</span></div>`;
+  }
+  el.innerHTML=`<div class="phone" style="${vars(d)}"><div class="screen"><div class="notch"></div>${inner}</div></div>`;
+  el.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{const s=b.dataset.s;pscreen=s==="home"?null:+s;renderPrev()});
+}
+function slug(s){return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"app"}
+function openPrev(fromChat){
+  if(cur.d.account&&fromChat)pscreen="login";
+  $("#prev").classList.add("open");renderPrev();
+}
+document.querySelectorAll(".ptabs .t").forEach(b=>b.onclick=()=>{pview=b.dataset.v;renderPrev()});
+$("#prevClose").onclick=()=>$("#prev").classList.remove("open");
+$("#prevBtn").onclick=()=>{const p=$("#prev");if(innerWidth>1100){p.hidden=!p.hidden}else{p.classList.add("open");renderPrev()}};
+
+/* ---- composer ---- */
+const inp=$("#inp");
+function autosize(){inp.style.height="auto";inp.style.height=Math.min(inp.scrollHeight,160)+"px";$("#send").disabled=!inp.value.trim()}
+inp.addEventListener("input",autosize);
+inp.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&innerWidth>760){e.preventDefault();send(inp.value)}});
+$("#send").onclick=()=>send(inp.value);
+$("#newBtn").onclick=()=>{$("#app").classList.remove("menu");const empty=projects.find(p=>p.step==="idea"&&p.msgs.length<=1);if(empty){cur=empty;renderAll()}else newProject()};
+$("#menuBtn").onclick=()=>$("#app").classList.add("menu");
+$("#scrim").onclick=()=>$("#app").classList.remove("menu");
+
+/* ================= AVVIO ================= */
+function enterApp(){
+  user=sess.get("creaapp-in");
+  $("#gate").hidden=true;$("#app").hidden=false;
+  $("#av").textContent=user.charAt(0).toUpperCase();$("#who").textContent=user;
+  projects=store.get(PK(),[]);
+  if(!projects.length)newProject();else{cur=projects[0];renderAll()}
+}
+if(sess.get("creaapp-in"))enterApp();else showGate();
+if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+</script>
+</body>
+</html>
