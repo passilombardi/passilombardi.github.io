@@ -634,12 +634,13 @@ let rec=null,recText="";
 $("#mic").onclick=()=>{
   if(!SR){alert("Su questo telefono i vocali non funzionano qui. Prova con Chrome (Android) o Safari (iPhone).");return}
   if(rec){rec.stop();return}
-  rec=new SR();rec.lang="it-IT";rec.interimResults=true;rec.continuous=false;recText="";
+  rec=new SR();rec.lang="it-IT";rec.interimResults=true;rec.continuous=true;recText="";
+  let quiet=null;const arm=ms=>{clearTimeout(quiet);quiet=setTimeout(()=>{if(rec)rec.stop()},ms)};arm(8000);
   const before=inp.value?inp.value.trim()+" ":"";
   $("#mic").classList.add("on");inp.placeholder="Ti ascolto… parla pure";
-  rec.onresult=e=>{let t="";for(const r of e.results)t+=r[0].transcript;recText=t;inp.value=before+t;autosize()};
+  rec.onresult=e=>{let t="";for(const r of e.results)t+=r[0].transcript;recText=t;inp.value=before+t;autosize();arm(1800)};
   rec.onerror=e=>{if(e.error==="not-allowed"||e.error==="service-not-allowed")alert("Devi dare il permesso al microfono per mandare i vocali.");else if(e.error==="no-speech")alert("Non ho sentito niente. Riprova parlando un po' più forte.")};
-  rec.onend=()=>{rec=null;$("#mic").classList.remove("on");renderChat();inp.value=before+recText;autosize();
+  rec.onend=()=>{clearTimeout(quiet);rec=null;$("#mic").classList.remove("on");renderChat();inp.value=before+recText;autosize();
     if(recText.trim())send(inp.value,true)};
   try{rec.start()}catch(e){rec=null;$("#mic").classList.remove("on")}
 };
