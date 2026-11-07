@@ -246,6 +246,12 @@ class Partita {
     return pts;
   }
   resize(){ const r = this.cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); this.W = r.width; this.H = r.height; this.cv.width = r.width * d; this.cv.height = r.height * d; this.x.setTransform(d, 0, 0, d, 0, 0); }
+  // cambia giocatori o modulo durante la partita (cambi, espulsioni, nuovo modulo)
+  aggiorna(lato, mod, giocatori){
+    const vecchi = this.sq[lato], nuovi = this.formazione(mod, lato);
+    nuovi.forEach((p, i) => { const v = vecchi[i]; if (v){ p.x = v.x; p.y = v.y; p.fase = v.fase; } const x = giocatori[i] || {}; p.num = x.num || ''; p.nome = x.nome || ''; p.via = !!x.via; const h = hashStr((x.nome || '') + lato + i); p.pelle = PELLI[h % PELLI.length]; p.capelli = CAPELLI[(h >> 4) % CAPELLI.length]; p.taglio = (h >> 8) % 4; p.dir = lato ? -1 : 1; });
+    this.sq[lato] = nuovi;
+  }
   stop(){ this.fine = true; removeEventListener('resize', this._r); }
   salta(){ while (this.k < this.ev.length){ this.cb(this.ev[this.k], true); this.k++; } this.min = this.durata; this.fine = true; this.onFine(); }
   loop(t){
@@ -341,7 +347,7 @@ class Partita {
     // giocatori e palla, dal più lontano al più vicino
     const col = [this.info.casa, this.info.ospiti];
     const tutti = [];
-    this.sq.forEach((sq, lato) => sq.forEach((p, i) => tutti.push({ p, lato, i })));
+    this.sq.forEach((sq, lato) => sq.forEach((p, i) => { if (!p.via) tutti.push({ p, lato, i }); }));
     let vicino = null, dmin = 9;
     tutti.forEach((o) => { const d = Math.hypot(o.p.x - this.palla.x, (o.p.y - this.palla.y) * 0.6); if (d < dmin){ dmin = d; vicino = o; } });
     const z = this.script ? Math.sin(Math.min(1, this.script.t / 0.7) * Math.PI) * 0.6 : 0;
@@ -378,6 +384,7 @@ class Partita {
     let vicino = null, dmin = 9;
     this.sq.forEach((sq, lato) => sq.forEach((p) => { const d = Math.hypot(p.x - this.palla.x, p.y - this.palla.y); if (d < dmin){ dmin = d; vicino = p; } }));
     this.sq.forEach((sq, lato) => sq.forEach((p, i) => {
+      if (p.via) return;
       const px = m + p.x * fw, py = m + p.y * fh, gk = i === 0, maglia = gk ? '#fcc419' : col[lato].c1, bordo = gk ? '#111' : col[lato].c2;
       x.beginPath(); x.ellipse(px + 2, py + 3, rr, rr * 0.8, 0, 0, 7); x.fillStyle = 'rgba(0,0,0,.25)'; x.fill();
       if (soloNumeri){

@@ -1,5 +1,5 @@
 /* =========================================================
-   PRESIDENTE PM — ONLINE
+   CALCIOMANIA PM — ONLINE
    Stesso account del Gioco della Vita PM (Firebase gioco-della-vita-pm).
    - calcio_salvataggi/{uid}: la tua società salvata online
    - calcio_gironi/{id}: i gironi condivisi. Ogni girone ha 12 squadre: bot e persone vere.
@@ -50,7 +50,7 @@ window.Online = (function(){
       avviso(testoErr(e)); throw e;
     });
   };
-  O.logout = () => { if (unsub) unsub(); unsub = null; return A.signOut(); };
+  O.logout = () => { if (unsub) unsub(); unsub = null; if (unsubSave) unsubSave(); unsubSave = null; return A.signOut(); };
   O.finestraLogin = function(){
     foglio(`<h2>Il tuo account</h2><p class="tenue">Lo stesso account del Gioco della Vita PM. Serve per salvare la società online e giocare con le altre persone.</p>
     <button class="btn largo" id="lgG">Entra con Google</button>
@@ -64,29 +64,58 @@ window.Online = (function(){
   };
 
   // ---------- salvataggio della società ----------
-  let saveT = 0;
+  // Si scrive con "merge": così non si cancellano i campi dell'app Account (modMs, modAdmin…).
+  let saveT = 0, unsubSave = null;
+  const accesso = () => user && (user.providerData || []).some((x) => x.providerId === 'google.com') ? 'Google' : 'Email';
   O.salvaCloud = function(stato){
-    if (!user) return; clearTimeout(saveT);
+    if (!user || !stato || stato.ospite) return; clearTimeout(saveT);
     saveT = setTimeout(() => {
-      D.collection(SAVE).doc(user.uid).set({ app: 'Calciomania PM', nome: O.nome(), email: user.email || '', club: stato.club.nome, categoria: TIERS[stato.tier - 1].nome, stagione: stato.stagione, dati: JSON.stringify(stato), aggMs: stato.agg || Date.now(), agg: firebase.firestore.FieldValue.serverTimestamp() })
-        .then(() => { err = ''; }).catch((e) => { err = testoErr(e); });
+      const v = { app: 'Calciomania PM', nome: O.nome(), email: user.email || '', accesso: accesso(), club: stato.club.nome, categoria: TIERS[stato.tier - 1].nome, stagione: stato.stagione,
+        soldi: Math.round(stato.soldi), giocatori: stato.rosa.length, dati: JSON.stringify(stato), aggMs: stato.agg || Date.now(), creatoMs: stato.creato || Date.now(), agg: firebase.firestore.FieldValue.serverTimestamp() };
+      if (stato.modVisto) v.modVistoMs = stato.modVisto;
+      D.collection(SAVE).doc(user.uid).set(v, { merge: true }).then(() => { err = ''; }).catch((e) => { err = testoErr(e); });
     }, 3000);
   };
-  async function leggiCloud(){ const s = await D.collection(SAVE).doc(user.uid).get(); if (!s.exists) return null; try { return JSON.parse(s.data().dati); } catch (e) { return null; } }
+  async function leggiCloud(){ const s = await D.collection(SAVE).doc(user.uid).get(); if (!s.exists) return null; const x = s.data(); try { const c = JSON.parse(x.dati); if (c && x.modMs) c.modVisto = Math.max(+c.modVisto || 0, +x.modMs); return c; } catch (e) { return null; } }
+  // modifiche fatte dall'amministratrice nell'app Account: arrivano nel gioco appena le salva
+  function ascoltaSalvataggio(){
+    if (unsubSave) unsubSave();
+    unsubSave = D.collection(SAVE).doc(user.uid).onSnapshot((s) => {
+      if (!s.exists || !S || S.ospite) return; const x = s.data(), m = +x.modMs || 0;
+      if (!m || m <= (+S.modVisto || 0)) return;
+      let c = null; try { c = JSON.parse(x.dati); } catch (e) { return; }
+      if (!c || !c.club) return;
+      const lega = S.lega && S.lega.online ? S.lega : null;
+      S = c; S.modVisto = m; S.ospite = false; if (lega && !(S.lega && S.lega.online)) S.lega = lega;
+      migra(); salva(true); chiudiFoglio(true); disegna();
+      D.collection(SAVE).doc(user.uid).set({ modVistoMs: m }, { merge: true }).catch(() => {});
+      avviso('La tua partita è stata aggiornata dall’amministratrice');
+    }, () => {});
+  }
   async function dopoLogin(){
     avviso('Ciao ' + O.nome() + '!');
     let c = null; try { c = await leggiCloud(); } catch (e) { err = testoErr(e); }
+    ascoltaSalvataggio();
     if (!S){
-      if (c && c.club){ S = c; migra(); Suono.on = S.opz.suono; schermo = 'casa'; disegna(); avviso('Ritrovata la tua ' + S.club.nome + '!'); O.riprendi(); }
-      else avviso('Non c’è ancora una società salvata: fondane una!');
+      const loc = carica();
+      if (c && c.club){ S = c; migra(); Suono.on = S.opz.suono; schermo = 'home'; salva(true); disegna(); avviso('Ritrovata la tua ' + S.club.nome + '!'); O.riprendi(); }
+      else if (loc){ S = loc; migra(); Suono.on = S.opz.suono; schermo = 'home'; O.salvaCloud(S); disegna(); avviso('La tua ' + S.club.nome + ' ora è salvata nel tuo account!'); }
+      else if (!document.querySelector('.fonda')){ fondazione(false, false); avviso('Fonda la tua società: si salverà nel tuo account'); }
       return;
     }
+    if (S.ospite){ S.ospite = false; if (c && c.club && c.creato !== S.creato){
+        foglio(`<h2>Hai già una società nel tuo account</h2><p>Nel tuo account c’è <b>${esc(c.club.nome)}</b> (stagione ${c.stagione}, ${TIERS[c.tier - 1].nome}). Adesso stai giocando con <b>${esc(S.club.nome)}</b> come ospite.</p><p>Quale vuoi tenere?</p>
+        <div class="riga-btn"><button class="btn" id="cTieni">${esc(c.club.nome)}</button><button class="btn sec" id="cQui">${esc(S.club.nome)}</button></div>`);
+        document.getElementById('cTieni').onclick = () => { S = c; migra(); chiudiFoglio(true); salva(true); disegna(); O.riprendi(); };
+        document.getElementById('cQui').onclick = () => { chiudiFoglio(true); salva(true); };
+      } else salva(true);
+      disegna(); return; }
     if (c && c.club && c.creato !== S.creato && (c.agg || 0) > (S.agg || 0)){
       foglio(`<h2>Hai un’altra società online</h2><p>Nel tuo account c’è <b>${esc(c.club.nome)}</b> (stagione ${c.stagione}, ${TIERS[c.tier - 1].nome}). Su questo telefono c’è <b>${esc(S.club.nome)}</b>.</p><p>Quale vuoi tenere?</p>
       <div class="riga-btn"><button class="btn" id="cTieni">${esc(c.club.nome)} (online)</button><button class="btn sec" id="cQui">${esc(S.club.nome)} (questo telefono)</button></div>`);
       document.getElementById('cTieni').onclick = () => { S = c; migra(); chiudiFoglio(true); salva(true); disegna(); O.riprendi(); };
       document.getElementById('cQui').onclick = () => { chiudiFoglio(true); O.salvaCloud(S); };
-    } else if (c && c.creato === S.creato && (c.agg || 0) > (S.agg || 0) + 2000){ S = c; migra(); salva(true); disegna(); O.riprendi(); }
+    } else if (c && c.creato === S.creato && ((c.agg || 0) > (S.agg || 0) + 2000 || (+c.modVisto || 0) > (+S.modVisto || 0))){ S = c; migra(); salva(true); disegna(); O.riprendi(); }
     else { O.salvaCloud(S); if (S.lega.online) O.riprendi(); }
     if (document.querySelector('.menu-top')) menu();
   }
@@ -160,10 +189,10 @@ window.Online = (function(){
   function applicaIngresso(r){
     S.lega = { online: true, gid: r.gid, dati: r.d, mio: r.i, giocate: r.d.giornata, stagione: r.d.stagione, attesa: !!r.attesa, cambio: 0 };
     const T = TIERS[r.d.tier - 1].nome;
-    if (r.attesa) notizia(`La Serie A online è piena: sei in lista d’attesa. Dalla prossima stagione la classifica si allunga!`, '⏳');
-    else if (r.allunga) notizia(`La Serie A online era piena di persone vere: la classifica si è allungata a ${r.d.n} squadre!`, '📏');
-    else if (r.preso) notizia(`Sei entrato nel girone online ${r.d.nome} di ${T}: hai preso il posto del bot ${r.preso}, con i suoi punti.`, '🌍');
-    else notizia(`Hai aperto il girone online ${r.d.nome} di ${T}. Quando entrano altre persone, prendono il posto dei bot.`, '🌍');
+    if (r.attesa) notizia(`La Serie A online è piena: sei in lista d’attesa. Dalla prossima stagione la classifica si allunga!`, 'societa');
+    else if (r.allunga) notizia(`La Serie A online era piena di persone vere: la classifica si è allungata a ${r.d.n} squadre!`, 'societa');
+    else if (r.preso) notizia(`Sei entrato nel girone online ${r.d.nome} di ${T}: hai preso il posto del bot ${r.preso}, con i suoi punti.`, 'societa');
+    else notizia(`Hai aperto il girone online ${r.d.nome} di ${T}. Quando entrano altre persone, prendono il posto dei bot.`, 'societa');
     salva(true); ascolta(r.gid); disegna();
   }
 
@@ -197,7 +226,7 @@ window.Online = (function(){
     const L = S && S.lega; if (!L || !L.online || L.gid !== gid || L.cambio) return;
     const i = d.squadre.findIndex((x) => x.uid === user.uid);
     if (L.attesa){
-      if (i >= 0){ L.attesa = false; L.mio = i; L.stagione = d.stagione; L.giocate = d.giornata; notizia('Sei entrato in Serie A: la classifica si è allungata!', '🎉'); }
+      if (i >= 0){ L.attesa = false; L.mio = i; L.stagione = d.stagione; L.giocate = d.giornata; notizia('Sei entrato in Serie A: la classifica si è allungata!', 'societa'); }
       L.dati = d; salva(); ridisegna(); return;
     }
     const nuovaStagione = d.stagione > L.stagione;
@@ -208,7 +237,7 @@ window.Online = (function(){
     if (L.giocate !== primaG || L.stagione !== primaS) liveT = 0;
     if (L.cambio) return; // è salito o sceso: sta già cercando il nuovo girone
     if (i < 0){
-      notizia('Non giocavi da tanto e un altro presidente ha preso il tuo posto. Ti cerchiamo un nuovo girone.', '🔁');
+      notizia('Non giocavi da tanto e un altro presidente ha preso il tuo posto. Ti cerchiamo un nuovo girone.', 'societa');
       O.cambiaCategoria(S.tier); return;
     }
     if (!nuovaStagione) L.mio = i; else L.mio = i;
