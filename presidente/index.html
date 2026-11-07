@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07130e">
+<meta name="description" content="Presidente PM: il gioco gratis in cui fondi la tua società di calcio e la porti dalla Terza Categoria alla Serie A. Giocatori, staff, stadio, partite in diretta e gironi online con persone vere.">
+<title>Presidente PM · Fonda la tua squadra di calcio</title>
+<link rel="icon" href="app/icon-192.png">
+<link rel="apple-touch-icon" href="app/icon-180.png">
+<meta property="og:title" content="Presidente PM">
+<meta property="og:description" content="Fonda la tua società di calcio: dalla Terza Categoria alla Serie A.">
+<meta property="og:image" content="https://passilombardi.github.io/presidente/app/icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: in alto stemma, nome, frase e «Gioca adesso»; poi tre telefoni con il gioco, cosa puoi fare, la scalata dei campionati, come funziona online, come installarla. */
+:root{--fondo:#07130e;--carta:#10261c;--linea:rgba(255,255,255,.1);--testo:#eef6f0;--tenue:#9db5a7;--lime:#c6ff3d;--oro:#f5c542;--oro2:#ffdf7e;
+  --ft:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;--f:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--fondo);color:var(--testo);font:17px/1.55 var(--f)}
+.wrap{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--ft);line-height:1.05;margin:0 0 .35em;letter-spacing:.01em}
+h2{font-size:clamp(32px,6vw,46px)}
+h3{font-size:22px}
+p{margin:.4em 0}
+.hero{position:relative;overflow:hidden;padding:64px 0 40px;text-align:center;border-bottom:1px solid var(--linea)}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(35% 40% at 12% 0%,rgba(255,249,219,.28),transparent 70%),radial-gradient(35% 40% at 88% 0%,rgba(255,249,219,.28),transparent 70%),repeating-linear-gradient(90deg,#14532d 0 70px,#166534 70px 140px)}
+.hero::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,19,14,.25),var(--fondo) 92%)}
+.hero>*{position:relative;z-index:1}
+.hero img.logo{width:132px;height:132px;filter:drop-shadow(0 18px 30px rgba(0,0,0,.6))}
+.hero h1{font-size:clamp(56px,13vw,104px);margin:10px 0 0;background:linear-gradient(180deg,#fff 35%,var(--oro));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero h1 span{-webkit-text-fill-color:var(--lime)}
+.hero .sotto{font-size:clamp(19px,3.5vw,24px);color:#d3f9d8;max-width:640px;margin:8px auto 26px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:58px;padding:12px 30px;border-radius:18px;font:800 22px var(--ft);letter-spacing:.05em;text-decoration:none;color:#0b2a05;background:linear-gradient(180deg,#e2ff8a,var(--lime));box-shadow:0 14px 34px -12px var(--lime)}
+.btn.oro{background:linear-gradient(180deg,var(--oro2),var(--oro));color:#3b2a00;box-shadow:0 14px 34px -12px var(--oro)}
+.gratis{display:block;margin-top:12px;color:var(--tenue);font-size:15px}
+.telefoni{display:flex;justify-content:center;gap:18px;margin:42px auto 0;padding:0 8px}
+.tel{width:min(30vw,250px);border-radius:28px;border:6px solid #1e2d26;box-shadow:0 30px 60px -20px rgba(0,0,0,.9);overflow:hidden;background:#000}
+.tel img{display:block;width:100%;height:auto}
+.tel:nth-child(1),.tel:nth-child(3){transform:translateY(26px) scale(.94)}
+@media (max-width:620px){.tel{width:42vw}.tel:nth-child(3){display:none}}
+section{padding:56px 0;border-bottom:1px solid var(--linea)}
+.griglia{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:20px}
+.voce{background:linear-gradient(180deg,#143024,var(--carta));border:1px solid var(--linea);border-radius:20px;padding:18px}
+.voce .ic{font-size:34px;line-height:1}
+.voce p{color:var(--tenue);font-size:16px}
+.scala{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:22px}
+.gr{width:var(--w);padding:9px 14px;border-radius:12px;font:800 19px var(--ft);display:flex;justify-content:space-between;background:linear-gradient(90deg,var(--c),color-mix(in srgb,var(--c) 50%,#000));box-shadow:0 6px 16px -10px #000}
+.gr small{font:600 13px var(--f);opacity:.85;align-self:center}
+.due{display:grid;grid-template-columns:1fr 1fr;gap:30px;align-items:center}
+@media (max-width:760px){.due{grid-template-columns:1fr}}
+.foto{border-radius:24px;overflow:hidden;border:6px solid #1e2d26;max-width:330px;margin:0 auto;box-shadow:0 30px 60px -24px #000}
+.foto img{display:block;width:100%;height:auto}
+.online{background:radial-gradient(60% 80% at 100% 0,rgba(77,171,247,.14),transparent 70%)}
+.passi{counter-reset:p;display:flex;flex-direction:column;gap:12px;margin-top:14px}
+.passi div{display:flex;gap:14px;align-items:flex-start}
+.passi div::before{counter-increment:p;content:counter(p);flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--lime);color:#0b2a05;font:800 18px var(--ft)}
+.chip{display:inline-block;background:rgba(255,255,255,.08);border:1px solid var(--linea);border-radius:999px;padding:2px 10px;font-size:14px}
+.fine{text-align:center;padding:60px 0 70px;border:0}
+footer{color:var(--tenue);text-align:center;font-size:14px;padding:0 0 40px}
+footer a{color:var(--oro)}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <img class="logo" src="app/icon-512.png" alt="">
+    <h1>PRESIDENTE <span>PM</span></h1>
+    <p class="sotto">Fonda la tua società di calcio con 1.000.000 €.<br>Comincia in Terza Categoria e portala fino alla <b>Serie A</b>.</p>
+    <a class="btn" href="app/">▶ GIOCA ADESSO</a>
+    <span class="gratis">Gratis · senza pubblicità · funziona sul telefono e sul computer</span>
+  </div>
+  <div class="telefoni">
+    <div class="tel"><img src="foto/stadio.jpg" alt="Lo stadio visto dall'alto" loading="lazy"></div>
+    <div class="tel"><img src="foto/casa.jpg" alt="La schermata della società con la prossima partita"></div>
+    <div class="tel"><img src="foto/partita.jpg" alt="Una partita in diretta con il GOL" loading="lazy"></div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>Il presidente sei tu</h2>
+    <p class="sotto" style="color:var(--tenue)">Ogni scelta è tua: chi comprare, chi far giocare, come spendere i soldi.</p>
+    <div class="griglia">
+      <div class="voce"><div class="ic">🎨</div><h3>Crea la società</h3><p>Nome, città, colori e stemma: forma, disegno e simbolo li scegli tu.</p></div>
+      <div class="voce"><div class="ic">✍️</div><h3>Ingaggia i giocatori</h3><p>Portieri, difensori, centrocampisti e attaccanti, ognuno con bravura, età, stipendio e talento.</p></div>
+      <div class="voce"><div class="ic">📋</div><h3>Scegli lo staff</h3><p>Allenatore, vice, preparatore atletico, preparatore dei portieri, medico, osservatore e direttore sportivo.</p></div>
+      <div class="voce"><div class="ic">🏟️</div><h3>Costruisci lo stadio</h3><p>Dalla rete intorno al campo allo stadio leggendario da 80.000 posti. Erba, luci, negozio, maxischermo e restauri.</p></div>
+      <div class="voce"><div class="ic">⚽</div><h3>Partite in diretta</h3><p>Guardi la partita sul campo con la telecronaca, i tiri, le parate e l’esplosione del GOL.</p></div>
+      <div class="voce"><div class="ic">💶</div><h3>Fai quadrare i conti</h3><p>Biglietti, sponsor, TV e premi da una parte; stipendi e manutenzione dall’altra. Non andare in rosso!</p></div>
+      <div class="voce"><div class="ic">🧒</div><h3>Fai crescere i giovani</h3><p>Con il centro giovanile ogni anno arrivano ragazzi che possono diventare campioni.</p></div>
+      <div class="voce"><div class="ic">🏆</div><h3>Vinci i trofei</h3><p>Ogni campionato vinto finisce in bacheca, insieme alla storia della tua società.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap due">
+    <div>
+      <h2>La scalata</h2>
+      <p>In ogni girone ci sono 12 squadre. I primi due salgono di categoria, gli ultimi due scendono. Nove campionati per arrivare in cima.</p>
+      <div class="scala">
+        <div class="gr" style="--c:#d4a017;--w:100%">Serie A <small>la cima</small></div>
+        <div class="gr" style="--c:#be123c;--w:95%">Serie B</div>
+        <div class="gr" style="--c:#7c3aed;--w:90%">Serie C</div>
+        <div class="gr" style="--c:#1d4ed8;--w:85%">Serie D</div>
+        <div class="gr" style="--c:#0e7490;--w:80%">Eccellenza</div>
+        <div class="gr" style="--c:#c2410c;--w:75%">Promozione</div>
+        <div class="gr" style="--c:#b45309;--w:70%">Prima Categoria</div>
+        <div class="gr" style="--c:#737373;--w:65%">Seconda Categoria</div>
+        <div class="gr" style="--c:#6b7280;--w:60%">Terza Categoria <small>si parte da qui</small></div>
+      </div>
+    </div>
+    <div class="foto"><img src="foto/classifica.jpg" alt="La classifica del girone" loading="lazy"></div>
+  </div>
+</section>
+
+<section class="online">
+  <div class="wrap due">
+    <div class="foto"><img src="foto/squadra.jpg" alt="La formazione in campo" loading="lazy"></div>
+    <div>
+      <h2>Bot 🤖 e persone vere 👤</h2>
+      <p>All’inizio nel tuo girone ci sei solo tu: le altre squadre sono bot. Quando entra nel girone una persona vera, <b>un bot se ne va e lei prende il suo posto</b>, con i suoi punti.</p>
+      <p>Quando nel girone ci sono più persone, la giornata si gioca appena siete tutti pronti, o al massimo dopo mezz’ora.</p>
+      <p>E in <b>Serie A</b>? Quando i bot sono finiti e sono tutte persone vere, <b>la classifica si allunga</b> per far posto a tutti.</p>
+      <p><span class="chip">Lo stesso account del Gioco della Vita PM</span> <span class="chip">La società si salva online</span></p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Mettila sul telefono</h2>
+    <div class="passi">
+      <div><p>Apri <a href="app/" style="color:var(--lime)">passilombardi.github.io/presidente/app</a> con il telefono.</p></div>
+      <div><p><b>Android:</b> tocca i tre puntini in alto e poi «Installa app». <b>iPhone:</b> tocca il quadrato con la freccia e poi «Aggiungi alla schermata Home».</p></div>
+      <div><p>Ora Presidente PM si apre come una vera app, a schermo intero. Si aggiorna da sola.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="fine">
+  <div class="wrap">
+    <h2>Pronto a fondare la tua squadra?</h2>
+    <p style="color:var(--tenue);margin-bottom:22px">1.000.000 € ti aspettano. Il resto dipende da te.</p>
+    <a class="btn oro" href="app/">⚽ FONDA LA TUA SOCIETÀ</a>
+  </div>
+</section>
+<footer>Presidente PM · squadre, giocatori e paesi sono tutti inventati · <a href="../">Passi Lombardi</a></footer>
+</body>
+</html>
