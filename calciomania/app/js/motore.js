@@ -42,10 +42,10 @@ const SQUADRE_GIRONE = 12;
 // livelli di difficoltà: quanto sono forti i bot e quanti soldi entrano
 const DIFFICOLTA = [
   { nome: 'Principiante', ico: '🐣', bot: -8, soldi: 1.4, desc: 'Bot deboli e tanti soldi: per imparare' },
-  { nome: 'Normale', ico: '🙂', bot: -4, soldi: 1.15, desc: 'Facile, ma bisogna pensarci un po’' },
+  { nome: 'Facile', ico: '🙂', bot: -4, soldi: 1.15, desc: 'Facile, ma bisogna pensarci un po’' },
   { nome: 'Medio', ico: '⚽', bot: 0, soldi: 1, desc: 'Il gioco giusto' },
   { nome: 'Forte', ico: '💪', bot: 4, soldi: 0.88, desc: 'Bot più forti e meno incassi' },
-  { nome: 'Estremo', ico: '🔥', bot: 8, soldi: 0.75, desc: 'Solo per veri presidenti' }
+  { nome: 'Fortissimo', ico: '🔥', bot: 8, soldi: 0.75, desc: 'Il livello dei campioni: qui ci sono le coppe' }
 ];
 const PROMOSSE = 2, RETROCESSE = 2;
 

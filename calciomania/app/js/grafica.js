@@ -327,10 +327,23 @@ class Partita {
     this.folla.forEach((f) => { const px = f.x * W, py = H * 0.07 + f.y * H * 0.14; const sal = this.flash > 0 ? Math.abs(Math.sin(t * 12 + f.f)) * 3 : Math.abs(Math.sin(t * 2 + f.f)) * 0.8;
       c.fillStyle = f.c; c.globalAlpha = 0.85; c.fillRect(px, py - sal, 3, 3); c.globalAlpha = 1; });
     for (let k = 0; k < 4; k++){ const fx = W * (0.12 + k * 0.25); const g = c.createRadialGradient(fx, H * 0.03, 0, fx, H * 0.03, W * 0.18); g.addColorStop(0, 'rgba(255,250,220,.55)'); g.addColorStop(1, 'rgba(255,250,220,0)'); c.fillStyle = g; c.fillRect(fx - W * 0.2, 0, W * 0.4, H * 0.3); }
+    // anelli delle tribune
+    for (let k = 0; k < 3; k++){ c.fillStyle = `rgba(255,255,255,${0.04 + k * 0.02})`; c.fillRect(0, H * (0.09 + k * 0.045), W, 1); }
     c.fillStyle = '#0c3b1f'; c.fillRect(0, H * 0.205, W, H);
+    // cartelloni pubblicitari a led sul lato lontano
+    { const a = P(-0.06, -0.04), b2 = P(1.06, -0.04), h = 11 * a.k * (H / 300); const cg = c.createLinearGradient(0, a.y - h, 0, a.y); cg.addColorStop(0, '#0b1220'); cg.addColorStop(1, '#16233b');
+      c.fillStyle = cg; c.fillRect(a.x, a.y - h, b2.x - a.x, h);
+      const marche = this.led || (this.led = ['CALCIOMANIA PM', (this.info.casa.nome || 'CASA').toUpperCase(), 'PRESIDENTE', 'FORZA RAGAZZI', (this.info.ospiti.nome || 'OSPITI').toUpperCase(), 'STADIO PIENO']);
+      c.save(); c.beginPath(); c.rect(a.x, a.y - h, b2.x - a.x, h); c.clip();
+      c.font = `800 ${Math.max(7, h * 0.62)}px "Barlow Condensed",Arial Narrow,sans-serif`; c.textBaseline = 'middle'; c.textAlign = 'left';
+      const passo = Math.max(120, W * 0.32), off = (t * 28) % passo;
+      for (let k = -1; k * passo < (b2.x - a.x) + passo; k++){ const tx = a.x + k * passo - off; const m = marche[((k % marche.length) + marche.length) % marche.length];
+        c.fillStyle = k % 2 ? '#22c55e' : '#d4af37'; c.fillText(m, tx + 8, a.y - h / 2); }
+      c.restore(); c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(a.x, a.y - h, b2.x - a.x, 1); }
     // erba a strisce
     const quad = (x0, y0, x1, y1) => { const a = P(x0, y0), b = P(x1, y0), d = P(x0, y1), e = P(x1, y1); c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.lineTo(e.x, e.y); c.lineTo(d.x, d.y); c.closePath(); };
-    for (let i = 0; i < 14; i++){ quad(-0.04 + i * 1.08 / 14, -0.06, -0.04 + (i + 1) * 1.08 / 14, 1.04); c.fillStyle = i % 2 ? '#2f9e44' : '#3cb553'; c.fill(); }
+    for (let i = 0; i < 14; i++){ quad(-0.04 + i * 1.08 / 14, -0.06, -0.04 + (i + 1) * 1.08 / 14, 1.04); const gg = c.createLinearGradient(0, H * 0.2, 0, H); gg.addColorStop(0, i % 2 ? '#2a8f3d' : '#34a84b'); gg.addColorStop(1, i % 2 ? '#2f9e44' : '#3cb553'); c.fillStyle = gg; c.fill(); }
+    { const lg = c.createRadialGradient(W / 2, H * 0.55, 0, W / 2, H * 0.55, W * 0.7); lg.addColorStop(0, 'rgba(255,255,230,.10)'); lg.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = lg; c.fillRect(0, H * 0.2, W, H); }
     const vign = c.createLinearGradient(0, H * 0.2, 0, H); vign.addColorStop(0, 'rgba(0,0,0,.28)'); vign.addColorStop(0.5, 'rgba(0,0,0,0)'); vign.addColorStop(1, 'rgba(0,0,0,.15)'); c.fillStyle = vign; c.fillRect(0, H * 0.2, W, H);
     // linee
     c.strokeStyle = 'rgba(255,255,255,.88)'; c.lineCap = 'round';
@@ -409,50 +422,94 @@ class Partita {
   }
   // un giocatore: ombra, gambe che corrono, maglia con il numero, braccia, faccia con i capelli
   omino(p, col, portiere, conPalla, base){
-    const c = this.x, q = this.proietta(p.x, p.y), s = q.k * base * 1.08;
+    const c = this.x, q = this.proietta(p.x, p.y), s = q.k * base * 1.02;
     const x = q.x, y = q.y, dir = p.dir || 1;
-    const corsa = Math.min(1, (p.v || 0) * 25 + 0.15), ang = Math.sin(p.fase || 0) * 0.65 * corsa;
+    const corsa = Math.min(1, (p.v || 0) * 25 + 0.12), ph = p.fase || 0;
     const maglia = portiere ? '#fcc419' : col.c1, bordo = portiere ? '#212529' : col.c2;
     const pantaloni = portiere ? '#212529' : (luminosita(col.c2) > 0.85 ? '#f1f3f5' : col.c2);
-    c.fillStyle = 'rgba(0,0,0,.32)'; c.beginPath(); c.ellipse(x, y, 8 * s, 2.8 * s, 0, 0, 7); c.fill();
-    // gambe
-    const anca = y - 13 * s;
-    [ang, -ang].forEach((a, k) => { const fx = x + Math.sin(a) * 8 * s * dir + (k ? 1.5 : -1.5) * s, fy = y - Math.cos(a) * 1.2 * s;
-      c.strokeStyle = maglia === '#fcc419' ? '#343a40' : col.c1; c.lineWidth = 3.2 * s; c.lineCap = 'round'; c.beginPath(); c.moveTo(x + (k ? 1.5 : -1.5) * s, anca); c.lineTo(fx, fy - 1 * s); c.stroke();
-      c.fillStyle = '#111'; c.beginPath(); c.ellipse(fx + dir * 1.3 * s, fy, 2.4 * s, 1.3 * s, 0, 0, 7); c.fill(); });
-    // pantaloncini
-    c.fillStyle = pantaloni; c.beginPath(); c.roundRect ? c.roundRect(x - 5.2 * s, anca - 4.5 * s, 10.4 * s, 6 * s, 1.5 * s) : c.rect(x - 5.2 * s, anca - 4.5 * s, 10.4 * s, 6 * s); c.fill();
-    // braccia
-    [-ang, ang].forEach((a, k) => { const sx = x + (k ? 5.5 : -5.5) * s, sy = anca - 13 * s;
-      c.strokeStyle = maglia; c.lineWidth = 2.8 * s; c.beginPath(); c.moveTo(sx, sy); const ex = sx + Math.sin(a) * 6 * s * dir, ey = sy + Math.cos(a) * 8 * s; c.lineTo(ex, ey); c.stroke();
-      c.fillStyle = portiere ? '#f8f9fa' : p.pelle; c.beginPath(); c.arc(ex, ey, 1.7 * s, 0, 7); c.fill(); });
-    // maglia
-    const mx = x - 6 * s, my = anca - 15 * s, mw = 12 * s, mh = 12.5 * s;
-    c.fillStyle = maglia; c.beginPath(); c.roundRect ? c.roundRect(mx, my, mw, mh, 3 * s) : c.rect(mx, my, mw, mh); c.fill();
-    c.fillStyle = bordo; c.fillRect(mx, my + mh - 1.6 * s, mw, 1.6 * s); c.fillRect(x - 2.2 * s, my - 0.6 * s, 4.4 * s, 1.6 * s);
-    if (s > 0.55){ c.font = `800 ${Math.round(7.5 * s)}px "Barlow Condensed",Arial Narrow,sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.lineWidth = 2 * s; c.strokeStyle = 'rgba(0,0,0,.55)'; c.strokeText(p.num, x, my + mh * 0.5); c.fillStyle = portiere ? '#111' : testoSu(maglia); c.fillText(p.num, x, my + mh * 0.5); }
-    // testa e faccia
-    const hx = x + dir * 0.6 * s, hy = my - 4.6 * s, r = 4.4 * s;
-    c.fillStyle = p.pelle; c.beginPath(); c.arc(hx, hy, r, 0, 7); c.fill();
+    const calze = portiere ? '#212529' : col.c1, pelle = p.pelle, pelleS = tono(pelle, -0.22);
+    const scarpe = SCARPE[(p.num || 1) % SCARPE.length];
+    // ombra morbida
+    const og = c.createRadialGradient(x, y, 0, x, y, 9 * s); og.addColorStop(0, 'rgba(0,0,0,.42)'); og.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = og; c.beginPath(); c.ellipse(x, y, 9 * s, 3 * s, 0, 0, 7); c.fill();
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    const hipY = y - 17 * s, shY = y - 29.5 * s;
+    // gambe: coscia, ginocchio, calzettone e scarpa (prima quella dietro)
+    const gamba = (k) => {
+      const fase = ph + k * Math.PI, sgn = k ? 1 : -1, dietro = k === 0;
+      const aT = Math.sin(fase) * 0.62 * corsa, aS = aT - Math.max(0, -Math.cos(fase)) * 1.15 * corsa;
+      const hx = x + sgn * 1.9 * s, hy = hipY;
+      const kx = hx + Math.sin(aT) * 8.2 * s * dir, ky = hy + Math.cos(aT) * 8.2 * s;
+      const ax = kx + Math.sin(aS) * 7.6 * s * dir, ay = ky + Math.cos(aS) * 7.6 * s;
+      c.strokeStyle = dietro ? pelleS : pelle; c.lineWidth = 3.7 * s; c.beginPath(); c.moveTo(hx, hy); c.lineTo(kx, ky); c.stroke();
+      c.strokeStyle = dietro ? tono(calze, -0.25) : calze; c.lineWidth = 3.1 * s; c.beginPath(); c.moveTo(kx + (ax - kx) * 0.18, ky + (ay - ky) * 0.18); c.lineTo(ax, ay); c.stroke();
+      c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 0.7 * s; c.beginPath(); c.moveTo(kx + (ax - kx) * 0.25 - 1.5 * s, ky + (ay - ky) * 0.25); c.lineTo(kx + (ax - kx) * 0.25 + 1.5 * s, ky + (ay - ky) * 0.25); c.stroke();
+      c.fillStyle = dietro ? tono(scarpe, -0.3) : scarpe; c.beginPath(); c.ellipse(ax + dir * 1.4 * s, ay + 0.3 * s, 2.6 * s, 1.25 * s, Math.sin(aS) * 0.4 * dir, 0, 7); c.fill();
+      // pantaloncino sopra la coscia
+      c.strokeStyle = dietro ? tono(pantaloni, -0.2) : pantaloni; c.lineWidth = 4.8 * s; c.beginPath(); c.moveTo(hx, hy - 0.6 * s); c.lineTo(hx + (kx - hx) * 0.42, hy + (ky - hy) * 0.42); c.stroke();
+    };
+    gamba(0);
+    // braccio dietro
+    const braccio = (k) => {
+      const fase = ph + (k ? 0 : Math.PI), sgn = k ? 1 : -1, dietro = k === 0;
+      const sx = x + sgn * 4.6 * s, sy = shY + 1.2 * s;
+      const a1 = Math.sin(fase) * 0.75 * corsa, a2 = a1 + 0.9 * (0.4 + corsa * 0.6);
+      const ex = sx + Math.sin(a1) * 6 * s * dir, ey = sy + Math.cos(a1) * 6 * s;
+      const hx = ex + Math.sin(a2) * 5.4 * s * dir, hy = ey + Math.cos(a2) * 5.4 * s;
+      c.strokeStyle = dietro ? pelleS : pelle; c.lineWidth = 2.4 * s; c.beginPath(); c.moveTo(sx, sy); c.lineTo(ex, ey); c.lineTo(hx, hy); c.stroke();
+      c.strokeStyle = dietro ? tono(maglia, -0.25) : maglia; c.lineWidth = 3.2 * s; c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx + (ex - sx) * 0.55, sy + (ey - sy) * 0.55); c.stroke();
+      if (portiere){ c.fillStyle = '#f8f9fa'; c.beginPath(); c.arc(hx, hy, 1.7 * s, 0, 7); c.fill(); }
+    };
+    braccio(0);
+    gamba(1);
+    // pantaloncini (vita)
+    c.fillStyle = pantaloni; c.beginPath(); c.moveTo(x - 4.4 * s, hipY - 2.2 * s); c.lineTo(x + 4.4 * s, hipY - 2.2 * s); c.lineTo(x + 4.6 * s, hipY + 1.6 * s); c.lineTo(x - 4.6 * s, hipY + 1.6 * s); c.closePath(); c.fill();
+    // busto con le spalle larghe e la luce da un lato
+    const g = c.createLinearGradient(x - 6 * s, 0, x + 6 * s, 0); g.addColorStop(0, tono(maglia, dir > 0 ? -0.18 : 0.14)); g.addColorStop(0.55, maglia); g.addColorStop(1, tono(maglia, dir > 0 ? 0.14 : -0.22));
+    c.fillStyle = g; c.beginPath();
+    c.moveTo(x - 5.6 * s, shY + 0.6 * s); c.quadraticCurveTo(x - 6.2 * s, shY - 0.8 * s, x - 3.6 * s, shY - 1.2 * s);
+    c.lineTo(x + 3.6 * s, shY - 1.2 * s); c.quadraticCurveTo(x + 6.2 * s, shY - 0.8 * s, x + 5.6 * s, shY + 0.6 * s);
+    c.lineTo(x + 4.3 * s, hipY - 1.6 * s); c.lineTo(x - 4.3 * s, hipY - 1.6 * s); c.closePath(); c.fill();
+    // righe della maglia se il secondo colore è diverso
+    if (!portiere && col.t === 1){ c.save(); c.clip(); c.fillStyle = bordo; for (let k = -2; k <= 2; k++) c.fillRect(x + k * 2.4 * s - 0.6 * s, shY - 2 * s, 1.2 * s, 15 * s); c.restore(); }
+    c.fillStyle = bordo; c.beginPath(); c.moveTo(x - 2.2 * s, shY - 1.2 * s); c.lineTo(x, shY + 1.4 * s); c.lineTo(x + 2.2 * s, shY - 1.2 * s); c.closePath(); c.fill();
+    c.fillRect(x - 4.4 * s, hipY - 2.4 * s, 8.8 * s, 0.9 * s);
+    if (s > 0.55){ c.font = `800 ${Math.round(6.4 * s)}px "Barlow Condensed",Arial Narrow,sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.lineWidth = 1.6 * s; c.strokeStyle = 'rgba(0,0,0,.5)'; c.strokeText(p.num, x, shY + 6.6 * s); c.fillStyle = portiere ? '#111' : testoSu(maglia); c.fillText(p.num, x, shY + 6.6 * s); }
+    braccio(1);
+    // collo e testa
+    c.fillStyle = pelleS; c.fillRect(x - 1.3 * s + dir * 0.3 * s, shY - 3.2 * s, 2.6 * s, 2.6 * s);
+    const hx = x + dir * 0.7 * s, hy = shY - 6 * s, rx = 3.3 * s, ry = 3.8 * s;
+    const fg = c.createRadialGradient(hx + dir * rx * 0.4, hy - ry * 0.2, rx * 0.2, hx, hy, ry * 1.1); fg.addColorStop(0, tono(pelle, 0.12)); fg.addColorStop(1, pelleS);
+    c.fillStyle = fg; c.beginPath(); c.ellipse(hx, hy, rx, ry, 0, 0, 7); c.fill();
+    c.fillStyle = pelleS; c.beginPath(); c.ellipse(hx - dir * rx * 0.55, hy + ry * 0.05, rx * 0.22, ry * 0.3, 0, 0, 7); c.fill();
     c.fillStyle = p.capelli; c.beginPath();
-    if (p.taglio === 0) c.arc(hx, hy - r * 0.15, r * 1.02, Math.PI * 1.05, Math.PI * 1.95);
-    else if (p.taglio === 1){ c.arc(hx, hy, r * 1.05, Math.PI, Math.PI * 2); c.lineTo(hx + r, hy - r * 0.1); }
-    else if (p.taglio === 2){ c.arc(hx, hy - r * 0.3, r * 0.95, Math.PI * 0.95, Math.PI * 2.05); }
-    else { c.ellipse(hx, hy - r * 0.55, r * 0.9, r * 0.6, 0, Math.PI, Math.PI * 2); }
+    if (p.taglio === 0){ c.ellipse(hx - dir * rx * 0.12, hy - ry * 0.35, rx * 1.05, ry * 0.75, 0, Math.PI * 1.02, Math.PI * 1.98); c.lineTo(hx - dir * rx, hy); }
+    else if (p.taglio === 1){ c.ellipse(hx, hy - ry * 0.25, rx * 1.08, ry * 0.85, 0, Math.PI, Math.PI * 2); c.lineTo(hx - dir * rx * 1.08, hy + ry * 0.35); }
+    else if (p.taglio === 2){ c.ellipse(hx, hy - ry * 0.55, rx * 0.98, ry * 0.5, 0, Math.PI, Math.PI * 2); }
+    else { c.ellipse(hx - dir * rx * 0.1, hy - ry * 0.45, rx * 1.1, ry * 0.7, 0, Math.PI * 0.95, Math.PI * 2.05); c.ellipse(hx - dir * rx * 0.8, hy + ry * 0.2, rx * 0.4, ry * 0.6, 0, 0, 7); }
     c.fill();
-    if (s > 0.5){ c.fillStyle = '#1a1a1a'; c.beginPath(); c.arc(hx + dir * r * 0.38, hy + r * 0.05, Math.max(0.6, r * 0.13), 0, 7); c.arc(hx + dir * r * 0.0, hy + r * 0.05, Math.max(0.6, r * 0.13), 0, 7); c.fill();
-      c.strokeStyle = 'rgba(120,40,30,.8)'; c.lineWidth = Math.max(0.6, r * 0.12); c.beginPath(); c.arc(hx + dir * r * 0.2, hy + r * 0.38, r * 0.22, 0.2, Math.PI - 0.2); c.stroke(); }
+    if (s > 0.62){
+      c.fillStyle = '#16110d'; c.beginPath(); c.ellipse(hx + dir * rx * 0.48, hy - ry * 0.02, Math.max(0.5, rx * 0.11), Math.max(0.6, ry * 0.12), 0, 0, 7); c.ellipse(hx + dir * rx * 0.05, hy - ry * 0.02, Math.max(0.5, rx * 0.11), Math.max(0.6, ry * 0.12), 0, 0, 7); c.fill();
+      c.strokeStyle = tono(p.capelli, -0.1); c.lineWidth = Math.max(0.5, s * 0.45); c.beginPath(); c.moveTo(hx - dir * rx * 0.1, hy - ry * 0.28); c.lineTo(hx + dir * rx * 0.25, hy - ry * 0.33); c.moveTo(hx + dir * rx * 0.36, hy - ry * 0.33); c.lineTo(hx + dir * rx * 0.68, hy - ry * 0.26); c.stroke();
+      c.strokeStyle = tono(pelle, -0.35); c.beginPath(); c.moveTo(hx + dir * rx * 0.62, hy + ry * 0.05); c.lineTo(hx + dir * rx * 0.85, hy + ry * 0.3); c.lineTo(hx + dir * rx * 0.6, hy + ry * 0.35); c.stroke();
+      c.strokeStyle = 'rgba(110,40,30,.85)'; c.beginPath(); c.moveTo(hx + dir * rx * 0.1, hy + ry * 0.55); c.quadraticCurveTo(hx + dir * rx * 0.35, hy + ry * 0.66, hx + dir * rx * 0.58, hy + ry * 0.52); c.stroke();
+    }
     // nome di chi ha la palla
     if (conPalla && p.nome){
-      c.font = `700 ${Math.round(Math.max(10, 9 * s))}px Barlow,system-ui,sans-serif`; c.textAlign = 'center'; c.textBaseline = 'bottom';
-      const tw = c.measureText(p.nome).width + 10; c.fillStyle = 'rgba(0,0,0,.7)'; c.beginPath(); c.roundRect ? c.roundRect(hx - tw / 2, hy - r - 18 * s, tw, 13 * s + 2, 4) : c.rect(hx - tw / 2, hy - r - 18 * s, tw, 13 * s + 2); c.fill();
-      c.fillStyle = '#fff'; c.fillText(p.nome, hx, hy - r - 4 * s + 1);
-      c.fillStyle = col.c1; c.beginPath(); c.moveTo(hx - 3, hy - r - 4 * s); c.lineTo(hx + 3, hy - r - 4 * s); c.lineTo(hx, hy - r - 1); c.fill();
+      const top = hy - ry - 4 * s;
+      c.font = `700 ${Math.round(Math.max(10, 8.5 * s))}px Barlow,system-ui,sans-serif`; c.textAlign = 'center'; c.textBaseline = 'bottom';
+      const tw = c.measureText(p.nome).width + 12, th = Math.max(14, 11 * s);
+      c.fillStyle = 'rgba(8,12,18,.82)'; c.beginPath(); c.roundRect ? c.roundRect(hx - tw / 2, top - th, tw, th, 5) : c.rect(hx - tw / 2, top - th, tw, th); c.fill();
+      c.fillStyle = col.c1; c.fillRect(hx - tw / 2, top - th, 3, th);
+      c.fillStyle = '#fff'; c.fillText(p.nome, hx + 1, top - 2);
+      c.fillStyle = 'rgba(8,12,18,.82)'; c.beginPath(); c.moveTo(hx - 3, top); c.lineTo(hx + 3, top); c.lineTo(hx, top + 3); c.fill();
     }
   }
 }
 
+function tono(hex, f){ const h = (hex || '#888').replace('#', ''); const n = parseInt(h.length === 3 ? h.split('').map((x) => x + x).join('') : h, 16); let r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255; const t = f < 0 ? 0 : 255, k = Math.abs(f); r = Math.round(r + (t - r) * k); g = Math.round(g + (t - g) * k); b = Math.round(b + (t - b) * k); return `rgb(${r},${g},${b})`; }
+const SCARPE = ['#111', '#f8f9fa', '#ff3b6b', '#22d3ee', '#a3e635', '#f97316', '#facc15', '#111', '#e11d48'];
 const PELLI = ['#f1c27d', '#e0ac69', '#c68642', '#8d5524', '#ffdbac', '#a8693f', '#5c3a21', '#f5d0a9'];
 const CAPELLI = ['#2b1b0e', '#4a2c18', '#a0522d', '#d9b45a', '#111111', '#7a4b2a', '#1c1c1c', '#c9a227'];
 

@@ -207,7 +207,7 @@ function apriMatch(o){
   const gH = (o.diretta ? Dir.sq[0].slots.map((s) => s.p ? { num: s.p.num || '', nome: s.p.c } : {}) : o.giocH) || [];
   const gA = (o.diretta ? Dir.sq[1].slots.map((s) => s.p ? { num: s.p.num || '', nome: s.p.c } : {}) : o.giocA) || [];
   _partita = new Partita($('#campo', v), {
-    casa: { c1: colH.c1, c2: colH.c2, mod: o.modH, giocatori: gH }, ospiti: { c1: colA.c1, c2: colA.c2, mod: o.modA, giocatori: gA },
+    casa: { c1: colH.c1, c2: colH.c2, t: colH.t, nome: h.nome, mod: o.modH, giocatori: gH }, ospiti: { c1: colA.c1, c2: colA.c2, t: colA.t, nome: a.nome, mod: o.modA, giocatori: gA },
     eventi: o.diretta ? Dir.ev.slice() : o.eventi, durata: o.durata, vista: S.opz.vista || 'tv',
     onEvento: (e, veloce) => {
       if (e.tipo === 'gol'){ if (e.lato === 0) gh++; else ga++; $('#gh', v).textContent = gh; $('#ga', v).textContent = ga;
