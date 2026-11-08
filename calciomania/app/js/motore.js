@@ -1,5 +1,5 @@
 /* =========================================================
-   PRESIDENTE PM — MOTORE
+   CALCIOMANIA PM — MOTORE
    Dati del gioco, giocatori, staff, stadio, partite e gironi.
    Lo stesso girone ("dati") serve sia da soli (bot) sia online:
    le squadre "bot" vengono sostituite dalle persone vere.
@@ -50,8 +50,40 @@ const DIFFICOLTA = [
 const PROMOSSE = 2, RETROCESSE = 2;
 
 // ---------- nomi inventati ----------
-const NOMI = ['Marco','Luca','Andrea','Matteo','Davide','Simone','Federico','Lorenzo','Alessandro','Francesco','Giorgio','Riccardo','Stefano','Paolo','Nicola','Tommaso','Gabriele','Edoardo','Filippo','Pietro','Daniele','Emanuele','Giacomo','Leonardo','Samuele','Michele','Fabio','Mattia','Diego','Cristian','Enrico','Alberto','Antonio','Giuseppe','Salvatore','Vincenzo','Raffaele','Elia','Jacopo','Manuel','Kevin','Ivan','Omar','Yusuf','Mateo','Lucas','Tiago','Nikola','Jonas','Malik','Sami','Ilias','Adam','Noah','Dario','Bruno','Carlo','Walter','Sergio','Ettore','Ruben','Hugo','Iker','Felipe','Kofi','Amadou','Sven','Lars','Milan','Luka'];
-const COGNOMI = ['Bertoli','Carraro','Galbiati','Fumagalli','Brambilla','Colombo','Mantovani','Pellegrini','Vitale','Gatti','Riva','Sala','Testa','Ferrario','Bonfanti','Castelli','Moretti','Fontana','Lombardi','Marchesi','Valsecchi','Zanetti','Bassi','Rinaldi','Ghezzi','Cattaneo','Longhi','Monti','Parisi','Ruggeri','Sartori','Tosi','Villa','Arnaboldi','Bellini','Corti','Donati','Fabbri','Guidi','Leone','Magni','Negri','Orlandi','Pagani','Quadri','Rota','Sironi','Tagliabue','Uboldi','Vergani','Zappa','Alberti','Barzaghi','Crippa','Dossena','Erba','Frigerio','Gorla','Invernizzi','Locatelli','Meroni','Nava','Oggioni','Perego','Redaelli','Spinelli','Terraneo','Usuelli','Viganò','Zucchi','Keller','Novak','Silva','Mendes','Diallo','Traoré','Larsen','Kovač','Petrov','Moreau','Ortega','Lindqvist','Okafor','Haddad','Weber','Costa','Duarte','Rahimi','Berg','Horvat'];
+const NOMI = ['Marco','Luca','Andrea','Matteo','Davide','Simone','Federico','Lorenzo','Alessandro','Francesco','Giorgio','Riccardo','Stefano','Paolo','Nicola','Tommaso','Gabriele','Edoardo','Filippo','Pietro','Daniele','Emanuele','Giacomo','Leonardo','Samuele','Michele','Fabio','Mattia','Diego','Cristian','Enrico','Alberto','Antonio','Giuseppe','Salvatore','Vincenzo','Raffaele','Elia','Jacopo','Manuel','Dario','Bruno','Carlo','Walter','Sergio','Ettore','Christian','Niccolò','Alessio','Valerio','Ivan','Kevin'];
+const COGNOMI = ['Bertoli','Carraro','Galbiati','Fumagalli','Brambilla','Colombo','Mantovani','Pellegrini','Vitale','Gatti','Riva','Sala','Testa','Ferrario','Bonfanti','Castelli','Moretti','Fontana','Lombardi','Marchesi','Valsecchi','Zanetti','Bassi','Rinaldi','Ghezzi','Cattaneo','Longhi','Monti','Parisi','Ruggeri','Sartori','Tosi','Villa','Arnaboldi','Bellini','Corti','Donati','Fabbri','Guidi','Leone','Magni','Negri','Orlandi','Pagani','Quadri','Rota','Sironi','Tagliabue','Uboldi','Vergani','Zappa','Alberti','Barzaghi','Crippa','Dossena','Erba','Frigerio','Gorla','Invernizzi','Locatelli','Meroni','Nava','Oggioni','Perego','Redaelli','Spinelli','Terraneo','Usuelli','Viganò','Zucchi','Esposito','Russo','Romano','Ricci','Marino','Greco','Bruno','Gallo','Conti','De Luca','Costa','Giordano','Mancini','Lombardo','Barbieri','Ferrara','Santoro','Caruso','Rizzi','Morelli'];
+// nazionalità: bandiera, nome, quanto sono comuni (in basso quasi tutti italiani), colore della pelle più probabile e nomi tipici
+const NAZIONI = {
+  IT: { n: 'Italia', f: '🇮🇹', w: 70, pelle: [0, 1, 4, 7, 2] },
+  ES: { n: 'Spagna', f: '🇪🇸', w: 3, pelle: [0, 1, 2], nomi: ['Pablo','Sergio','Álvaro','Iker','Raúl','Dani','Hugo','Marcos','Javi','Rodrigo'], cognomi: ['García','Fernández','López','Martínez','Sánchez','Romero','Navarro','Ruiz','Torres','Moreno'] },
+  FR: { n: 'Francia', f: '🇫🇷', w: 3, pelle: [0, 4, 3, 6, 2], nomi: ['Lucas','Hugo','Théo','Antoine','Kylian','Jules','Mathis','Yanis','Enzo','Noah'], cognomi: ['Martin','Bernard','Dubois','Moreau','Laurent','Girard','Mbemba','Fofana','Lefèvre','Roux'] },
+  BR: { n: 'Brasile', f: '🇧🇷', w: 3, pelle: [1, 2, 3, 5, 6], nomi: ['Gabriel','Thiago','Rafael','Bruno','Vinícius','Matheus','Lucas','Felipe','Caio','João'], cognomi: ['Silva','Santos','Oliveira','Souza','Pereira','Lima','Carvalho','Ferreira','Rocha','Almeida'] },
+  AR: { n: 'Argentina', f: '🇦🇷', w: 2, pelle: [0, 1, 2], nomi: ['Santiago','Mateo','Facundo','Nicolás','Joaquín','Agustín','Lautaro','Franco','Tomás','Gonzalo'], cognomi: ['González','Rodríguez','Gómez','Fernández','Díaz','Álvarez','Romero','Sosa','Benítez','Acosta'] },
+  DE: { n: 'Germania', f: '🇩🇪', w: 2, pelle: [4, 0, 7], nomi: ['Lukas','Jonas','Leon','Finn','Niklas','Felix','Tim','Jan','Max','Paul'], cognomi: ['Müller','Schmidt','Schneider','Fischer','Weber','Wagner','Becker','Hoffmann','Koch','Richter'] },
+  PT: { n: 'Portogallo', f: '🇵🇹', w: 2, pelle: [0, 1, 2], nomi: ['Rui','Diogo','Tiago','André','Gonçalo','Nuno','Bernardo','Pedro','Rúben','Vitinha'], cognomi: ['Pereira','Costa','Ferreira','Gonçalves','Ramos','Cardoso','Mendes','Neves','Teixeira','Moutinho'] },
+  NL: { n: 'Olanda', f: '🇳🇱', w: 1, pelle: [4, 0, 3], nomi: ['Daan','Sem','Lars','Jesse','Thijs','Ruben','Bram','Stijn','Teun','Joey'], cognomi: ['de Jong','Jansen','de Vries','van Dijk','Bakker','Visser','Smit','Meijer','de Boer','Mulder'] },
+  HR: { n: 'Croazia', f: '🇭🇷', w: 1, pelle: [4, 0], nomi: ['Luka','Ivan','Marko','Josip','Ante','Mateo','Dario','Nikola','Mario','Tin'], cognomi: ['Horvat','Kovačić','Babić','Marić','Jurić','Novak','Perić','Vuković','Knežević','Pavlović'] },
+  RS: { n: 'Serbia', f: '🇷🇸', w: 1, pelle: [4, 0], nomi: ['Nikola','Stefan','Aleksandar','Miloš','Dušan','Filip','Lazar','Vanja','Sergej','Uroš'], cognomi: ['Jovanović','Petrović','Nikolić','Marković','Đorđević','Stojanović','Ilić','Stanković','Pavlović','Milinković'] },
+  AL: { n: 'Albania', f: '🇦🇱', w: 2, pelle: [0, 1], nomi: ['Ardit','Elseid','Kristjan','Arlind','Ermir','Klaus','Marash','Nedim','Taulant','Ylber'], cognomi: ['Hysaj','Berisha','Krasniqi','Gashi','Shala','Hoxha','Kola','Ramadani','Dervishi','Muçi'] },
+  RO: { n: 'Romania', f: '🇷🇴', w: 1, pelle: [0, 1], nomi: ['Andrei','Ionuț','Alexandru','Florin','Răzvan','Bogdan','Cristian','Mihai','Radu','Vlad'], cognomi: ['Popescu','Ionescu','Dumitru','Stan','Marin','Tănase','Munteanu','Radu','Matei','Lazăr'] },
+  SN: { n: 'Senegal', f: '🇸🇳', w: 2, pelle: [3, 6, 5], nomi: ['Moussa','Cheikh','Ibrahima','Pape','Mamadou','Ismaïla','Abdou','Krépin','Idrissa','Bamba'], cognomi: ['Diallo','Ndiaye','Sarr','Gueye','Diop','Fall','Sow','Cissé','Mané','Faye'] },
+  NG: { n: 'Nigeria', f: '🇳🇬', w: 1, pelle: [3, 6], nomi: ['Victor','Samuel','Emmanuel','Ahmed','Kelechi','Wilfred','Ola','Chidera','Tochukwu','Moses'], cognomi: ['Okafor','Osimhen','Adeyemi','Eze','Nwankwo','Okoye','Balogun','Iheanacho','Ndidi','Onuachu'] },
+  MA: { n: 'Marocco', f: '🇲🇦', w: 2, pelle: [1, 2, 5], nomi: ['Youssef','Achraf','Hakim','Sofyan','Nayef','Azzedine','Amine','Bilal','Zakaria','Ilias'], cognomi: ['El Amrani','Benali','Ziyech','Amrabat','Saïss','Ounahi','Haddad','Bennani','Rahimi','Aguerd'] },
+  CI: { n: 'Costa d’Avorio', f: '🇨🇮', w: 1, pelle: [3, 6], nomi: ['Franck','Serge','Wilfried','Seko','Jean','Yves','Simon','Ibrahim','Odilon','Sébastien'], cognomi: ['Kessié','Aurier','Zaha','Fofana','Bamba','Koné','Touré','Gradel','Adingra','Haller'] },
+  UY: { n: 'Uruguay', f: '🇺🇾', w: 1, pelle: [0, 1], nomi: ['Federico','Rodrigo','Darwin','Manuel','Matías','Ronald','Facundo','Nahitan','Giorgian','Sebastián'], cognomi: ['Valverde','Bentancur','Núñez','Ugarte','Araújo','Giménez','Pellistri','Vecino','Olivera','Cáceres'] },
+  DK: { n: 'Danimarca', f: '🇩🇰', w: 1, pelle: [4, 7], nomi: ['Mikkel','Rasmus','Christian','Andreas','Jonas','Kasper','Pierre','Simon','Joakim','Mathias'], cognomi: ['Jensen','Nielsen','Hansen','Pedersen','Andersen','Larsen','Sørensen','Rasmussen','Christensen','Poulsen'] },
+  SE: { n: 'Svezia', f: '🇸🇪', w: 1, pelle: [4, 7], nomi: ['Erik','Oscar','Viktor','Emil','Gustav','Alexander','Isak','Ludvig','Filip','Jesper'], cognomi: ['Andersson','Johansson','Karlsson','Nilsson','Eriksson','Larsson','Olsson','Persson','Lindqvist','Berg'] }
+};
+const NAZ_K = Object.keys(NAZIONI);
+function scegliNaz(tier, r = RND){
+  // più si sale di categoria, più stranieri ci sono
+  const extra = Math.max(0, tier - 3) * 6;
+  const tot = NAZ_K.reduce((s, k) => s + (k === 'IT' ? NAZIONI.IT.w : NAZIONI[k].w * (1 + extra / 10)), 0);
+  let x = r() * tot;
+  for (const k of NAZ_K){ x -= (k === 'IT' ? NAZIONI.IT.w : NAZIONI[k].w * (1 + extra / 10)); if (x <= 0) return k; }
+  return 'IT';
+}
+function nomeDaNaz(naz, r = RND){ const N = NAZIONI[naz] || NAZIONI.IT; return [pick(N.nomi || NOMI, r), pick(N.cognomi || COGNOMI, r)]; }
 const PRE_PAESE = ['Borgo','Castel','Monte','San','Villa','Ponte','Rocca','Valle','Poggio','Pieve','Torre','Colle','Riva','Campo','Porto','Prato','Fonte','Serra','Bosco','Sasso'];
 const RAD_PAESE = ['verde','fiore','alto','chiaro','bello','franco','lungo','rosso','nuovo','sereno','dorato','azzurro','forte','marino','lucente','argento','querce','cielo','sole','vento','rame','olmo','lago','pino'];
 const PREF_CLUB = [['ASD','Pol.','US','GS','Oratorio','Virtus','Sporting','Atletico','Real'],['ASD','US','Virtus','Sporting','Atletico','Real','Unione','Pro'],['FC','AC','Calcio','Sporting','Atletico','Real','Unione','Dinamo','Olimpia','Inter']];
@@ -92,12 +124,15 @@ function nuovoGiocatore(tier, o = {}){
   val = clamp(val, 12, 94);
   let pot = val + (eta <= 19 ? ri(6, 24, r) : eta <= 22 ? ri(3, 16, r) : eta <= 26 ? ri(0, 7, r) : 0);
   pot = clamp(pot, val, 97);
-  const p = { id: uid() + ri(0, 999, r), n: pick(NOMI, r), c: pick(COGNOMI, r), r: ruolo, eta, val, pot, forma: ri(85, 100, r), inf: 0, gol: 0, pres: 0, num: 0 };
+  const naz = o.naz || scegliNaz(tier, r), nm = nomeDaNaz(naz, r);
+  const p = { id: uid() + ri(0, 999, r), n: nm[0], c: nm[1], r: ruolo, eta, val, pot, naz, forma: ri(85, 100, r), mor: ri(62, 85, r), fm: 6, voti: [], inf: 0, squal: 0, gol: 0, ass: 0, pres: 0, amm: 0, esp: 0, num: 0, contr: ri(1, 4, r) };
   p.prezzo = valoreDi(p); p.stip = stipDi(p);
   return p;
 }
 const nomeG = (p) => p.n.charAt(0) + '. ' + p.c;
-const efficienza = (p) => p.val * (0.72 + 0.28 * p.forma / 100);
+// quanto rende davvero un giocatore: bravura, condizione fisica, morale e forma del momento
+const efficienza = (p) => p.val * (0.72 + 0.28 * p.forma / 100) + ((p.mor == null ? 70 : p.mor) - 70) / 18 + ((p.fm || 6) - 6) * 0.6;
+const mediaVoto = (p) => p.nv ? Math.round(p.sv / p.nv * 100) / 100 : 0;
 
 // ---------- staff ----------
 const STAFF = [
@@ -105,14 +140,21 @@ const STAFF = [
   { k: 'vice', nome: 'Vice allenatore',      ico: '🗒️', eff: 'Aiuta l’allenatore e i giovani a crescere' },
   { k: 'atl', nome: 'Preparatore atletico',  ico: '🏃', eff: 'Giocatori meno stanchi e meno infortuni' },
   { k: 'por', nome: 'Preparatore portieri',  ico: '🧤', eff: 'Portiere più bravo' },
-  { k: 'med', nome: 'Medico',                ico: '🩺', eff: 'Guarigioni più veloci' },
+  { k: 'med', nome: 'Medico',                ico: '🩺', eff: 'Guarigioni più veloci e infortuni meno gravi' },
+  { k: 'fisio', nome: 'Fisioterapista',      ico: '💆', eff: 'Recupero più veloce della condizione fisica' },
   { k: 'oss', nome: 'Osservatore',           ico: '🔭', eff: 'Trova giocatori migliori al mercato' },
   { k: 'ds',  nome: 'Direttore sportivo',    ico: '💼', eff: 'Compri a meno e vendi a più' }
 ];
 const STAFF_STIP = [0, 150, 500, 1800, 6000, 20000];
+const STAFF_ATT = { all: ['Tattica', 'Motivazione', 'Giovani'], vice: ['Tattica', 'Allenamento', 'Giovani'], atl: ['Preparazione', 'Prevenzione', 'Recupero'], por: ['Tecnica', 'Riflessi', 'Uscite'],
+  med: ['Diagnosi', 'Cure', 'Prevenzione'], fisio: ['Recupero', 'Massaggi', 'Riabilitazione'], oss: ['Occhio per il talento', 'Giovani', 'Contatti'], ds: ['Trattative', 'Contratti', 'Contatti'] };
 function nuovoStaff(k, liv, r = RND){
   const stip = tondo(STAFF_STIP[liv] * (0.85 + r() * 0.3));
-  return { id: uid(), k, nome: pick(NOMI, r) + ' ' + pick(COGNOMI, r), liv, stip, ingaggio: tondo(stip * 12), eta: ri(32, 66, r) };
+  const naz = r() < 0.85 ? 'IT' : scegliNaz(6, r), nm = nomeDaNaz(naz, r);
+  const att = (STAFF_ATT[k] || ['Bravura', 'Esperienza', 'Carisma']).map(() => clamp(Math.round(liv * 3.4 + ri(-2, 3, r)), 1, 20));
+  const s = { id: uid(), k, nome: nm[0] + ' ' + nm[1], naz, liv, stip, ingaggio: tondo(stip * 12), eta: ri(32, 66, r), att };
+  if (k === 'all') s.mod = pick(Object.keys(MODULI), r);
+  return s;
 }
 const livStaff = (S, k) => (S.staff[k] ? S.staff[k].liv : 0);
 
@@ -137,6 +179,9 @@ const STADIO = [
   { k: 'giov', nome: 'Centro giovanile', ico: '🧒', eff: 'Ogni anno arrivano ragazzi forti gratis',
     livelli: ['Niente','Scuola calcio','Settore giovanile','Accademia','Accademia d’élite'],
     costi: [0, 80000, 400000, 2500000, 10000000], tempi: [0, 2, 2, 3, 4] },
+  { k: 'centro', nome: 'Centro allenamento', ico: '🏋️', eff: 'Allenamenti migliori: i giocatori crescono di più e si fanno meno male',
+    livelli: ['Campetto','Campo d’allenamento','Centro sportivo','Centro moderno','Centro d’élite'],
+    costi: [0, 60000, 350000, 2000000, 8000000], tempi: [0, 1, 2, 3, 4] },
   { k: 'maxi', nome: 'Maxischermo', ico: '📺', eff: 'Più tifosi e più spettacolo',
     livelli: ['Niente','Tabellone luminoso','Maxischermo gigante'],
     costi: [0, 150000, 2000000], tempi: [0, 1, 2] },
@@ -149,8 +194,18 @@ const postiStadio = (S) => STADIO_K.tribune.posti[S.stadio.tribune];
 const costoRestauro = (S) => tondo(1500 + STADIO_K.tribune.costi[S.stadio.tribune] * 0.012 * (100 - S.stadio.usura) / 40 + 200 * (100 - S.stadio.usura));
 
 // ---------- moduli ----------
-const MODULI = { '4-4-2': [4, 4, 2], '4-3-3': [4, 3, 3], '3-5-2': [3, 5, 2], '4-2-3-1': [4, 5, 1], '5-3-2': [5, 3, 2], '3-4-3': [3, 4, 3] };
-const MENTALITA = ['Difensiva', 'Equilibrata', 'Offensiva'];
+const MODULI = { '4-4-2': [4, 4, 2], '4-3-3': [4, 3, 3], '4-2-3-1': [4, 5, 1], '4-1-4-1': [4, 5, 1], '4-3-1-2': [4, 4, 2], '4-5-1': [4, 5, 1], '3-5-2': [3, 5, 2], '3-4-3': [3, 4, 3], '5-3-2': [5, 3, 2], '5-4-1': [5, 4, 1] };
+const MENTALITA = ['Molto difensiva', 'Difensiva', 'Equilibrata', 'Offensiva', 'Molto offensiva'];
+const STILI = [['equi', 'Equilibrato', 'Un po’ di tutto'], ['poss', 'Possesso palla', 'Tanti passaggi: più controllo a centrocampo'], ['contro', 'Contropiede', 'Difendi e riparti veloce'], ['lanci', 'Lanci lunghi', 'Palla subito alle punte']];
+const PRESSING = ['Basso', 'Medio', 'Alto'], LINEA = ['Bassa', 'Media', 'Alta'];
+const ISTRUZIONI = [['', 'Nessuna'], ['off', 'Spingi in avanti'], ['dif', 'Resta dietro'], ['tiro', 'Tira da fuori'], ['reg', 'Regista (gioca la palla)']];
+// infortuni: nome e giornate (minimo, massimo)
+const INFORTUNI = [['Affaticamento muscolare', 1, 1, 30], ['Contusione', 1, 2, 24], ['Distorsione alla caviglia', 2, 4, 16], ['Stiramento', 2, 4, 14], ['Lesione muscolare', 4, 8, 9], ['Problema al ginocchio', 5, 10, 4], ['Frattura del piede', 8, 14, 2], ['Rottura del crociato', 18, 28, 1]];
+function tipoInfortunio(r = RND, med = 0){
+  const tot = INFORTUNI.reduce((s, x, i) => s + x[3] * (i >= 4 ? 1 - med * 0.12 : 1), 0); let x = r() * tot;
+  for (let i = 0; i < INFORTUNI.length; i++){ x -= INFORTUNI[i][3] * (i >= 4 ? 1 - med * 0.12 : 1); if (x <= 0) return INFORTUNI[i]; }
+  return INFORTUNI[0];
+}
 
 // ---------- calendario (girone di andata e ritorno) ----------
 function calendario(n){
@@ -208,10 +263,12 @@ function ordina(squadre){
 function posizioneDi(d, i){ return ordina(d.squadre).findIndex((s) => s.i === i) + 1; }
 
 // gioca la prossima giornata del girone (modifica d). Ritorna i risultati.
-function giocaGiornataDati(d){
+// fisso: {h, a, gh, ga, mh, ma, pos, th, ta, rec} = la partita giocata in diretta (non si ricalcola)
+function giocaGiornataDati(d, fisso){
   const g = d.giornata;
   const cal = calendario(d.n)[g];
   const ris = cal.map(([h, a]) => {
+    if (fisso && fisso.h === h && fisso.a === a) return Object.assign({}, fisso);
     const H = d.squadre[h], A = d.squadre[a];
     const m = simPartita(rng(d.seed + '|' + d.stagione + '|' + g + '|' + h + '-' + a), H.forza, A.forza, 2 + (H.campo || 0) * 0.6);
     return { h, a, gh: m.gh, ga: m.ga, mh: m.mh, ma: m.ma, pos: m.pos, th: m.th, ta: m.ta, rec: m.rec };
@@ -276,7 +333,45 @@ function campioneDa(k, stagione){
   const c = CAMPIONI[k]; const eta = 2026 - c[3] + (stagione - 1);
   const val = c[4] - Math.max(0, eta - 32) * 2;
   const pot = eta <= 23 ? Math.min(95, val + (24 - eta) * 2) : val;
-  const p = { id: 'cmp' + k, n: c[0], c: c[1], r: c[2], eta, val, pot, forma: 100, inf: 0, gol: 0, pres: 0, num: 0, stella: true };
+  const p = { id: 'cmp' + k, n: c[0], c: c[1], r: c[2], eta, val, pot, forma: 100, mor: 80, fm: 6.5, voti: [], inf: 0, squal: 0, gol: 0, ass: 0, pres: 0, amm: 0, esp: 0, num: 0, stella: true, contr: 3, naz: CAMPIONI_NAZ[k] || 'IT' };
   p.prezzo = valoreDi(p); p.stip = stipDi(p);
   return p;
+}
+
+// nazionalità dei campioni veri (stesso ordine della lista)
+const CAMPIONI_NAZ = ['FR','CH','IT','IT','IT','IT','BE','IT','ES','IT','IT','IT','IT','IT','IT','BR','IT','FR','NL','EN','XK','IT','FR','IT','IT','IT','CI','SE','IT','IT',
+  'IT','TR','SC','AM','SK','IT','NL','FR','HR','FR','CM','BE','IT','IT','AR','IT','IT','BR','NL','FR','IT','EN','PL',
+  'AR','FR','RS','CA','PT','US','NG','BE','DK','IT','TR','AR','UA','DE','IT','IT','AR','IT','IT','IT','PT','BE','IS','MX','IT','AR','IT','ME','AR'];
+const BANDIERE_EXTRA = { CH: ['Svizzera', '🇨🇭'], BE: ['Belgio', '🇧🇪'], EN: ['Inghilterra', '🏴'], XK: ['Kosovo', '🇽🇰'], TR: ['Turchia', '🇹🇷'], SC: ['Scozia', '🏴'], AM: ['Armenia', '🇦🇲'], SK: ['Slovacchia', '🇸🇰'], CM: ['Camerun', '🇨🇲'],
+  PL: ['Polonia', '🇵🇱'], CA: ['Canada', '🇨🇦'], US: ['Stati Uniti', '🇺🇸'], UA: ['Ucraina', '🇺🇦'], IS: ['Islanda', '🇮🇸'], MX: ['Messico', '🇲🇽'], ME: ['Montenegro', '🇲🇪'] };
+const nazDi = (k) => NAZIONI[k] ? { n: NAZIONI[k].n, f: NAZIONI[k].f } : BANDIERE_EXTRA[k] ? { n: BANDIERE_EXTRA[k][0], f: BANDIERE_EXTRA[k][1] } : { n: 'Italia', f: '🇮🇹' };
+
+// ---------- la rosa delle squadre avversarie (sempre la stessa per squadra e stagione) ----------
+const _rose = {};
+function rosaDi(sq, tier, stagione = 1){
+  const key = sq.nome + '|' + tier + '|' + stagione;
+  if (_rose[key]) return _rose[key];
+  const r = rng('rosa|' + key), f = sq.forza || forzaBot(tier, r);
+  const linea = { P: f.por, D: f.dif, C: f.cen, A: f.att };
+  const L = [];
+  [['P', 2], ['D', 6], ['C', 6], ['A', 4]].forEach(([ruolo, n]) => {
+    for (let i = 0; i < n; i++){
+      const naz = scegliNaz(tier, r), nm = nomeDaNaz(naz, r);
+      const eta = clamp(Math.round(25 + gauss(r) * 4), 17, 35);
+      const val = clamp(Math.round(linea[ruolo] + (i < (ruolo === 'P' ? 1 : n - 2) ? 1 : -4) + gauss(r) * 3), 10, 95);
+      const p = { id: 'b' + hashStr(key + ruolo + i).toString(36), n: nm[0], c: nm[1], r: ruolo, eta, val, pot: clamp(val + (eta <= 21 ? ri(4, 14, r) : ri(0, 3, r)), val, 97), naz, forma: 100, mor: 75, fm: 6, num: 0 };
+      p.prezzo = valoreDi(p); p.stip = stipDi(p);
+      L.push(p);
+    }
+  });
+  const usati = new Set();
+  L.forEach((p, k) => { const pref = { P: [1, 12], D: [2, 3, 4, 5, 6, 13], C: [8, 10, 14, 16, 17, 18], A: [9, 7, 11, 19] }[p.r]; let n = pref.find((x) => !usati.has(x)); if (!n){ n = 20 + k; } usati.add(n); p.num = n; });
+  return (_rose[key] = L);
+}
+// i titolari di una squadra avversaria per un modulo
+function titolariDi(rosa, mod = '4-4-2'){
+  const m = MODULI[mod] || [4, 4, 2], prendi = (r, n) => rosa.filter((p) => p.r === r).sort((a, b) => b.val - a.val).slice(0, n);
+  const xi = prendi('P', 1).concat(prendi('D', m[0]), prendi('C', m[1]), prendi('A', m[2]));
+  while (xi.length < 11){ const x = rosa.find((p) => !xi.includes(p)); if (!x) break; xi.push(x); }
+  return xi;
 }
