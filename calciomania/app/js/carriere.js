@@ -363,16 +363,22 @@ function azioneCarriera(v){
   const d = S.lega.dati, pos = posizioneDi(d, S.lega.mio);
   const bravo = m === 'giocatore' ? clamp((media - 6) * 0.5 + (formazione().some((x) => x.p && x.p.io) ? 0.25 : -0.2) + (io.val - tierMedia(S.tier)) / 40, -0.5, 0.9) : clamp(((S.fiducia || 60) - 50) / 80 + (posObiettivo(d.n) - pos) * 0.04, -0.5, 0.8);
   const aspetta = (k) => { const ult = X['ult_' + k]; if (ult != null && g - ult < 5){ avviso(`Riprova tra ${5 - (g - ult)} giornat${5 - (g - ult) === 1 ? 'a' : 'e'}`); return true; } X['ult_' + k] = g; return false; };
-  if (v === 'aumento'){
+  if (v === 'aumento' || v.startsWith('aumento:')){
+    const ora = m === 'giocatore' ? S.mio.stip : stipAllenatore();
+    if (v === 'aumento'){
+      const ult = X.ult_aumento; if (ult != null && g - ult < 5) return avviso(`Riprova tra ${5 - (g - ult)} giornat${5 - (g - ult) === 1 ? 'a' : 'e'}`);
+      return foglioAumento(ora, 0.35 + bravo);
+    }
     if (aspetta('aumento')) return;
-    if (RND() < 0.35 + bravo){
-      const k = 1.12 + RND() * 0.18;
+    const pct = clamp(+v.split(':')[1] || 10, 5, 100), k = 1 + pct / 100;
+    const prob = clamp(0.35 + bravo + 0.3 - pct / 100 * 1.1, 0.03, 0.97);
+    if (RND() < prob){
       if (m === 'giocatore'){ S.mio.stip = tondo(S.mio.stip * k); notizia(`${S.mio.nome} ottiene l’aumento: ora guadagna ${euroBreve(S.mio.stip)} a giornata.`, 'mercato'); }
       else { X.extra = Math.round(((X.extra || 1) * k) * 100) / 100; notizia(`Il presidente dà l’aumento a ${X.nome}: ${euroBreve(stipAllenatore())} a giornata.`, 'mercato'); }
-      salva(); disegna(); return esitoAz(true, 'Aumento accettato!', `Il presidente ha detto sì: adesso guadagni ${euroBreve(m === 'giocatore' ? S.mio.stip : stipAllenatore())} a giornata.`);
+      salva(); disegna(); return esitoAz(true, 'Aumento accettato!', `Il presidente ha detto sì: prima guadagnavi ${euroBreve(ora)}, adesso ${euroBreve(m === 'giocatore' ? S.mio.stip : stipAllenatore())} a giornata.`);
     }
-    if (m === 'giocatore'){ io.mor = clamp((io.mor || 70) - 8, 0, 100); } else S.fiducia = clamp((S.fiducia || 60) - 4, 0, 100);
-    salva(); disegna(); return esitoAz(false, 'Aumento rifiutato', m === 'giocatore' ? 'La società dice che devi giocare meglio prima di guadagnare di più. Allenati e riprova.' : 'Il presidente vuole prima vedere più risultati.');
+    if (m === 'giocatore'){ io.mor = clamp((io.mor || 70) - (pct > 40 ? 12 : 8), 0, 100); } else S.fiducia = clamp((S.fiducia || 60) - (pct > 40 ? 7 : 4), 0, 100);
+    salva(); disegna(); return esitoAz(false, 'Aumento rifiutato', pct > 40 ? 'Hai chiesto troppo! Il presidente si è arrabbiato. La prossima volta chiedi un po’ meno.' : m === 'giocatore' ? 'La società dice che devi giocare meglio prima di guadagnare di più. Allenati e riprova.' : 'Il presidente vuole prima vedere più risultati.');
   }
   if (v === 'budget'){
     if (aspetta('budget')) return;
@@ -397,5 +403,20 @@ function azioneCarriera(v){
       salva(); disegna(); mostraOfferte(true, () => mostraPendenti());
     });
   }
+}
+// finestra: scegli tu quanto chiedere in più
+function foglioAumento(ora, base){
+  const chance = (p) => { const x = clamp(base + 0.3 - p / 100 * 1.1, 0.03, 0.97); return x > 0.7 ? ['Facile', 'verde'] : x > 0.45 ? ['Possibile', 'oro'] : x > 0.2 ? ['Difficile', 'arancio'] : ['Quasi impossibile', 'rosso']; };
+  foglio(`<h2>${ic('euro')} Chiedi un aumento</h2>
+    <div class="aum-box"><div><span>Adesso guadagni</span><b>${euroBreve(ora)}</b></div><div><span>Chiedi in più</span><b id="aumPiu"></b></div><div><span>Diventerebbe</span><b id="aumTot" class="aum-verde"></b></div></div>
+    <div class="aum-sl"><input type="range" id="aumPct" min="5" max="100" step="5" value="15"><div class="aum-pct"><b id="aumP"></b> in più</div></div>
+    <div class="aum-veloci">${[10, 25, 50, 100].map((p) => `<button class="btn sec" data-ap="${p}">+${p}%</button>`).join('')}</div>
+    <p class="aum-ch">Il presidente dirà sì? <b id="aumCh"></b></p>
+    <p class="tenue">Più chiedi, più è difficile. Se chiedi troppo il presidente si arrabbia.</p>
+    <button class="btn largo oro" id="aumOk" data-a="ioAzione" data-v="aumento:15">Chiedi l’aumento</button>`);
+  const sl = $('#aumPct');
+  const agg = () => { const p = +sl.value, piu = tondo(ora * p / 100), c = chance(p); $('#aumPiu').textContent = '+ ' + euroBreve(piu); $('#aumTot').textContent = euroBreve(ora + piu); $('#aumP').textContent = '+' + p + '%'; const ch = $('#aumCh'); ch.textContent = c[0]; ch.className = c[1]; $('#aumOk').dataset.v = 'aumento:' + p; };
+  sl.oninput = agg; document.querySelectorAll('[data-ap]').forEach((b) => b.onclick = (e) => { e.stopPropagation(); sl.value = b.dataset.ap; agg(); });
+  agg();
 }
 function esitoAz(ok, t, testo){ foglio(`<div class="evento"><span class="ev-ico">${ic(ok ? 'check' : 'x')}</span><h2>${esc(t)}</h2><p>${esc(testo)}</p><button class="btn largo" data-a="chiudi">Ok</button></div>`); if (ok) Suono.cassa(); }
