@@ -135,7 +135,7 @@ function genStaffMercato(){
   STAFF.forEach((s) => { for (let l = 1; l <= 5; l++) L.push(nuovoStaff(s.k, l)); });
   S.staffMercato = { lista: L, s: S.stagione };
 }
-function listaCampioni(){ const presi = new Set(S.campioniPresi || []); return CAMPIONI.map((c, k) => campioneDa(k, S.stagione)).filter((p) => !presi.has(p.id) && p.eta <= 38).sort((a, b) => b.val - a.val); }
+function listaCampioni(){ const presi = new Set(S.campioniPresi || []), nomi = nomiInRosa(); return CAMPIONI.map((c, k) => campioneDa(k, S.stagione)).filter((p) => !presi.has(p.id) && !nomi.has((p.n + ' ' + p.c).trim()) && p.eta <= 38).sort((a, b) => b.val - a.val); }
 const inVendita = (id) => trovaInMercato(id);
 const costoRicerca = () => tondo(Math.max(1500, TIERS[S.tier - 1].sponsor * 0.8));
 // vendita veloce: un club compra subito, ma paga meno che con un'offerta vera
@@ -181,7 +181,9 @@ function squadraPronta(){
   const prezzo = (p) => trucco('gratis') ? 0 : tondo(p.prezzo * (1 - livStaff(S, 'ds') * 0.04));
   lista.forEach((r) => {
     let bonus = 6; let p;
-    for (let k = 0; k < 12; k++){ p = nuovoGiocatore(t, { ruolo: r, bonus, spread: 2 }); if (prezzo(p) <= per) break; bonus -= 2; }
+    const veri = t >= 8 ? mercatoVero(t, 60).filter((x) => x.r === r && !presi.some((y) => y.id === x.id) && prezzo(x) <= per).sort((x, y) => y.val - x.val) : [];
+    if (veri.length) p = veri[0];
+    else for (let k = 0; k < 12; k++){ p = nuovoGiocatore(t, { ruolo: r, bonus, spread: 2 }); if (prezzo(p) <= per) break; bonus -= 2; }
     const c = prezzo(p);
     if (spesa + c <= budget && S.soldi - spesa - c > 0 && S.rosa.length + presi.length < 30){ spesa += c; presi.push(p); }
   });

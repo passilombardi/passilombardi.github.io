@@ -129,7 +129,7 @@ function nuovoGiocatore(tier, o = {}){
   p.prezzo = valoreDi(p); p.stip = stipDi(p);
   return p;
 }
-const nomeG = (p) => p.n.charAt(0) + '. ' + p.c;
+const nomeG = (p) => p.n ? p.n.charAt(0) + '. ' + p.c : p.c;
 // quanto rende davvero un giocatore: bravura, condizione fisica, morale e forma del momento
 const efficienza = (p) => p.val * (0.72 + 0.28 * p.forma / 100) + ((p.mor == null ? 70 : p.mor) - 70) / 18 + ((p.fm || 6) - 6) * 0.6;
 const mediaVoto = (p) => p.nv ? Math.round(p.sv / p.nv * 100) / 100 : 0;

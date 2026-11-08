@@ -177,7 +177,10 @@ function genMercato(){
   const t = S.tier, oss = livStaff(S, 'oss'), L = [];
   const ruoli = ['P','P','P','D','D','D','D','D','D','D','D','C','C','C','C','C','C','C','C','C','A','A','A','A','A','A','A','A','D','C'];
   const bots = S.lega && S.lega.dati ? S.lega.dati.squadre.filter((s) => s.tipo === 'bot') : [];
+  // in Serie A e Serie B il mercato è fatto di giocatori veri
+  if (t >= 8) mercatoVero(t, 30).forEach((p) => L.push(p));
   ruoli.forEach((r, i) => {
+    if (L.length >= 30) return;
     const bonus = i % 9 === 0 ? 9 + oss * 2 : -10 + RND() * 16 + oss * 1.4;
     const giovane = RND() < 0.2 + oss * 0.04;
     const p = nuovoGiocatore(t, { ruolo: r, bonus, spread: 3, eta: giovane ? ri(17, 21) : undefined });
