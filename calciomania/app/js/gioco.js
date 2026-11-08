@@ -22,10 +22,10 @@ function salva(subito){
   S.agg = Date.now();
   if (S.ospite) return;            // come ospite la partita non si salva
   clearTimeout(_salvaT);
-  const f = () => { try { localStorage.setItem(CHIAVE, JSON.stringify(S)); } catch (e) {} if (window.Online && Online.loggato()) Online.salvaCloud(S); };
+  const f = () => { try { localStorage.setItem(chiaveDi(modo()), JSON.stringify(S)); } catch (e) {} if (window.Online && Online.loggato()) Online.salvaCloud(S); };
   if (subito) f(); else _salvaT = setTimeout(f, 400);
 }
-function carica(){ try { const t = localStorage.getItem(CHIAVE); const c = t ? JSON.parse(t) : null; return c && c.club ? c : null; } catch (e) { return null; } }
+function carica(m = carrieraAttiva()){ try { const t = localStorage.getItem(chiaveDi(m)); const c = t ? JSON.parse(t) : null; return c && c.club ? c : null; } catch (e) { return null; } }
 // salvataggi manuali (3 slot) e copia automatica a inizio stagione
 const SLOT_K = (i) => 'calciomania-slot-' + i;
 function leggiSlot(i){ try { const t = localStorage.getItem(SLOT_K(i)); return t ? JSON.parse(t) : null; } catch (e) { return null; } }
@@ -47,9 +47,9 @@ function nuovoSponsor(tier){
   return { nome: pick(a, r) + ' ' + nomePaese(r), val: tondo(TIERS[tier - 1].sponsor * (0.9 + r() * 0.25)) };
 }
 function nuovaSocieta(club){
-  const ospite = !!club.ospite; delete club.ospite;
+  const ospite = !!club.ospite, modoN = club.modo || 'presidente'; delete club.ospite; delete club.modo;
   S = {
-    v: VERSIONE_DATI, club, diff: club.diff == null ? 1 : club.diff, soldi: SOLDI_INIZIO, stagione: 1, tier: 1,
+    v: VERSIONE_DATI, modo: modoN, club, diff: club.diff == null ? 1 : club.diff, soldi: SOLDI_INIZIO, stagione: 1, tier: 1,
     rosa: [], staff: {}, stadio: { tribune: 0, campo: 0, spogl: 0, luci: 0, negozio: 0, giov: 0, maxi: 0, park: 0, centro: 0, usura: 92, cantieri: [], design: club.stadio ? { nome: club.stadio } : {} },
     tattica: { mod: '4-4-2', ment: 2, stile: 'equi', press: 1, linea: 1, tit: null, ist: {} }, morale: 70, tifosi: 80,
     lega: null, mercato: { lista: [], agg: -99 }, svincolati: [], staffMercato: { lista: [], s: 0 }, sponsor: nuovoSponsor(1),
@@ -119,6 +119,8 @@ const forzaMia = () => forzaDa(formazione());
 const forzaTot = (f) => Math.round((f.por + f.dif * 1.4 + f.cen * 1.3 + f.att * 1.3) / 5);
 function problemiPerGiocare(){
   const pr = [];
+  if (modo() === 'giocatore'){ completaRosaAuto(); return pr; }
+  if (modo() === 'allenatore' && S.esonerato) return [{ t: 'Sei stato esonerato: scegli la nuova squadra', vai: 'club', sub: 'panchina' }];
   const sani = S.rosa.filter(disponibile);
   if (!S.staff.all) pr.push({ t: 'Ingaggia un allenatore', vai: 'mercato', sub: 'staff' });
   if (sani.length < 11) pr.push({ t: `Ti servono almeno 11 giocatori disponibili (ne hai ${sani.length})`, vai: 'mercato', sub: 'cerca' });
@@ -158,6 +160,7 @@ function numeroLibero(r){
 }
 function ingaggia(id){
   const s = S.staffMercato.lista.find((x) => x.id === id); if (!s) return;
+  if (modo() === 'allenatore' && s.k === 'all') return avviso('L’allenatore sei tu!');
   const costo = trucco('gratis') ? 0 : s.ingaggio;
   if (S.soldi < costo) return avviso('Non hai abbastanza soldi per l’ingaggio');
   const vecchio = S.staff[s.k];
@@ -272,7 +275,7 @@ function sincronizza(live, giaVista){
     if (ultima) Object.assign(ultima, { tab: ordina(d.squadre).map(rigaMini), mio: L.mio, tier: d.tier, n: d.n });
   }
   S._live = null;
-  if (fine){ S.pendenti.push(fine); if (fine.livello) S.pendenti.push(Object.assign({ tipo: 'livello' }, fine.livello)); }
+  if (fine){ S.pendenti.push(fine); if (fine.livello) S.pendenti.push(Object.assign({ tipo: 'livello' }, fine.livello)); if (fine.offerte) S.pendenti.push({ tipo: 'offerteCarriera' }); }
   salva(true);
   if (ultima && giaVista){ dopoPartita(ultima); }
   else if (ultima && live){ mostraPartita(ultima, () => dopoPartita(ultima)); }
@@ -369,7 +372,7 @@ function applicaGiornata(ris, r, nomi, n, tier){
     return true;
   });
   if (S.giornate - S.mercato.agg >= 3) genMercato();
-  offerteDalleSquadre();
+  if (modo() !== 'giocatore') offerteDalleSquadre();
   crescitaGiovani();
   if (r === Math.floor(giornateTot(n) / 2)){ const sc = S.rosa.filter((p) => !p.prestito && p.contr <= 1); if (sc.length) notizia(`Contratti in scadenza a fine stagione: ${sc.map((p) => p.c).join(', ')}. Rinnovali o se ne andranno!`, 'mercato'); }
   if (S.soldi < 0) notizia('Attenzione: la cassa è in rosso! Vendi qualche giocatore, chiedi un prestito o risparmia.', 'soldi');
@@ -384,8 +387,9 @@ function applicaGiornata(ris, r, nomi, n, tier){
     ris: ris.map((x) => ({ h: x.h, a: x.a, gh: x.gh, ga: x.ga, nh: (nomi(x.h) || {}).nome, na: (nomi(x.a) || {}).nome })) };
   S.ultima = rep;
   S.risultati = (S.risultati || []).concat([{ s: S.stagione, r, casa, avv: avv.nome, gf, gs, esito }]).slice(-60);
-  if (!trucco('noImpr')) imprevisto();
-  conferenza(rep);
+  if (!trucco('noImpr') && modo() !== 'giocatore') imprevisto();
+  if (modo() !== 'giocatore') conferenza(rep);
+  dopoGiornataModo(rep, esito, voti, giocato);
   aggiornaMioSlot();
   return rep;
 }
@@ -403,7 +407,7 @@ function fineStagione(prev){
   const migliore = S.rosa.filter((p) => p.nv >= 5).sort((a, b) => mediaVoto(b) - mediaVoto(a))[0];
   S.storico.unshift({ stagione: S.stagione, tier: prev.tier, pos, n: prev.n, pt: me ? me.pt : 0, v: me ? me.v : 0, n_: me ? me.n : 0, p: me ? me.p : 0, gf: me ? me.gf : 0, gs: me ? me.gs : 0, bomber: capocannoniere && capocannoniere.gol ? nomeG(capocannoniere) + ' (' + capocannoniere.gol + ')' : '', migliore: migliore ? nomeG(migliore) + ' (' + mediaVoto(migliore).toFixed(2) + ')' : '', online: L.online, soldi: Math.round(S.soldi) });
   if (pos === 1) S.trofei.push({ stagione: S.stagione, tier: prev.tier, nome: 'Campioni ' + T.nome });
-  const salitoLiv = pos === 1 && prev.tier === TOP && !L.online && livello() < LIV_MAX;
+  const salitoLiv = pos === 1 && prev.tier === TOP && !L.online && livello() < LIV_MAX && modo() !== 'giocatore';
   if (!salitoLiv) qualificaEuropa(pos, prev.tier, L.online);
   if (pos === 1 && prev.tier === TOP && !L.online && livello() === LIV_MAX) notizia(`Campioni d’Italia al livello Fortissimo: la ${S.club.nome} è nella leggenda!`, 'trofeo');
   const vecchioTier = prev.tier;
@@ -424,6 +428,7 @@ function fineStagione(prev){
   };
   S.rosa.forEach((p) => {
     invecchia(p);
+    if (p.io){ p.contr = 9; return; }
     if (p.prestito){ tornati.push(p); return; }
     p.contr = (p.contr == null ? 2 : p.contr) - 1;
     if (p.contr <= 0) scaduti.push(p);
@@ -470,6 +475,7 @@ function fineStagione(prev){
     scaduti: scaduti.map((p) => p.n + ' ' + p.c), tornati: tornati.map((p) => p.n + ' ' + p.c), rientrati: rientrati.map((p) => p.n + ' ' + p.c), obiettivi,
     bomber: S.storico[0].bomber, migliore: S.storico[0].migliore, top: prev.tab.slice(0, 3).map((t) => t.nome), coppe: coppeDellaStagione().filter((c) => c.vinta).map((c) => COPPE[c.k].nome) };
   if (salitoLiv) rapporto.livello = ricominciaLivello();
+  else fineStagioneModo(rapporto);
   return rapporto;
 }
 
@@ -477,6 +483,7 @@ function dopoPartita(rep){ disegna(); mostraRisultati(rep, () => mostraPendenti(
 function mostraPendenti(){
   const p = S.pendenti.shift(); if (!p){ salva(); disegna(); return; }
   salva();
+  if (mostraPendenteModo(p, () => mostraPendenti())) return;
   if (p.tipo === 'stagione') mostraFineStagione(p, () => mostraPendenti());
   else if (p.tipo === 'partita') foglio(`<h2>Si è giocata la giornata ${p.rep.r + 1}</h2><p class="tenue">Gli altri presidenti erano pronti: ecco com'è andata.</p>${cartaRisultato(p.rep)}<div class="riga-btn"><button class="btn" data-a="rivedi">${ic('play')} Guarda la partita</button><button class="btn sec" data-a="chiudi">Ok</button></div>`, () => mostraPendenti());
   else if (p.tipo === 'coppa') mostraCoppa(p, () => mostraPendenti());
@@ -527,13 +534,14 @@ function menu(){
       <div class="riga-btn"><button class="btn" data-a="loginGoogle">Entra con Google</button><button class="btn sec" data-a="loginEmail">Entra con email</button></div>`)
     : `<p>Sei dentro come <b>${esc(Online.nome())}</b>. La tua società si salva online da sola.</p>
       ${L.online ? `<p><i class="online-dot"></i> Stai giocando nel girone online <b>${esc(L.dati.nome)}</b> di ${TIERS[L.dati.tier - 1].nome}.</p><div class="riga-btn"><button class="btn sec" data-a="esciOnline">Torna a giocare da solo</button></div>`
-        : `<p>Adesso giochi da solo contro i bot.</p><div class="riga-btn"><button class="btn oro" data-a="vaiOnline">Entra in un girone online</button></div><p class="nota">La stagione ricomincia in un girone di ${TIERS[S.tier - 1].nome} con altre persone vere: prendi il posto di un bot, con i suoi punti.</p>`}
+        : modo() !== 'presidente' ? '<p>I gironi online sono per la carriera da presidente.</p>' : `<p>Adesso giochi da solo contro i bot.</p><div class="riga-btn"><button class="btn oro" data-a="vaiOnline">Entra in un girone online</button></div><p class="nota">La stagione ricomincia in un girone di ${TIERS[S.tier - 1].nome} con altre persone vere: prendi il posto di un bot, con i suoi punti.</p>`}
       <div class="riga-btn"><button class="link" data-a="logout">Esci dall’account</button></div>`}
     ${window.Online && Online.errore() ? `<p class="rosso">${esc(Online.errore())}</p>` : ''}
   </section>
   <section class="menu-sez">
+  <button class="riga-menu oro" data-a="cambiaCarriera">${ic(CARRIERE[modo()].ico)} Cambia carriera<span>${CARRIERE[modo()].nome}</span></button>
   <button class="riga-menu" data-a="salvataggi">${ic('salva')} Salvataggi<span>${S.ospite ? 'ospite' : 'automatico attivo'}</span></button>
-  <button class="riga-menu" data-a="vai" data-v="club" data-sub="personalizza">${ic('pennello')} Personalizza club, maglie e nomi</button>
+  ${modo() === 'presidente' ? `<button class="riga-menu" data-a="vai" data-v="club" data-sub="personalizza">${ic('pennello')} Personalizza club, maglie e nomi</button>` : ''}
   <button class="riga-menu oro" data-a="codice">${ic(S.codice ? 'bacchetta' : 'chiave')} ${S.codice ? 'Pannello segreto' : 'Aggiungi codice'}</button>
   <button class="riga-menu" data-a="comeSiGioca">${ic('aiuto')} Come si gioca</button>
   <button class="riga-menu" data-a="suono">${ic(S.opz.suono ? 'suono' : 'muto')} ${S.opz.suono ? 'Suoni attivi' : 'Suoni spenti'}</button>
@@ -721,16 +729,23 @@ document.addEventListener('click', (e) => {
     case 'esporta': { const c = codiceDi(S); foglio(`<h2>${ic('copia')} Codice della partita</h2><p class="nota">Copialo e incollalo su un altro telefono (Menu → Salvataggi → Incolla un codice).</p><textarea id="codTxt" class="cod" readonly>${c}</textarea><div class="riga-btn"><button class="btn" id="codCopia">Copia</button><button class="btn sec" data-a="salvataggi">Indietro</button></div>`); $('#codCopia').onclick = () => { const t = $('#codTxt'); t.select(); (navigator.clipboard ? navigator.clipboard.writeText(c) : Promise.reject()).then(() => avviso('Codice copiato!')).catch(() => { try { document.execCommand('copy'); avviso('Codice copiato!'); } catch (x) { avviso('Tieni premuto sul testo per copiarlo'); } }); }; break; }
     case 'importa': foglio(`<h2>${ic('cartella')} Incolla un codice</h2><textarea id="codIn" class="cod" placeholder="Incolla qui il codice della partita"></textarea><p class="rosso" id="codErr"></p><div class="riga-btn"><button class="btn" id="codOk">Carica la partita</button><button class="btn sec" data-a="salvataggi">Indietro</button></div>`); $('#codOk').onclick = () => { const s = daCodice($('#codIn').value); if (!s) return ($('#codErr').textContent = 'Il codice non è giusto'); const ospite = S.ospite; S = s; S.ospite = ospite; migra(); salva(true); chiudiFoglio(true); schermo = 'home'; disegna(); avviso('Partita caricata: ' + S.club.nome); }; break;
     case 'installa': foglio(`<h2>Metti l’app sul telefono</h2><div class="guida"><p><b>Android (Chrome):</b> tocca i tre puntini in alto a destra e poi «Installa app» o «Aggiungi a schermata Home».</p><p><b>iPhone (Safari):</b> tocca il quadrato con la freccia in basso e poi «Aggiungi alla schermata Home».</p><p>Così Calciomania PM si apre come una vera app, a schermo intero.</p></div><button class="btn largo" data-a="chiudi">Ok</button>`); break;
-    case 'ricomincia': chiedi('Vuoi cancellare la tua società e ricominciare da capo?', () => { if (S.lega.online && window.Online) Online.esci().catch(() => {}); try { if (!S.ospite) localStorage.removeItem(CHIAVE); } catch (e) {} S = null; chiudiFoglio(true); schermataIniziale(); }); break;
+    case 'ricomincia': chiedi('Vuoi cancellare la tua società e ricominciare da capo?', () => { if (S.lega.online && window.Online) Online.esci().catch(() => {}); try { if (!S.ospite) localStorage.removeItem(chiaveDi(modo())); } catch (e) {} S = null; chiudiFoglio(true); schermataIniziale(); }); break;
     case 'modClub': chiudiFoglio(true); fondazione(true); break;
     case 'continua': S = carica(); if (!S) return schermataIniziale(); migra(); Suono.on = S.opz.suono; schermo = 'home'; disegna(); if (S.lega.online) caricaOnline().then(() => Online.riprendi()).catch(() => {}); mostraPendenti(); break;
-    case 'fonda': fondazione(false, false); break;
-    case 'ospite': fondazione(false, true); break;
+    case 'fonda': scegliCarriera(false); break;
+    case 'ospite': scegliCarriera(true); break;
+    case 'cambiaCarriera': cambiaCarriera(); break;
+    case 'carriera': passaA(v); break;
+    case 'nuovaCarriera': nuovaCarriera(v, b.dataset.osp != null ? b.dataset.osp === '1' : undefined); break;
+    case 'accettaOff': accettaOfferta(+v); break;
+    case 'rifiutaOff': S.offerteCarriera = null; salva(); chiudiFoglio(); disegna(); break;
+    case 'vediOfferte': mostraOfferte(!!S.esonerato, () => mostraPendenti()); break;
+    case 'ioFocus': S.mio.focus = v; salva(); disegna(); avviso('Allenamento: ' + FOCUS[v][0]); break;
     case 'indietroIntro': schermataIniziale(); break;
     case 'fcol': fondazione.leggi(); bozza[b.dataset.k] = v; if (bozza.kit && b.dataset.k === 'c1'){ bozza.kit[0].c1 = v; bozza.kit[1].c2 = v; } if (bozza.kit && b.dataset.k === 'c2') bozza.kit[0].c2 = v; fondazione.draw(); break;
     case 'fopz': bozza[b.dataset.k] = +v; fondazione.draw(); break;
     case 'fkit': bozza.kit[+b.dataset.k][b.dataset.c] = b.dataset.c === 't' ? +v : v; fondazione.draw(); break;
-    case 'creaClub': { if (!pulisciBozza()) return; nuovaSocieta(Object.assign({}, bozza)); schermo = 'home'; disegna(); coriandoli([bozza.c1, bozza.c2, '#d4af37'], 160); Suono.fanfara(); setTimeout(comeSiGioca, 900); break; }
+    case 'creaClub': { if (!pulisciBozza()) return; segnaAttiva('presidente'); nuovaSocieta(Object.assign({}, bozza)); schermo = 'home'; disegna(); coriandoli([bozza.c1, bozza.c2, '#d4af37'], 160); Suono.fanfara(); setTimeout(comeSiGioca, 900); break; }
     case 'salvaClub': { if (!pulisciBozza()) return; const st = bozza.stadio; delete bozza.stadio; delete bozza.ospite; S.club = Object.assign({}, bozza); S.stadio.design = Object.assign({}, S.stadio.design || {}, { nome: st }); aggiornaMioSlot(); if (S.lega.online && window.Online) Online.aggiornaSquadra(mioSlot()); salva(); disegna(); avviso('Club aggiornato!'); break; }
     case 'annullaClub': disegna(); break;
     case 'loginGoogle': caricaOnline().then(() => Online.loginGoogle()).catch((er) => avviso((er && er.message) || 'Non riesco ad entrare')); break;

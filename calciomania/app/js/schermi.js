@@ -30,8 +30,8 @@ function tagTipo(s){ if (s.uid && s.uid === mioId()) return '<span class="tag tu
 const contrTxt = (p) => p.prestito ? 'in prestito' : p.contr <= 1 ? 'scade a fine stagione' : p.contr + ' stagioni';
 function moraleIco(m){ m = m == null ? 70 : m; return `<span class="mor ${m >= 75 ? 'su' : m >= 50 ? 'ok' : 'giu'}" title="Morale ${Math.round(m)}">${m >= 75 ? '▲' : m >= 50 ? '●' : '▼'}</span>`; }
 function tabsHTML(sez){
-  const cur = sottoschermo[sez] || SUBS[sez][0][0];
-  return `<nav class="subnav">${SUBS[sez].map(([k, n, i]) => `<button class="${cur === k ? 'on' : ''}" data-a="sub" data-s="${sez}" data-v="${k}">${ic(i)}<span>${n}</span>${badgeSub(sez, k)}</button>`).join('')}</nav>`;
+  const SB = subsM(), cur = sottoschermo[sez] && SB[sez].some((x) => x[0] === sottoschermo[sez]) ? sottoschermo[sez] : SB[sez][0][0];
+  return `<nav class="subnav">${SB[sez].map(([k, n, i]) => `<button class="${cur === k ? 'on' : ''}" data-a="sub" data-s="${sez}" data-v="${k}">${ic(i)}<span>${n}</span>${badgeSub(sez, k)}</button>`).join('')}</nav>`;
 }
 function badgeSub(sez, k){
   if (sez === 'mercato' && k === 'trattative' && (S.offerte || []).length) return `<i class="num-b">${S.offerte.length}</i>`;
@@ -44,27 +44,29 @@ function disegna(){
   const app = $('#app');
   if (!S){ app.innerHTML = ''; return; }
   const L = S.lega, T = TIERS[S.tier - 1];
-  const sch = { home: schermoHome, squadra: schermoSquadra, mercato: schermoMercato, club: schermoClub, campionato: schermoCampionato }[schermo] || schermoHome;
-  if (!SUBS[schermo] && schermo !== 'home') schermo = 'home';
+  if (!subsM()[schermo] && schermo !== 'home' || !navM().some((x) => x[0] === schermo)) schermo = 'home';
+  const SB = subsM(); Object.keys(SB).forEach((k) => { if (sottoschermo[k] && !SB[k].some((x) => x[0] === sottoschermo[k])) sottoschermo[k] = SB[k][0][0]; });
+  const sch = { home: schermoHome, squadra: schermoSquadra, mercato: schermoMercato, club: schermoClub, campionato: schermoCampionato, io: schermoIo }[schermo] || schermoHome;
+  const SV = soldiVisti();
   const badgeNav = (k) => k === 'mercato' && (S.offerte || []).length ? '<i class="pallino"></i>' : k === 'club' && S.stadio.cantieri.length ? '<i class="pallino blu"></i>' : k === 'squadra' && S.rosa.some((p) => p.inf > 0 || p.squal > 0) ? '<i class="pallino rosso"></i>' : '';
   app.innerHTML = `<div class="shell">
   <aside class="side">
     <div class="side-logo"><b>CALCIOMANIA</b><span>PM</span></div>
     <button class="side-club" data-a="vai" data-v="home">${mioStemma(44)}<span><b>${esc(S.club.nome)}</b><small>${T.nome} · stagione ${S.stagione}</small></span></button>
-    <nav class="side-nav">${NAV.map(([k, n, i]) => `<button class="${schermo === k ? 'on' : ''}" data-a="vai" data-v="${k}">${ic(i)}<span>${n}</span>${badgeNav(k)}</button>`).join('')}</nav>
-    <div class="side-soldi"><small>Cassa</small><b class="${S.soldi < 0 ? 'rosso' : ''}">${euro(S.soldi)}</b>${debitoTot() ? `<small>Debito ${euroBreve(debitoTot())}</small>` : ''}</div>
+    <nav class="side-nav">${navM().map(([k, n, i]) => `<button class="${schermo === k ? 'on' : ''}" data-a="vai" data-v="${k}">${ic(i)}<span>${n}</span>${badgeNav(k)}</button>`).join('')}</nav>
+    <div class="side-soldi"><small>${SV.t}</small><b class="${SV.v < 0 ? 'rosso' : ''}">${euro(SV.v)}</b>${debitoTot() ? `<small>Debito ${euroBreve(debitoTot())}</small>` : ''}</div>
     <button class="side-menu" data-a="menu">${ic('ingranaggio')} Impostazioni</button>
   </aside>
   <div class="main">
     <header class="top">
       <button class="club" data-a="vai" data-v="home">${mioStemma(32)}<span><b>${esc(S.club.nome)}</b><small style="--c:${T.colore}">${T.nome}${L.online ? ' · <i class="online-dot"></i> online' : ''}${S.ospite ? ' · ospite' : ''}</small></span></button>
-      <button class="soldi ${S.soldi < 0 ? 'rosso' : ''}" data-a="vai" data-v="club" data-sub="finanze" title="${euro(S.soldi)}">${ic('euro')}${euroBreve(S.soldi)}</button>
+      <button class="soldi ${SV.v < 0 ? 'rosso' : ''}" data-a="vai" data-v="${SV.vai}" data-sub="${SV.sub}" title="${SV.t}: ${euro(SV.v)}">${ic('euro')}${euroBreve(SV.v)}</button>
       <button class="menu-btn" data-a="menu" aria-label="Impostazioni">${ic('ingranaggio')}</button>
     </header>
-    ${SUBS[schermo] ? tabsHTML(schermo) : ''}
+    ${SB[schermo] ? tabsHTML(schermo) : ''}
     <main class="schermo" id="schermo">${sch()}</main>
   </div>
-  <nav class="barra">${NAV.map(([k, n, i]) => `<button class="${schermo === k ? 'on' : ''}" data-a="vai" data-v="${k}">${ic(i)}<span>${n}</span>${badgeNav(k)}</button>`).join('')}</nav>
+  <nav class="barra">${navM().map(([k, n, i]) => `<button class="${schermo === k ? 'on' : ''}" data-a="vai" data-v="${k}">${ic(i)}<span>${n}</span>${badgeNav(k)}</button>`).join('')}</nav>
   </div>`;
   if (schermo === 'home') avviaContoAllaRovescia();
 }
@@ -119,7 +121,7 @@ function schermoHome(){
         <div class="hm-t">${pp.casa ? stemmaDi(pp.avv, 70) : mioStemma(70)}<b>${esc(pp.casa ? pp.avv.nome : S.club.nome)}</b><small>${pp.casa ? posizioneDi(d, pp.avvI) + '° · ' + pp.avv.pt + ' pt ' + tagTipo(pp.avv) : pos + '° · ' + me.pt + ' pt'}</small></div>
       </div>
       <div class="hm-conf"><span>Forza ${ft}</span><span class="hm-bar"><i style="width:${clamp(50 + (ft - avvF) * 3, 8, 92)}%"></i></span><span>${avvF} avversario</span></div>
-      <div class="hm-info"><span>${ic('tattica')} ${S.tattica.mod} · ${MENTALITA[S.tattica.ment == null ? 2 : S.tattica.ment]}</span><button class="link" data-a="vai" data-v="squadra" data-sub="tattica">Cambia tattica ›</button></div>
+      <div class="hm-info"><span>${ic('tattica')} ${S.tattica.mod} · ${MENTALITA[S.tattica.ment == null ? 2 : S.tattica.ment]}</span>${modo() === 'giocatore' ? '' : '<button class="link" data-a="vai" data-v="squadra" data-sub="tattica">Cambia tattica ›</button>'}</div>
       ${btn}`;
   }
   const todo = [
@@ -129,10 +131,10 @@ function schermoHome(){
     { ok: S.stadio.campo > 0 || S.stadio.tribune > 0 || S.stadio.cantieri.length > 0, t: 'Migliora lo stadio', vai: 'club', sub: 'stadio' },
     { ok: S.giornate > 0, t: 'Gioca la prima partita!', vai: 'home' }
   ];
-  const mostraTodo = S.giornate < 3 && todo.some((x) => !x.ok);
+  const mostraTodo = modo() === 'presidente' && S.giornate < 3 && todo.some((x) => !x.ok);
   const vicini = ordina(d.squadre); const k = vicini.findIndex((s) => s.i === L.mio);
   const da = clamp(k - 2, 0, Math.max(0, vicini.length - 5));
-  const avvisi = avvisiHome().filter((x) => !pr.some((p) => p.t === x[2]));
+  const avvisi = modo() === 'giocatore' ? [] : avvisiHome().filter((x) => !pr.some((p) => p.t === x[2]));
   const recenti = (S.risultati || []).filter((x) => x.s === S.stagione).slice(-5);
   const prossime = [1, 2, 3].map((k) => prossimaPartita(k)).filter(Boolean);
   const disp = S.rosa.filter(disponibile).length, inf = S.rosa.filter((p) => p.inf > 0).length, squal = S.rosa.filter((p) => p.squal > 0).length;
@@ -142,6 +144,7 @@ function schermoHome(){
   const tile = (val, n, sub, cls = '', p) => `<div class="tessera ${cls}">${p != null ? `<div class="anello" style="--p:${clamp(p, 0.03, 1)}"><b>${val}</b></div>` : `<div class="numero">${val}</div>`}<span>${n}</span><small>${sub}</small></div>`;
   return `
   <div class="dash">
+  ${modo() === 'giocatore' ? cartaIo() : ''}
   <section class="hero-match ${pp ? '' : 'vuoto'}">${blocco || `<div class="attesa"><b>La stagione è finita.</b><p>Si riparte presto!</p></div>`}</section>
   ${avvisi.length ? `<section class="carta avvisi"><div class="carta-tit"><h3>${ic('avviso')} Da fare</h3><span class="tenue">${avvisi.length}</span></div>${avvisi.slice(0, 6).map(([c, i, t, vai, sub]) => `<button class="avv-r ${c}" data-a="vai" data-v="${vai}" ${sub ? `data-sub="${sub}"` : ''}>${ic(i)}<span>${esc(t)}</span><b>›</b></button>`).join('')}</section>` : ''}
   ${mostraTodo ? `<section class="carta todo"><h3>Per iniziare</h3>${todo.map((x) => `<button class="todo-r ${x.ok ? 'ok' : ''}" data-a="vai" data-v="${x.vai}" ${x.sub ? `data-sub="${x.sub}"` : ''}><i>${x.ok ? ic('check') : ''}</i>${x.t}</button>`).join('')}${S.rosa.length < 11 ? `<button class="btn oro" data-a="squadraPronta">${ic('fulmine')} Squadra pronta in un tocco</button><p class="nota">Compra subito i giocatori adatti al tuo campionato e un allenatore, spendendo meno della metà dei soldi.</p>` : ''}</section>` : ''}
@@ -158,10 +161,11 @@ function schermoHome(){
   ${cartaCoppe()}
   ${carta('Ultima partita', S.ultima ? `${cartaRisultato(S.ultima)}${S.ultima.motm ? `<p class="nota centro">${ic('stella')} Migliore in campo: <b>${esc(S.ultima.motm)}</b></p>` : ''}<div class="forma-r">${recenti.map((x) => `<span class="fr ${x.esito}" title="${esc(x.avv)} ${x.gf}-${x.gs}">${x.esito}</span>`).join('')}</div><div class="riga-btn"><button class="btn mini sec" data-a="ultimaRep">Pagelle e statistiche</button><button class="btn mini sec" data-a="rivedi">${ic('play')} Rivedi</button></div>` : '<p class="tenue">Ancora nessuna partita giocata.</p>')}
   ${carta('Prossime partite', prossime.length ? `<div class="cal">${prossime.map((x) => `<div class="cal-r"><span class="g">${x.g + 1}</span><span class="dove">${x.casa ? 'C' : 'T'}</span>${stemmaDi(x.avv, 22)}<span class="nm">${esc(x.avv.nome)}</span><span class="tenue">${posizioneDi(d, x.avvI)}°</span></div>`).join('')}</div>` : '<p class="tenue">Fine del calendario.</p>', `<button class="link" data-a="vai" data-v="campionato" data-sub="calendario">Calendario ›</button>`)}
-  ${carta('Finanze', `<div class="fin-mini"><div><small>Cassa</small><b class="${S.soldi < 0 ? 'rosso' : ''}">${euroBreve(S.soldi)}</b></div><div><small>Ultima giornata</small><b class="${S.bilancio && S.bilancio.netto < 0 ? 'rosso' : 'verde'}">${S.bilancio ? (S.bilancio.netto >= 0 ? '+' : '') + euroBreve(S.bilancio.netto) : '—'}</b></div><div><small>Stipendi</small><b>${euroBreve(stipendiGiocatori() + stipendiStaff())}</b></div></div>${graficoLinea(S.soldiStoria, 320, 70, '#d4af37')}`, `<button class="link" data-a="vai" data-v="club" data-sub="finanze">Bilancio ›</button>`)}
+  ${modo() === 'allenatore' ? carta('La tua panchina', `<div class="ob"><div class="ob-t"><span>${ic('cuore')} Fiducia del presidente</span><small>${Math.round(S.fiducia == null ? 60 : S.fiducia)}/100</small></div>${barra(S.fiducia == null ? 60 : S.fiducia, (S.fiducia || 60) < 25 ? 'rosso' : (S.fiducia || 60) < 50 ? '' : 'verde')}</div><div class="fin-mini"><div><small>Budget mercato</small><b>${euroBreve(S.soldi)}</b></div><div><small>Il tuo conto</small><b class="verde">${euroBreve((S.allenatore || {}).conto || 0)}</b></div></div>`, `<button class="link" data-a="vai" data-v="club" data-sub="panchina">Carriera ›</button>`) : ''}
+  ${modo() !== 'presidente' ? '' : carta('Finanze', `<div class="fin-mini"><div><small>Cassa</small><b class="${S.soldi < 0 ? 'rosso' : ''}">${euroBreve(S.soldi)}</b></div><div><small>Ultima giornata</small><b class="${S.bilancio && S.bilancio.netto < 0 ? 'rosso' : 'verde'}">${S.bilancio ? (S.bilancio.netto >= 0 ? '+' : '') + euroBreve(S.bilancio.netto) : '—'}</b></div><div><small>Stipendi</small><b>${euroBreve(stipendiGiocatori() + stipendiStaff())}</b></div></div>${graficoLinea(S.soldiStoria, 320, 70, '#d4af37')}`, `<button class="link" data-a="vai" data-v="club" data-sub="finanze">Bilancio ›</button>`)}
   ${carta('Stato della rosa', `<div class="fin-mini"><div><small>Disponibili</small><b class="verde">${disp}</b></div><div><small>Infortunati</small><b class="${inf ? 'rosso' : ''}">${inf}</b></div><div><small>Squalificati</small><b class="${squal ? 'giallo' : ''}">${squal}</b></div></div>
     ${bomber && bomber.gol ? `<p class="nota">${ic('pallone')} Capocannoniere: <b>${esc(nomeG(bomber))}</b> (${bomber.gol} gol)</p>` : ''}${migl ? `<p class="nota">${ic('stella')} Media voto più alta: <b>${esc(nomeG(migl))}</b> (${mediaVoto(migl).toFixed(2)})</p>` : ''}`, `<button class="link" data-a="vai" data-v="squadra" data-sub="rosa">Rosa ›</button>`)}
-  ${carta('Obiettivi della stagione', ob.length ? ob.map((o) => `<div class="ob"><div class="ob-t"><span>${o.ok ? ic('check', 'verde') : ic('bersaglio')} ${esc(o.t)}</span><small>${esc(o.val)}</small></div>${barra(o.p * 100, o.ok ? 'verde' : '')}</div>`).join('') : `<p class="tenue">Gli obiettivi arrivano alla prima partita della stagione. Il tuo obiettivo: <b>${AMBIZIONI[S.club.amb == null ? 1 : S.club.amb][0].toLowerCase()}</b>.</p>`)}
+  ${modo() === 'giocatore' ? '' : carta('Obiettivi della stagione', ob.length ? ob.map((o) => `<div class="ob"><div class="ob-t"><span>${o.ok ? ic('check', 'verde') : ic('bersaglio')} ${esc(o.t)}</span><small>${esc(o.val)}</small></div>${barra(o.p * 100, o.ok ? 'verde' : '')}</div>`).join('') : `<p class="tenue">Gli obiettivi arrivano alla prima partita della stagione. Il tuo obiettivo: <b>${AMBIZIONI[S.club.amb == null ? 1 : S.club.amb][0].toLowerCase()}</b>.</p>`)}
   ${carta('Notizie', `<div class="notizie">${S.notizie.slice(0, 6).map(rigaNotizia).join('')}</div>`, `<button class="link" data-a="vai" data-v="club" data-sub="media">Tutte ›</button>`, 'largo2')}
   </div></div>`;
 }
@@ -232,7 +236,7 @@ function schedaGiocatore(id){
   ${p.squal > 0 ? `<p class="avviso-in giallo">${ic('cartellino')} Squalificato per ${giornate(p.squal)}.</p>` : ''}
   ${mio ? `<div class="f-due"><label class="campo-t">Allenamento individuale<select data-ch="allenInd" data-id="${p.id}">${ALLEN_IND.map(([k, n]) => `<option value="${k}" ${(p.allen || '') === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
     <label class="campo-t">Istruzione in partita<select data-ch="istruz" data-id="${p.id}">${ISTRUZIONI.map(([k, n]) => `<option value="${k}" ${ist === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>
-    <div class="riga-btn">${p.prestito ? '' : `<button class="btn" data-a="rinnova" data-id="${p.id}">${ic('contratto')} Rinnova</button><button class="btn sec" data-a="lista" data-id="${p.id}">${p.lista ? 'Togli dalla vendita' : 'Metti in vendita'}</button><button class="btn sec" data-a="presta" data-id="${p.id}">Presta</button><button class="btn rosso" data-a="vendi" data-id="${p.id}">Vendi subito · ${euroBreve(prezzoVendita(p))}</button>`}</div>`
+    <div class="riga-btn">${p.prestito || modo() === 'giocatore' ? '' : `<button class="btn" data-a="rinnova" data-id="${p.id}">${ic('contratto')} Rinnova</button><button class="btn sec" data-a="lista" data-id="${p.id}">${p.lista ? 'Togli dalla vendita' : 'Metti in vendita'}</button><button class="btn sec" data-a="presta" data-id="${p.id}">Presta</button><button class="btn rosso" data-a="vendi" data-id="${p.id}">Vendi subito · ${euroBreve(prezzoVendita(p))}</button>`}</div>`
     : giov ? `<div class="riga-btn"><button class="btn" data-a="promuovi" data-id="${p.id}">${ic('freccia_su')} Promuovi in prima squadra</button><button class="btn sec rosso" data-a="giovVia" data-id="${p.id}">Lascia andare</button></div>`
     : (S.scoutGiov || []).includes(p) ? `<div class="riga-btn"><button class="btn" data-a="giovIngaggia" data-id="${p.id}">Prendi nella Primavera · ${euroBreve(p.costo)}</button></div>`
     : `<div class="riga-btn"><button class="btn" data-a="tratta" data-id="${p.id}">${ic('contratto')} ${p.svinc ? 'Fai firmare' : 'Tratta l’acquisto'}</button>${p.svinc || p.stella ? '' : `<button class="btn sec" data-a="prestito" data-id="${p.id}">Chiedi in prestito</button>`}</div>`}`, null, 'scheda');
@@ -356,7 +360,7 @@ function schedaStaff(id){
 }
 
 // ---------- CLUB ----------
-function schermoClub(){ const t = sottoschermo.club || 'finanze'; return ({ finanze: schermoFinanze, stadio: schermoStadio, media: schermoMedia, bacheca: schermoBacheca, personalizza: schermoPersonalizza })[t](); }
+function schermoClub(){ const t = sottoschermo.club || subsM().club[0][0]; return ({ finanze: schermoFinanze, stadio: schermoStadio, media: schermoMedia, bacheca: schermoBacheca, personalizza: schermoPersonalizza, panchina: schermoPanchina })[t](); }
 function schermoFinanze(){
   const c = contiStagione(), e = totaleConti(c, 'e'), u = totaleConti(c, 'u'), b = S.bilancio;
   const righe = (lato, cat) => { const o = c[lato], mx = Math.max(1, ...Object.values(o)); return Object.entries(o).sort((x, y) => y[1] - x[1]).map(([k, v]) => `<div class="fin-r"><span>${ic((cat[k] || cat.altro)[1])} ${(cat[k] || cat.altro)[0]}</span>${barra(v / mx * 100, lato === 'e' ? 'verde' : 'rosso')}<b class="${lato === 'e' ? 'verde' : 'rosso'}">${lato === 'e' ? '+' : '−'}${euroBreve(v)}</b></div>`).join('') || '<p class="tenue">Ancora niente.</p>'; };

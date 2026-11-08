@@ -106,7 +106,7 @@ function simMinuto(D){
       if (s && !D.pers[s.p.id].inf){
         D.pers[s.p.id].inf = 1; s.en = Math.min(s.en, 25); s.ferito = true;
         D.ev.push({ min: t(0.8), tipo: 'infortunio', lato, mio: lato === noi, t: `${nomeG(s.p)} resta a terra: si è fatto male.` });
-        if (!sq.mio) cambioBot(D, lato, sq.slots.indexOf(s), m);
+        if (!sq.mio || modo() === 'giocatore') cambioBot(D, lato, sq.slots.indexOf(s), m);
         else if (sq.cambi < MAX_CAMBI && sq.panca.length) D.pausaAuto = { min: t(0.8), slot: sq.slots.indexOf(s), t: `${nomeG(s.p)} si è fatto male: chi entra al suo posto?` };
       }
     }
@@ -117,6 +117,7 @@ function simMinuto(D){
   // cambi dei bot
   const lb = 1 - noi, sb = D.sq[lb];
   if (m >= 56 && m <= 84 && sb.cambi < 3 && R() < 0.1) cambioBot(D, lb, -1, m);
+  if (modo() === 'giocatore' && m >= 58 && m <= 84 && D.sq[noi].cambi < 3 && R() < 0.1) cambioBot(D, noi, -1, m);
   if (m === 45) D.ev.push({ min: 45.5, tipo: 'int', t: 'Fine primo tempo. Tutti negli spogliatoi.' });
   if (m >= durata){ D.ev.push({ min: durata, tipo: 'fine', t: 'Triplice fischio! Partita finita.' }); D.fine = true; }
 }
@@ -192,7 +193,7 @@ function apriMatch(o){
   <div class="m-tabs">${[['cron', 'Cronaca'], ['stat', 'Statistiche'], ['form', 'Formazioni']].map(([k, n], i) => `<button data-mt="${k}" class="${i ? '' : 'on'}">${n}</button>`).join('')}</div>
   <div class="m-pan" id="mPan"><div class="cronaca" id="cronaca"></div></div>
   <div class="viste">${[['tv', 'Telecamera'], ['alto', 'Dall’alto'], ['numeri', 'Solo numeri']].map(([k, n]) => `<button data-vista="${k}" class="${(S.opz.vista || 'tv') === k ? 'on' : ''}">${n}</button>`).join('')}</div>
-  <div class="mctrl"><span>Velocità</span>${[1, 2, 4].map((x) => `<button data-vel="${x}" class="${x === (S.opz.vel || 2) ? 'on' : ''}">×${x}</button>`).join('')}${o.diretta ? `<button id="mPausa" class="pausa">${ic('cambio')} Pausa e cambi</button>` : ''}<button id="salta" class="salta">Salta ${ic('play')}</button></div>`;
+  <div class="mctrl"><span>Velocità</span>${[1, 2, 4].map((x) => `<button data-vel="${x}" class="${x === (S.opz.vel || 2) ? 'on' : ''}">×${x}</button>`).join('')}${o.diretta && modo() !== 'giocatore' ? `<button id="mPausa" class="pausa">${ic('cambio')} Pausa e cambi</button>` : ''}<button id="salta" class="salta">Salta ${ic('play')}</button></div>`;
   document.body.appendChild(v); document.body.classList.add('in-partita');
   let gh = 0, ga = 0, finito = false, tab = 'cron';
   const righe = [];
@@ -299,7 +300,7 @@ function apriMatch(o){
     let e = esp; sq.slots = ruoli.map((r, k) => out[k] ? Object.assign({}, out[k], { ruolo: r }) : (e-- > 0 ? { ruolo: r, p: null, esp: true, en: 0 } : { ruolo: r, p: null, en: 0 }));
     sq.mod = mod; S.tattica.mod = mod;
   }
-  if (o.diretta) $('#mPausa', v).onclick = () => apriCambi(null);
+  if (o.diretta && $('#mPausa', v)) $('#mPausa', v).onclick = () => apriCambi(null);
   const orologio = $('#orologio', v);
   const tick = () => { if (!_partita || !document.body.contains(v)) return; const m = Math.floor(_partita.min); orologio.textContent = _partita.pausa === Infinity ? 'PAUSA' : (m > 90 ? '90+' + (m - 90) : m) + '’'; if (!_partita.fine) requestAnimationFrame(tick); else orologio.textContent = 'FINE'; };
   tick();

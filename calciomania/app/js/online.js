@@ -70,18 +70,31 @@ window.Online = (function(){
   O.salvaCloud = function(stato){
     if (!user || !stato || stato.ospite) return; clearTimeout(saveT);
     saveT = setTimeout(() => {
-      const v = { app: 'Calciomania PM', nome: O.nome(), email: user.email || '', accesso: accesso(), club: stato.club.nome, categoria: TIERS[stato.tier - 1].nome, stagione: stato.stagione,
+      const m = stato.modo || 'presidente';
+      if (m !== 'presidente'){
+        const w = { attiva: m, ['dati_' + m]: JSON.stringify(stato), ['aggMs_' + m]: stato.agg || Date.now(), agg: firebase.firestore.FieldValue.serverTimestamp() };
+        cloudDoc['dati_' + m] = w['dati_' + m];
+        D.collection(SAVE).doc(user.uid).set(w, { merge: true }).then(() => { err = ''; }).catch((e) => { err = testoErr(e); });
+        return;
+      }
+      const v = { attiva: 'presidente', app: 'Calciomania PM', nome: O.nome(), email: user.email || '', accesso: accesso(), club: stato.club.nome, categoria: TIERS[stato.tier - 1].nome, stagione: stato.stagione,
         soldi: Math.round(stato.soldi), giocatori: stato.rosa.length, dati: JSON.stringify(stato), aggMs: stato.agg || Date.now(), creatoMs: stato.creato || Date.now(), agg: firebase.firestore.FieldValue.serverTimestamp() };
       if (stato.modVisto) v.modVistoMs = stato.modVisto;
       D.collection(SAVE).doc(user.uid).set(v, { merge: true }).then(() => { err = ''; }).catch((e) => { err = testoErr(e); });
     }, 3000);
   };
-  async function leggiCloud(){ const s = await D.collection(SAVE).doc(user.uid).get(); if (!s.exists) return null; const x = s.data(); try { const c = JSON.parse(x.dati); if (c && x.modMs) c.modVisto = Math.max(+c.modVisto || 0, +x.modMs); return c; } catch (e) { return null; } }
+  let cloudDoc = {};
+  O.carrieraCloud = function(m){ try { const t = m === 'presidente' ? cloudDoc.dati : cloudDoc['dati_' + m]; const c = t ? JSON.parse(t) : null; return c && c.club ? c : null; } catch (e) { return null; } };
+  async function leggiCloud(m){
+    const s = await D.collection(SAVE).doc(user.uid).get(); if (!s.exists){ cloudDoc = {}; return null; } const x = s.data(); cloudDoc = x;
+    const quale = m || x.attiva || 'presidente';
+    try { const c = JSON.parse(quale === 'presidente' ? x.dati : x['dati_' + quale]); if (c && quale === 'presidente' && x.modMs) c.modVisto = Math.max(+c.modVisto || 0, +x.modMs); return c; } catch (e) { return null; }
+  }
   // modifiche fatte dall'amministratrice nell'app Account: arrivano nel gioco appena le salva
   function ascoltaSalvataggio(){
     if (unsubSave) unsubSave();
     unsubSave = D.collection(SAVE).doc(user.uid).onSnapshot((s) => {
-      if (!s.exists || !S || S.ospite) return; const x = s.data(), m = +x.modMs || 0;
+      if (!s.exists || !S || S.ospite || (S.modo && S.modo !== 'presidente')) return; const x = s.data(), m = +x.modMs || 0;
       if (!m || m <= (+S.modVisto || 0)) return;
       let c = null; try { c = JSON.parse(x.dati); } catch (e) { return; }
       if (!c || !c.club) return;
@@ -94,13 +107,13 @@ window.Online = (function(){
   }
   async function dopoLogin(){
     avviso('Ciao ' + O.nome() + '!');
-    let c = null; try { c = await leggiCloud(); } catch (e) { err = testoErr(e); }
+    let c = null; try { c = await leggiCloud(S ? (S.modo || 'presidente') : (localStorage.getItem('calciomania-attiva') || undefined)); } catch (e) { err = testoErr(e); }
     ascoltaSalvataggio();
     if (!S){
       const loc = carica();
-      if (c && c.club){ S = c; migra(); Suono.on = S.opz.suono; schermo = 'home'; salva(true); disegna(); avviso('Ritrovata la tua ' + S.club.nome + '!'); O.riprendi(); }
+      if (c && c.club){ S = c; segnaAttiva(S.modo || 'presidente'); migra(); Suono.on = S.opz.suono; schermo = 'home'; salva(true); disegna(); avviso('Ritrovata la tua ' + S.club.nome + '!'); O.riprendi(); }
       else if (loc){ S = loc; migra(); Suono.on = S.opz.suono; schermo = 'home'; O.salvaCloud(S); disegna(); avviso('La tua ' + S.club.nome + ' ora è salvata nel tuo account!'); }
-      else if (!document.querySelector('.fonda')){ fondazione(false, false); avviso('Fonda la tua società: si salverà nel tuo account'); }
+      else if (!document.querySelector('.fonda')){ scegliCarriera(false); avviso('Scegli la tua carriera: si salverà nel tuo account'); }
       return;
     }
     if (S.ospite){ S.ospite = false; if (c && c.club && c.creato !== S.creato){

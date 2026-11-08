@@ -14,6 +14,7 @@ const CAT_U = { stipendi: ['Stipendi giocatori', 'squadra'], staff: ['Stipendi s
 function contiStagione(k = S.stagione){ S.conti = S.conti || {}; if (!S.conti[k]) S.conti[k] = { e: {}, u: {} }; return S.conti[k]; }
 function movimento(cat, importo, testo){
   importo = Math.round(importo || 0); if (!importo) return;
+  if (!movimentoConta(cat)) return;
   S.soldi += importo;
   const c = contiStagione(), lato = importo >= 0 ? 'e' : 'u';
   c[lato][cat] = (c[lato][cat] || 0) + Math.abs(importo);
