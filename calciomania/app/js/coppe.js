@@ -132,12 +132,13 @@ function qualificaEuropa(pos, tier, online){
 // vinci la Serie A: si sale di livello e si riparte dalla Terza Categoria
 function ricominciaLivello(){
   const vecchio = S, da = livello(), a = Math.min(LIV_MAX, da + 1);
-  const club = Object.assign({}, vecchio.club, { diff: a, stadio: (vecchio.stadio.design && vecchio.stadio.design.nome) || '', ospite: vecchio.ospite });
+  const club = Object.assign({}, vecchio.club, { diff: a, stadio: (vecchio.stadio.design && vecchio.stadio.design.nome) || '', ospite: vecchio.ospite, modo: vecchio.modo || 'presidente' });
   nuovaSocieta(club);
   const nuovo = S, salta = new Set(['coppe', 'europa', '_live', 'abbonati']);
   Object.keys(vecchio).forEach((k) => { if (!(k in nuovo) && !salta.has(k)) nuovo[k] = vecchio[k]; });
   Object.assign(nuovo, { trofei: vecchio.trofei, storico: vecchio.storico, opz: vecchio.opz, stagione: vecchio.stagione, pendenti: vecchio.pendenti,
     notizie: nuovo.notizie.concat(vecchio.notizie).slice(0, 80), livelli: (vecchio.livelli || []).concat([{ d: da, s: vecchio.stagione - 1 }]) });
+  if (modo() === 'allenatore'){ S.fiducia = 60; rosaDiPartenza(); }
   notizia(`NUOVO LIVELLO: ${DIFFICOLTA[a].nome.toUpperCase()}! Dopo aver vinto la Serie A, la ${S.club.nome} riparte dalla Terza Categoria con ${euro(SOLDI_INIZIO)}. Bot più forti, stessa voglia di vincere!`, 'trofeo');
   salva(true);
   return { da, a };
