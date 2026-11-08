@@ -98,7 +98,7 @@ function completaRosaAuto(){
 
 // ---------- ALLENATORE ----------
 const livAllenatore = () => clamp(1 + Math.floor(((S.allenatore && S.allenatore.rep) || 0) / 20), 1, 5);
-const stipAllenatore = () => tondo(STAFF_STIP[livAllenatore()] * (1 + (S.tier - 1) * 0.35));
+const stipAllenatore = () => tondo(STAFF_STIP[livAllenatore()] * (1 + (S.tier - 1) * 0.35) * ((S.allenatore && S.allenatore.extra) || 1));
 function staffIo(){
   const A = S.allenatore || {}, liv = livAllenatore();
   return { id: 'io', k: 'all', io: true, nome: A.nome || 'Tu', naz: 'IT', liv, stip: 0, ingaggio: 0, eta: A.eta || 40, att: (STAFF_ATT.all || [1, 2, 3]).map(() => clamp(Math.round(liv * 3.4), 1, 20)), mod: S.tattica ? S.tattica.mod : '4-4-2' };
@@ -192,7 +192,7 @@ function trasferimento(club, stip){
   io.forma = 100; io.mor = 85; S.rosa = [io];
   rosaDiPartenza();
   S.rosa.filter((p) => !p.io && p.num === io.num).forEach((p) => { p.num = numeroLibero(p.r); });
-  S.mio.stip = stip; S.offerteCarriera = null;
+  S.mio.stip = stip; S.offerteCarriera = null; S.esonerato = null;
   S.mio.carriera = (S.mio.carriera || []).concat([{ club: club.nome, tier: club.tier, s: S.stagione }]);
   notizia(`UFFICIALE: ${S.mio.nome} è un nuovo giocatore della ${club.nome} (${TIERS[club.tier - 1].nome})!`, 'mercato');
   salva(true);
@@ -273,14 +273,15 @@ function mostraOfferte(esonero, dopo){
   if (!L || !L.length){ dopo && dopo(); return; }
   const extra = (o) => m === 'giocatore' ? ` · ${euroBreve(o.stip)} a giornata` : '';
   foglio(`<div class="evento"><span class="ev-ico">${ic(esonero ? 'avviso' : 'contratto')}</span>
-    <h2>${esonero ? 'Sei stato esonerato' : m === 'giocatore' ? 'Ti vogliono comprare!' : 'Nuove offerte per te'}</h2>
-    <p class="tenue">${esonero ? 'La società ha deciso di cambiare allenatore. Scegli la tua nuova squadra.' : m === 'giocatore' ? `Hai giocato bene e queste squadre ti vogliono. Adesso guadagni ${euroBreve(S.mio.stip)} a giornata.` : 'Hai fatto un ottimo lavoro: queste squadre di categoria più alta vogliono te in panchina.'}</p>
+    <h2>${esonero && m === 'giocatore' ? 'Sei senza squadra' : esonero && S.dimesso ? 'Ti sei dimesso' : esonero ? 'Sei stato esonerato' : m === 'giocatore' ? 'Ti vogliono comprare!' : 'Nuove offerte per te'}</h2>
+    <p class="tenue">${esonero && m === 'giocatore' ? 'Hai lasciato la squadra. Queste società ti offrono un contratto: scegline una.' : esonero && S.dimesso ? 'Ti sei dimesso. Queste squadre ti vogliono in panchina: scegline una.' : esonero ? 'La società ha deciso di cambiare allenatore. Scegli la tua nuova squadra.' : m === 'giocatore' ? `Hai giocato bene e queste squadre ti vogliono. Adesso guadagni ${euroBreve(S.mio.stip)} a giornata.` : 'Queste squadre vogliono te in panchina. Se accetti, cambi squadra subito.'}</p>
     <div class="off-lista">${L.map((o, i) => cartaOfferta(o, i, extra(o)).replace('data-a="offSel"', 'data-a="accettaOff"')).join('')}</div>
     ${esonero ? '' : `<button class="btn largo sec" data-a="rifiutaOff">Resto dove sono</button>`}</div>`, dopo);
 }
 function accettaOfferta(i){
   const m = modo(), L = S.esonerato || S.offerteCarriera; if (!L || !L[i]) return;
   const o = L[i];
+  S.dimesso = false;
   if (m === 'allenatore') nuovaPanchina(o); else if (m === 'giocatore') trasferimento(o, o.stip);
   chiudiFoglio(true); schermo = 'home'; disegna(); Suono.fanfara(); coriandoli([o.c1, o.c2, '#d4af37'], 160);
   setTimeout(() => mostraPendenti(), 300);
@@ -324,7 +325,9 @@ function cartaIo(){
 function ioProfilo(){
   const io = ioG(), M = S.mio;
   return `<div class="griglia">${cartaIo()}
-  ${carta('Contratto e soldi', `<div class="dati-g"><div><small>Squadra</small><b>${esc(S.club.nome)}</b></div><div><small>Stipendio</small><b>${euroBreve(M.stip)}</b><small>a giornata</small></div><div><small>Il mio conto</small><b class="verde">${euroBreve(M.conto)}</b></div><div><small>Valore</small><b>${euroBreve(io.prezzo || valoreDi(io))}</b></div></div>`)}
+  ${carta('Contratto e soldi', `<div class="dati-g"><div><small>Squadra</small><b>${esc(S.club.nome)}</b></div><div><small>Stipendio</small><b>${euroBreve(M.stip)}</b><small>a giornata</small></div><div><small>Il mio conto</small><b class="verde">${euroBreve(M.conto)}</b></div><div><small>Valore</small><b>${euroBreve(io.prezzo || valoreDi(io))}</b></div></div>
+    <div class="az-lista"><button class="btn" data-a="ioAzione" data-v="aumento">${ic('euro')} Chiedi un aumento</button><button class="btn sec" data-a="ioAzione" data-v="cerca">${ic('cerca')} Trova un’altra squadra</button><button class="btn sec rosso" data-a="ioAzione" data-v="licenzia">${ic('esci')} Licenziati</button></div>
+    <p class="nota">Puoi chiedere un aumento o cercare squadra una volta ogni 5 giornate. Se ti licenzi lasci subito la squadra e scegli tra le offerte che arrivano.</p>`)}
   ${carta('In carriera', `<div class="dati-g"><div><small>Gol totali</small><b>${(io.golTot || 0) + M.st.gol}</b></div><div><small>Presenze totali</small><b>${(io.presTot || 0) + M.st.pres}</b></div><div><small>Nazionale</small><b>${M.nazionale || 0}</b></div><div><small>Palloni d’Oro</small><b>${M.palloni || 0}</b></div></div>`)}</div>`;
 }
 function ioAllenamento(){
@@ -336,17 +339,63 @@ function ioCarriera(){
   const M = S.mio;
   return `<div class="griglia">${carta('Le mie squadre', `<div class="cal">${(M.carriera || []).map((x) => `<div class="cal-r"><span class="g">${x.s}</span><span class="nm">${esc(x.club)}</span><span class="tenue">${TIERS[x.tier - 1].nome}</span></div>`).join('')}</div>`)}
   ${carta('Stagioni', S.storico.length ? `<div class="cal">${S.storico.map((x) => `<div class="cal-r"><span class="g">${x.stagione}</span><span class="nm">${TIERS[x.tier - 1].nome} · ${x.pos}°</span><span class="tenue">${x.io ? `${x.io.gol} gol · ${x.io.pres} pres. · ${x.io.media || '—'}` : ''}</span></div>`).join('')}</div>` : '<p class="tenue">Ancora nessuna stagione finita.</p>')}
-  ${S.offerteCarriera && S.offerteCarriera.length ? carta('Offerte', `<button class="btn" data-a="vediOfferte">Guarda le offerte (${S.offerteCarriera.length})</button>`) : ''}</div>`;
+  ${S.esonerato ? carta('Sei senza squadra', `<button class="btn oro" data-a="vediOfferte">Scegli la nuova squadra</button>`) : S.offerteCarriera && S.offerteCarriera.length ? carta('Offerte', `<button class="btn" data-a="vediOfferte">Guarda le offerte (${S.offerteCarriera.length})</button>`) : ''}</div>`;
 }
 function schermoPanchina(){
   const A = S.allenatore || {}, f = S.fiducia == null ? 60 : S.fiducia, d = S.lega.dati;
   return `<div class="griglia">${carta(`${ic('tattica')} ${esc(A.nome || 'Mister')}`, `<div class="dati-g"><div><small>Squadra</small><b>${esc(S.club.nome)}</b></div><div><small>Reputazione</small><b>${A.rep || 0}/100</b></div><div><small>Livello mister</small><b>${stelle(livAllenatore())}</b></div><div><small>Esoneri</small><b>${A.esoneri || 0}</b></div></div>
     <div class="ob"><div class="ob-t"><span>${ic('cuore')} Fiducia del presidente</span><small>${Math.round(f)}/100</small></div>${barra(f, f < 25 ? 'rosso' : f < 50 ? '' : 'verde')}</div>
     <p class="nota">Obiettivo della società: <b>${AMBIZIONI[S.club.amb == null ? 1 : S.club.amb][0].toLowerCase()}</b> (almeno ${posObiettivo(d.n)}° posto). Se la fiducia scende troppo ti esonerano.</p>`)}
-  ${carta('Soldi', `<div class="dati-g"><div><small>Budget mercato</small><b>${euroBreve(S.soldi)}</b></div><div><small>Il tuo stipendio</small><b>${euroBreve(stipAllenatore())}</b><small>a giornata</small></div><div><small>Il tuo conto</small><b class="verde">${euroBreve(A.conto || 0)}</b></div></div><p class="nota">Stadio, sponsor e stipendi li paga la società. Tu usi il budget per comprare giocatori e staff.</p>`)}
+  ${carta('Soldi', `<div class="dati-g"><div><small>Budget mercato</small><b>${euroBreve(S.soldi)}</b></div><div><small>Il tuo stipendio</small><b>${euroBreve(stipAllenatore())}</b><small>a giornata</small></div><div><small>Il tuo conto</small><b class="verde">${euroBreve(A.conto || 0)}</b></div></div><p class="nota">Stadio, sponsor e stipendi li paga la società. Tu usi il budget per comprare giocatori e staff.</p>
+    <div class="az-lista"><button class="btn" data-a="ioAzione" data-v="aumento">${ic('euro')} Chiedi un aumento</button><button class="btn sec" data-a="ioAzione" data-v="budget">${ic('banca')} Chiedi più budget</button><button class="btn sec" data-a="ioAzione" data-v="cerca">${ic('cerca')} Trova un’altra squadra</button><button class="btn sec rosso" data-a="ioAzione" data-v="licenzia">${ic('esci')} Dimettiti</button></div>`)}
   ${carta('Le mie panchine', `<div class="cal">${(A.panchine || []).map((x) => `<div class="cal-r"><span class="g">${x.s}</span><span class="nm">${esc(x.club)}</span><span class="tenue">${TIERS[x.tier - 1].nome}</span></div>`).join('')}</div>`)}
   ${S.esonerato ? carta('Sei senza squadra', `<button class="btn oro" data-a="vediOfferte">Scegli la nuova squadra</button>`) : S.offerteCarriera && S.offerteCarriera.length ? carta('Offerte', `<button class="btn" data-a="vediOfferte">Guarda le offerte (${S.offerteCarriera.length})</button>`) : ''}</div>`;
 }
 // soldi: l'allenatore muove solo il budget del mercato, il giocatore non tocca i soldi della società
 const CAT_ALLENATORE = new Set(['acquisti', 'cessioni', 'commissioni', 'altro', 'giovani', 'prestiti']);
 function movimentoConta(cat){ const m = modo(); if (m === 'giocatore') return cat === 'altro'; if (m === 'allenatore') return CAT_ALLENATORE.has(cat); return true; }
+
+// ---------- chiedere un aumento, cercare squadra, licenziarsi ----------
+function azioneCarriera(v){
+  const m = modo(), g = S.giornate || 0, X = m === 'giocatore' ? S.mio : S.allenatore; if (!X) return;
+  const io = m === 'giocatore' ? ioG() : null;
+  const st = m === 'giocatore' ? S.mio.st : null, media = st && st.nv ? st.sv / st.nv : 6;
+  const d = S.lega.dati, pos = posizioneDi(d, S.lega.mio);
+  const bravo = m === 'giocatore' ? clamp((media - 6) * 0.5 + (formazione().some((x) => x.p && x.p.io) ? 0.25 : -0.2) + (io.val - tierMedia(S.tier)) / 40, -0.5, 0.9) : clamp(((S.fiducia || 60) - 50) / 80 + (posObiettivo(d.n) - pos) * 0.04, -0.5, 0.8);
+  const aspetta = (k) => { const ult = X['ult_' + k]; if (ult != null && g - ult < 5){ avviso(`Riprova tra ${5 - (g - ult)} giornat${5 - (g - ult) === 1 ? 'a' : 'e'}`); return true; } X['ult_' + k] = g; return false; };
+  if (v === 'aumento'){
+    if (aspetta('aumento')) return;
+    if (RND() < 0.35 + bravo){
+      const k = 1.12 + RND() * 0.18;
+      if (m === 'giocatore'){ S.mio.stip = tondo(S.mio.stip * k); notizia(`${S.mio.nome} ottiene l’aumento: ora guadagna ${euroBreve(S.mio.stip)} a giornata.`, 'mercato'); }
+      else { X.extra = Math.round(((X.extra || 1) * k) * 100) / 100; notizia(`Il presidente dà l’aumento a ${X.nome}: ${euroBreve(stipAllenatore())} a giornata.`, 'mercato'); }
+      salva(); disegna(); return esitoAz(true, 'Aumento accettato!', `Il presidente ha detto sì: adesso guadagni ${euroBreve(m === 'giocatore' ? S.mio.stip : stipAllenatore())} a giornata.`);
+    }
+    if (m === 'giocatore'){ io.mor = clamp((io.mor || 70) - 8, 0, 100); } else S.fiducia = clamp((S.fiducia || 60) - 4, 0, 100);
+    salva(); disegna(); return esitoAz(false, 'Aumento rifiutato', m === 'giocatore' ? 'La società dice che devi giocare meglio prima di guadagnare di più. Allenati e riprova.' : 'Il presidente vuole prima vedere più risultati.');
+  }
+  if (v === 'budget'){
+    if (aspetta('budget')) return;
+    if (RND() < 0.3 + bravo){ const extra = tondo(budgetSocieta(S.tier) * (0.25 + RND() * 0.35)); movimento('altro', extra, 'Budget extra dal presidente'); salva(); disegna(); return esitoAz(true, 'Budget in più!', `Il presidente ti dà altri ${euroBreve(extra)} per il mercato.`); }
+    S.fiducia = clamp((S.fiducia || 60) - 3, 0, 100); salva(); disegna(); return esitoAz(false, 'Niente soldi in più', 'Il presidente dice che il budget è quello: usalo bene.');
+  }
+  if (v === 'cerca'){
+    if (aspetta('cerca')) return;
+    const salto = bravo > 0.25 && S.tier < TOP ? 1 : 0;
+    const L = offerteClub(clamp(S.tier + salto - (bravo < -0.2 ? 1 : 0), 1, TOP), RND() < 0.5 + bravo ? 2 : 1);
+    if (m === 'giocatore') L.forEach((o) => { o.stip = tondo(S.mio.stip * (0.95 + RND() * 0.4) * (o.tier > S.tier ? 1.3 : 1)); });
+    if (RND() < 0.2 - bravo * 0.2){ salva(); return esitoAz(false, 'Nessuna offerta', 'Per ora nessuna squadra ti cerca. Riprova più avanti.'); }
+    S.offerteCarriera = L; salva(); disegna(); return mostraOfferte(false, () => mostraPendenti());
+  }
+  if (v === 'licenzia'){
+    chiedi(m === 'giocatore' ? 'Vuoi davvero lasciare la squadra? Sceglierai subito una nuova società.' : 'Vuoi davvero dimetterti? Sceglierai subito una nuova panchina.', () => {
+      chiudiFoglio(true);
+      S.esonerato = offerteClub(clamp(S.tier - (RND() < 0.5 ? 1 : 0), 1, TOP), 3);
+      if (m === 'giocatore') S.esonerato.forEach((o) => { o.stip = tondo(S.mio.stip * (0.8 + RND() * 0.3)); });
+      else { S.dimesso = true; X.rep = Math.max(0, (X.rep || 0) - 3); }
+      notizia(m === 'giocatore' ? `${S.mio.nome} rescinde il contratto con la ${S.club.nome}!` : `${X.nome} si dimette dalla panchina della ${S.club.nome}!`, 'societa');
+      salva(); disegna(); mostraOfferte(true, () => mostraPendenti());
+    });
+  }
+}
+function esitoAz(ok, t, testo){ foglio(`<div class="evento"><span class="ev-ico">${ic(ok ? 'check' : 'x')}</span><h2>${esc(t)}</h2><p>${esc(testo)}</p><button class="btn largo" data-a="chiudi">Ok</button></div>`); if (ok) Suono.cassa(); }
