@@ -119,8 +119,8 @@ const forzaMia = () => forzaDa(formazione());
 const forzaTot = (f) => Math.round((f.por + f.dif * 1.4 + f.cen * 1.3 + f.att * 1.3) / 5);
 function problemiPerGiocare(){
   const pr = [];
-  if (modo() === 'giocatore'){ completaRosaAuto(); return pr; }
-  if (modo() === 'allenatore' && S.esonerato) return [{ t: 'Sei stato esonerato: scegli la nuova squadra', vai: 'club', sub: 'panchina' }];
+  if (modo() === 'giocatore'){ if (S.esonerato) return [{ t: 'Sei senza squadra: scegli la nuova società', vai: 'io', sub: 'carriera' }]; completaRosaAuto(); return pr; }
+  if (modo() === 'allenatore' && S.esonerato) return [{ t: S.dimesso ? 'Ti sei dimesso: scegli la nuova squadra' : 'Sei stato esonerato: scegli la nuova squadra', vai: 'club', sub: 'panchina' }];
   const sani = S.rosa.filter(disponibile);
   if (!S.staff.all) pr.push({ t: 'Ingaggia un allenatore', vai: 'mercato', sub: 'staff' });
   if (sani.length < 11) pr.push({ t: `Ti servono almeno 11 giocatori disponibili (ne hai ${sani.length})`, vai: 'mercato', sub: 'cerca' });
@@ -740,6 +740,7 @@ document.addEventListener('click', (e) => {
     case 'accettaOff': accettaOfferta(+v); break;
     case 'rifiutaOff': S.offerteCarriera = null; salva(); chiudiFoglio(); disegna(); break;
     case 'vediOfferte': mostraOfferte(!!S.esonerato, () => mostraPendenti()); break;
+    case 'ioAzione': azioneCarriera(v); break;
     case 'ioFocus': S.mio.focus = v; salva(); disegna(); avviso('Allenamento: ' + FOCUS[v][0]); break;
     case 'indietroIntro': schermataIniziale(); break;
     case 'fcol': fondazione.leggi(); bozza[b.dataset.k] = v; if (bozza.kit && b.dataset.k === 'c1'){ bozza.kit[0].c1 = v; bozza.kit[1].c2 = v; } if (bozza.kit && b.dataset.k === 'c2') bozza.kit[0].c2 = v; fondazione.draw(); break;
