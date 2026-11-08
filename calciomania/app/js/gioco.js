@@ -238,6 +238,7 @@ async function gioca(veloce){
   if (pr.length) return avviso(pr[0].t);
   Suono.init();
   if (!S.obiettivi || S.obiettivi.s !== S.stagione) nuoviObiettivi();
+  preparaCoppe();
   if (S.abbS !== S.stagione){ S.abbS = S.stagione; vendiAbbonamenti(); }
   aggiornaMioSlot();
   if (S.lega.online){
@@ -259,17 +260,17 @@ function sincronizza(live, giaVista){
   if (d.stagione > L.stagione){
     if (d.prev && d.prev.stagione === L.stagione){
       const nomi = (i) => d.prev.tab.find((t) => t.i === i);
-      for (let r = L.giocate; r < giornateTot(d.prev.n); r++){ if (d.prev.ris[r]) ultima = applicaGiornata(d.prev.ris[r], r, nomi, d.prev.n, d.prev.tier) || ultima; }
+      for (let r = L.giocate; r < giornateTot(d.prev.n); r++){ if (d.prev.ris[r]){ ultima = applicaGiornata(d.prev.ris[r], r, nomi, d.prev.n, d.prev.tier) || ultima; if (!L.online) turnoCoppe(r); } }
       if (ultima) Object.assign(ultima, { tab: d.prev.tab.map(rigaMini), mio: L.mio, tier: d.prev.tier, n: d.prev.n });
       fine = fineStagione(d.prev);
     } else { L.stagione = d.stagione; L.giocate = 0; }
   } else {
     const nomi = (i) => d.squadre[i];
-    for (let r = L.giocate; r < d.giornata; r++){ if (d.ris[r]) ultima = applicaGiornata(d.ris[r], r, nomi, d.n, d.tier) || ultima; }
+    for (let r = L.giocate; r < d.giornata; r++){ if (d.ris[r]){ ultima = applicaGiornata(d.ris[r], r, nomi, d.n, d.tier) || ultima; if (!L.online) turnoCoppe(r); } }
     if (ultima) Object.assign(ultima, { tab: ordina(d.squadre).map(rigaMini), mio: L.mio, tier: d.tier, n: d.n });
   }
   S._live = null;
-  if (fine) S.pendenti.push(fine);
+  if (fine){ S.pendenti.push(fine); if (fine.livello) S.pendenti.push(Object.assign({ tipo: 'livello' }, fine.livello)); }
   salva(true);
   if (ultima && giaVista){ dopoPartita(ultima); }
   else if (ultima && live){ mostraPartita(ultima, () => dopoPartita(ultima)); }
@@ -400,6 +401,9 @@ function fineStagione(prev){
   const migliore = S.rosa.filter((p) => p.nv >= 5).sort((a, b) => mediaVoto(b) - mediaVoto(a))[0];
   S.storico.unshift({ stagione: S.stagione, tier: prev.tier, pos, n: prev.n, pt: me ? me.pt : 0, v: me ? me.v : 0, n_: me ? me.n : 0, p: me ? me.p : 0, gf: me ? me.gf : 0, gs: me ? me.gs : 0, bomber: capocannoniere && capocannoniere.gol ? nomeG(capocannoniere) + ' (' + capocannoniere.gol + ')' : '', migliore: migliore ? nomeG(migliore) + ' (' + mediaVoto(migliore).toFixed(2) + ')' : '', online: L.online, soldi: Math.round(S.soldi) });
   if (pos === 1) S.trofei.push({ stagione: S.stagione, tier: prev.tier, nome: 'Campioni ' + T.nome });
+  const salitoLiv = pos === 1 && prev.tier === TOP && !L.online && livello() < LIV_MAX;
+  if (!salitoLiv) qualificaEuropa(pos, prev.tier, L.online);
+  if (pos === 1 && prev.tier === TOP && !L.online && livello() === LIV_MAX) notizia(`Campioni d’Italia al livello Fortissimo: la ${S.club.nome} è nella leggenda!`, 'trofeo');
   const vecchioTier = prev.tier;
   const nuovoTier = sale ? prev.tier + 1 : scende ? prev.tier - 1 : prev.tier;
   // giocatori: un anno in più, i giovani crescono, i vecchi calano, qualcuno smette
@@ -460,9 +464,11 @@ function fineStagione(prev){
   }
   aggiornaMioSlot();
   if (!S.ospite) setTimeout(() => scriviSlot('auto'), 100);
-  return { tipo: 'stagione', pos, n: prev.n, sale, scende, premio, vecchioTier, nuovoTier, campione: pos === 1, pt: me ? me.pt : 0, ritirati: ritirati.map((p) => p.n + ' ' + p.c), giovani: giovani.map((p) => p.n + ' ' + p.c),
+  const rapporto = { tipo: 'stagione', pos, n: prev.n, sale, scende, premio, vecchioTier, nuovoTier, campione: pos === 1, pt: me ? me.pt : 0, ritirati: ritirati.map((p) => p.n + ' ' + p.c), giovani: giovani.map((p) => p.n + ' ' + p.c),
     scaduti: scaduti.map((p) => p.n + ' ' + p.c), tornati: tornati.map((p) => p.n + ' ' + p.c), rientrati: rientrati.map((p) => p.n + ' ' + p.c), obiettivi,
-    bomber: S.storico[0].bomber, migliore: S.storico[0].migliore, top: prev.tab.slice(0, 3).map((t) => t.nome) };
+    bomber: S.storico[0].bomber, migliore: S.storico[0].migliore, top: prev.tab.slice(0, 3).map((t) => t.nome), coppe: coppeDellaStagione().filter((c) => c.vinta).map((c) => COPPE[c.k].nome) };
+  if (salitoLiv) rapporto.livello = ricominciaLivello();
+  return rapporto;
 }
 
 function dopoPartita(rep){ disegna(); mostraRisultati(rep, () => mostraPendenti()); }
@@ -471,6 +477,8 @@ function mostraPendenti(){
   salva();
   if (p.tipo === 'stagione') mostraFineStagione(p, () => mostraPendenti());
   else if (p.tipo === 'partita') foglio(`<h2>Si è giocata la giornata ${p.rep.r + 1}</h2><p class="tenue">Gli altri presidenti erano pronti: ecco com'è andata.</p>${cartaRisultato(p.rep)}<div class="riga-btn"><button class="btn" data-a="rivedi">${ic('play')} Guarda la partita</button><button class="btn sec" data-a="chiudi">Ok</button></div>`, () => mostraPendenti());
+  else if (p.tipo === 'coppa') mostraCoppa(p, () => mostraPendenti());
+  else if (p.tipo === 'livello') mostraLivello(p, () => mostraPendenti());
   else if (p.tipo === 'info') foglio(`<div class="evento"><span class="ev-ico">${ic(p.ico || 'fulmine')}</span><h2>Imprevisto</h2><p>${esc(p.t)}</p><button class="btn largo" data-a="chiudi">Ok</button></div>`, () => mostraPendenti());
   else if (p.tipo === 'scelta'){
     foglio(`<div class="evento"><span class="ev-ico">${ic(p.ico || 'fulmine')}</span><h2>Devi decidere</h2><p>${esc(p.t)}</p><div class="scelte">${p.op.map((o, i) => `<button class="btn ${i ? 'sec' : ''}" data-scelta="${i}">${esc(o)}</button>`).join('')}</div></div>`, () => mostraPendenti());
@@ -510,7 +518,7 @@ function chiedi(testo, si){
 function menu(){
   const on = window.Online && Online.loggato();
   const L = S.lega;
-  foglio(`<div class="menu-top">${mioStemma(54)}<div><h2>${esc(S.club.nome)}</h2><p class="tenue">${esc(S.club.citta || '')} · stagione ${S.stagione} · ${TIERS[S.tier - 1].nome} · ${DIFFICOLTA[S.diff == null ? 2 : S.diff].nome}</p></div></div>
+  foglio(`<div class="menu-top">${mioStemma(54)}<div><h2>${esc(S.club.nome)}</h2><p class="tenue">${esc(S.club.citta || '')} · stagione ${S.stagione} · ${TIERS[S.tier - 1].nome}</p><p class="liv-tag">Livello: <b>${testoLivello()}</b></p></div></div>
   ${S.ospite ? `<section class="menu-sez avviso-sez"><h3>${ic('utente')} Stai giocando come ospite</h3><p>Quando chiudi l’app la partita non si salva. Entra con il tuo account per tenerla.</p><div class="riga-btn"><button class="btn" data-a="loginGoogle">Entra con Google</button><button class="btn sec" data-a="loginEmail">Entra con email</button></div></section>` : ''}
   <section class="menu-sez online-sez"><h3>${ic('mondo')} Account e gioco online</h3>
     ${!on ? (S.ospite ? '' : `<p>Entra con il tuo account (lo stesso del Gioco della Vita PM): la società si salva online e puoi entrare nei gironi con altre persone vere.</p>
@@ -573,7 +581,7 @@ const AMB_ICO = ['scudo', 'bilancia', 'coppa'];
 function fondazione(modifica, ospite){
   const r = RND;
   bozza = modifica ? JSON.parse(JSON.stringify(S.club)) : Object.assign({ nome: '', citta: '', sigla: '', mister: '', primavera: '', stadio: '' }, stemmaCasuale(r));
-  if (!modifica){ Object.assign(bozza, { c1: '#0f3b2a', c2: '#d4af37', st: 0, pat: 1, sim: 0, diff: 1, amb: 1 }); bozza.ospite = !!ospite; }
+  if (!modifica){ Object.assign(bozza, { c1: '#0f3b2a', c2: '#d4af37', st: 0, pat: 1, sim: 0, diff: 0, amb: 1 }); bozza.ospite = !!ospite; }
   if (modifica) bozza.stadio = (S.stadio.design || {}).nome || '';
   bozza.kit = bozza.kit || [{ t: 1, c1: bozza.c1, c2: bozza.c2 }, { t: 0, c1: '#f8fafc', c2: bozza.c1 }];
   const sigla = () => (bozza.sigla || iniziali(bozza.nome || 'PM')).slice(0, 4).toUpperCase();
@@ -596,7 +604,7 @@ function fondazione(modifica, ospite){
       <div class="colori pic">${COLORI.concat(['#f8fafc', '#0b0d10']).map((c) => `<button class="col ${bozza.kit[k].c2 === c ? 'on' : ''}" style="--c:${c}" data-a="fkit" data-k="${k}" data-c="c2" data-v="${c}" aria-label="colore"></button>`).join('')}</div></div></div>`).join('')}</section>
     ${modifica ? '' : `<section class="f-sez"><h3>${ic('bersaglio')} Obiettivi e difficoltà</h3>
     <div class="scelta"><span>Obiettivo iniziale</span><div class="diff">${AMBIZIONI.map((x, i) => `<button class="${bozza.amb === i ? 'on' : ''}" data-a="fopz" data-k="amb" data-v="${i}">${ic(AMB_ICO[i])}<span>${x[0]}</span></button>`).join('')}</div><p class="nota">${AMBIZIONI[bozza.amb][1]}. Puoi sempre fare di più!</p></div>
-    <div class="scelta"><span>Difficoltà</span><div class="diff">${DIFFICOLTA.map((x, i) => `<button class="${bozza.diff === i ? 'on' : ''}" data-a="fopz" data-k="diff" data-v="${i}"><b>${x.ico}</b><span>${x.nome}</span></button>`).join('')}</div><p class="nota">${DIFFICOLTA[bozza.diff].desc}</p></div></section>`}
+    <div class="scelta"><span>Livello</span>${scalaLivelli(0)}<p class="nota">Tutti partono da <b>Principiante</b>. Vinci la Serie A e passi al livello dopo, ripartendo dalla Terza Categoria. Al livello Fortissimo ci sono la Coppa Italia e le coppe europee!</p></div></section>`}
     <button class="btn largo oro" data-a="${modifica ? 'salvaClub' : 'creaClub'}">${modifica ? 'Salva le modifiche' : 'Fonda la società · ' + euroBreve(SOLDI_INIZIO)}</button>
     ${modifica ? '<button class="btn largo sec" data-a="annullaClub">Annulla</button>' : '<button class="link" data-a="indietroIntro">‹ Indietro</button>'}</div>`;
   const leggi = () => { const g = (id) => { const e = $(id); return e ? e.value : null; }; if ($('#fNome')){ bozza.nome = g('#fNome'); bozza.citta = g('#fCitta'); bozza.sigla = g('#fSigla'); bozza.stadio = g('#fStadio'); bozza.mister = g('#fMister'); bozza.primavera = g('#fPrim'); } };

@@ -590,6 +590,32 @@ tr.retro .pos{background:var(--rosso);color:#fff}
 .kit-ed:first-of-type{border-top:0}
 .kit-big{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none}.kit-big small{color:var(--tenue);font-size:12px}
 .kit-ed>div:last-child{flex:1;min-width:0}
+
+/* livelli e coppe */
+.scala-liv{display:flex;align-items:center;gap:0;margin:8px 0;overflow-x:auto;padding-bottom:2px}
+.scala-liv i{flex:0 0 6px;height:3px;background:var(--linea);border-radius:2px}
+.scala-liv .sl{flex:1 1 0;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;padding:6px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:12px;background:var(--bg2);border:2px solid transparent;opacity:.55;font-size:11px;font-weight:600}
+.scala-liv .sl b{font-size:20px;line-height:1}
+.scala-liv .sl.fatto{opacity:1;border-color:rgba(34,197,94,.45);background:var(--verdeT)}
+.scala-liv .sl.ora{opacity:1;border-color:var(--oro);background:radial-gradient(circle at 50% 0,rgba(212,175,55,.3),transparent 70%),var(--bg2);box-shadow:0 0 0 3px rgba(212,175,55,.15),0 6px 18px rgba(212,175,55,.2)}
+.liv-box{margin:12px 0;padding:12px;border-radius:14px;background:linear-gradient(135deg,rgba(212,175,55,.08),transparent 60%),var(--bg2);border:1px solid rgba(212,175,55,.2)}
+.liv-box small{color:var(--oro);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:11px}
+.liv-tag{margin:4px 0 0;font-size:13px;color:var(--tenue)}.liv-tag b{color:var(--oro)}
+.coppa-r{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:linear-gradient(90deg,color-mix(in srgb,var(--cc) 18%,transparent),transparent 70%),var(--bg2);margin-bottom:8px;border-left:3px solid var(--cc)}
+.coppa-r>div:nth-child(2){flex:1;min-width:0;display:flex;flex-direction:column}.coppa-r small{color:var(--tenue);font-size:12px}
+.cr-turni{display:flex;gap:4px}.cr-turni i{width:9px;height:9px;border-radius:50%;background:var(--linea)}.cr-turni i.ok{background:var(--verde)}.cr-turni i.ora{background:var(--oro);box-shadow:0 0 0 3px rgba(212,175,55,.25);animation:pulsa 1.4s infinite}
+@keyframes pulsa{50%{transform:scale(1.35)}}
+.coppa-svg{flex:none;filter:drop-shadow(0 4px 10px rgba(212,175,55,.35))}
+.coppa-f{display:flex;flex-direction:column;gap:10px}
+.cf-testa{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;background:linear-gradient(135deg,color-mix(in srgb,var(--cc) 35%,transparent),transparent 75%),var(--bg2)}
+.cf-testa small{color:var(--tenue);text-transform:uppercase;letter-spacing:.08em;font-size:11px;font-weight:700}.cf-testa b{display:block;font:700 22px var(--f-tit)}
+.coppa-f.festa h2{color:var(--oro);font-size:30px}.coppa-f.triste h2{color:#93a3c2}
+.coppa-f .coppa-svg{animation:salto 1.4s ease-in-out infinite alternate}
+.livello-f{text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px}
+.livello-f .lf-ico{font-size:76px;line-height:1;filter:drop-shadow(0 10px 30px rgba(212,175,55,.5));animation:salto 1.4s ease-in-out infinite alternate}
+.livello-f h1{font-size:44px;margin:0;background:linear-gradient(180deg,#fff,var(--oro));-webkit-background-clip:text;background-clip:text;color:transparent}
+.livello-f .scala-liv{width:100%}
+p.oro{color:var(--oro)}
 </style>
 </head>
 <body>
@@ -601,6 +627,7 @@ tr.retro .pos{background:var(--rosso);color:#fff}
 <script src="js/sistemi.js"></script>
 <script src="js/partita.js"></script>
 <script src="js/schermi.js"></script>
+<script src="js/coppe.js"></script>
 <script src="js/gioco.js"></script>
 </body>
 </html>

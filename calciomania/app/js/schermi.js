@@ -155,6 +155,7 @@ function schermoHome(){
   </section>
   <div class="griglia">
   ${carta('Classifica', `<p class="nota">${L.online ? `Girone online: <b>${umani(d).length}</b> persone vere e ${d.n - umani(d).length} bot.` : 'Giochi da solo contro i bot. Dal menu puoi andare online.'}</p>${tabellaHTML(vicini.slice(da, da + 5), d, true, da)}`, `<button class="link" data-a="vai" data-v="campionato" data-sub="classifica">Tutta ›</button>`)}
+  ${cartaCoppe()}
   ${carta('Ultima partita', S.ultima ? `${cartaRisultato(S.ultima)}${S.ultima.motm ? `<p class="nota centro">${ic('stella')} Migliore in campo: <b>${esc(S.ultima.motm)}</b></p>` : ''}<div class="forma-r">${recenti.map((x) => `<span class="fr ${x.esito}" title="${esc(x.avv)} ${x.gf}-${x.gs}">${x.esito}</span>`).join('')}</div><div class="riga-btn"><button class="btn mini sec" data-a="ultimaRep">Pagelle e statistiche</button><button class="btn mini sec" data-a="rivedi">${ic('play')} Rivedi</button></div>` : '<p class="tenue">Ancora nessuna partita giocata.</p>')}
   ${carta('Prossime partite', prossime.length ? `<div class="cal">${prossime.map((x) => `<div class="cal-r"><span class="g">${x.g + 1}</span><span class="dove">${x.casa ? 'C' : 'T'}</span>${stemmaDi(x.avv, 22)}<span class="nm">${esc(x.avv.nome)}</span><span class="tenue">${posizioneDi(d, x.avvI)}°</span></div>`).join('')}</div>` : '<p class="tenue">Fine del calendario.</p>', `<button class="link" data-a="vai" data-v="campionato" data-sub="calendario">Calendario ›</button>`)}
   ${carta('Finanze', `<div class="fin-mini"><div><small>Cassa</small><b class="${S.soldi < 0 ? 'rosso' : ''}">${euroBreve(S.soldi)}</b></div><div><small>Ultima giornata</small><b class="${S.bilancio && S.bilancio.netto < 0 ? 'rosso' : 'verde'}">${S.bilancio ? (S.bilancio.netto >= 0 ? '+' : '') + euroBreve(S.bilancio.netto) : '—'}</b></div><div><small>Stipendi</small><b>${euroBreve(stipendiGiocatori() + stipendiStaff())}</b></div></div>${graficoLinea(S.soldiStoria, 320, 70, '#d4af37')}`, `<button class="link" data-a="vai" data-v="club" data-sub="finanze">Bilancio ›</button>`)}
@@ -438,7 +439,8 @@ function schermoPersonalizza(){
   const c = S.club;
   return `<div class="griglia">
   <section class="carta perso"><div class="anteprima">${mioStemma(96)}<div><b>${esc(c.nome)}</b><small>${esc(c.sigla || '')} · ${esc(c.citta || '')}</small><div class="kit-ant">${magliaSVG(kitDi(c, false), 50, 10)}${magliaSVG(kitDi(c, true), 50, 10)}</div></div></div>
-  <div class="dati-g"><div><small>Presidente</small><b>${esc(c.mister || '—')}</b></div><div><small>Squadra giovanile</small><b>${esc(nomePrimavera())}</b></div><div><small>Stadio</small><b>${esc(nomeStadio(S))}</b></div><div><small>Obiettivo</small><b>${AMBIZIONI[c.amb == null ? 1 : c.amb][0]}</b></div></div>
+  <div class="dati-g"><div><small>Presidente</small><b>${esc(c.mister || '—')}</b></div><div><small>Squadra giovanile</small><b>${esc(nomePrimavera())}</b></div><div><small>Stadio</small><b>${esc(nomeStadio(S))}</b></div><div><small>Obiettivo</small><b>${AMBIZIONI[c.amb == null ? 1 : c.amb][0]}</b></div><div><small>Livello</small><b>${DIFFICOLTA[livello()].ico} ${DIFFICOLTA[livello()].nome}</b></div></div>
+  <div class="liv-box"><small>Il tuo livello · ${livello() + 1} di ${LIV_MAX + 1}</small>${scalaLivelli(livello())}<p class="nota">${livello() < LIV_MAX ? `Vinci la Serie A per passare a <b>${DIFFICOLTA[livello() + 1].nome}</b>.` : 'Sei al livello più alto: in Serie A giochi le coppe!'}${(S.livelli || []).length ? ' Livelli superati: ' + S.livelli.map((x) => DIFFICOLTA[x.d].nome + ' (stagione ' + x.s + ')').join(', ') + '.' : ''}</p></div>
   <button class="btn largo" data-a="modClub">${ic('pennello')} Cambia nome, stemma, maglie e nomi</button></section>
   ${carta('Partita', `<div class="scelta"><span>Velocità della partita</span><div class="seg">${[1, 2, 4].map((x) => `<button class="${(S.opz.vel || 2) === x ? 'on' : ''}" data-a="segOpz" data-k="vel" data-v="${x}">×${x}</button>`).join('')}</div></div><div class="scelta"><span>Telecamera</span><div class="seg">${[['tv', 'Telecamera'], ['alto', 'Dall’alto'], ['numeri', 'Solo numeri']].map(([k, n]) => `<button class="${(S.opz.vista || 'tv') === k ? 'on' : ''}" data-a="segOpz" data-k="vista" data-v="${k}">${n}</button>`).join('')}</div></div>`)}
   </div>`;
@@ -496,9 +498,10 @@ function mostraFineStagione(p, dopo){
   <div class="dati-g"><div><small>Posizione</small><b>${p.pos}°</b><small>su ${p.n}</small></div><div><small>Punti</small><b>${p.pt}</b></div><div><small>Premio</small><b>${euroBreve(p.premio)}</b></div></div>
   ${(p.obiettivi || []).length ? `<h3>Obiettivi</h3><div class="ob-fine">${p.obiettivi.map(([ok, t, x]) => `<div class="${ok}">${ic(ok === 'ok' ? 'check' : 'x')}<span>${esc(t)}</span><small>${esc(x)}</small></div>`).join('')}</div>` : ''}
   ${p.bomber ? `<p>${ic('pallone')} Capocannoniere: <b>${esc(p.bomber)}</b></p>` : ''}${p.migliore ? `<p>${ic('stella')} Miglior media voto: <b>${esc(p.migliore)}</b></p>` : ''}
+  ${(p.coppe || []).length ? `<p>${ic('coppa', 'oro')} Coppe vinte: <b>${p.coppe.map(esc).join(', ')}</b></p>` : ''}${p.livello ? `<p class="oro">${ic('stella')} Hai vinto la Serie A: sali al livello <b>${DIFFICOLTA[p.livello.a].nome}</b>!</p>` : ''}
   <p class="tenue">Podio: ${p.top.map((n, i) => ['1°', '2°', '3°'][i] + ' ' + esc(n)).join(' · ')}</p>
   ${lista('giovani', 'Nuovi ragazzi nella Primavera', p.giovani)}${lista('contratto', 'Contratti scaduti, se ne vanno', p.scaduti, 'tenue')}${lista('mercato', 'Tornano dal prestito', p.rientrati)}${lista('mercato', 'Finiscono il prestito', p.tornati, 'tenue')}${lista('cuore', 'Si ritirano', p.ritirati, 'tenue')}
-  <button class="btn largo oro" data-a="chiudi">Inizia la stagione ${S.stagione}</button></div>`, dopo);
+  <button class="btn largo oro" data-a="chiudi">${p.livello ? 'Continua' : 'Inizia la stagione ' + S.stagione}</button></div>`, dopo);
   if (p.sale || p.campione){ Suono.fanfara(); coriandoli([S.club.c1, S.club.c2, '#d4af37', '#fff'], 200); setTimeout(() => coriandoli([S.club.c1, S.club.c2, '#d4af37'], 160), 900); }
 }
 
@@ -526,6 +529,7 @@ function pannelloSegreto(){
   ${sez('stadio', 'Stadio e staff', `<div class="riga-btn">${b('lavori', 'Finisci subito i lavori')}${b('stadioMax', 'Stadio al massimo')}${b('nuovo', 'Stadio come nuovo')}${b('staff', 'Tutto lo staff a 5 stelle')}</div>`)}
   ${sez('coppa', 'Campionato', `<div class="login-f"><select id="sTier" ${on ? 'disabled' : ''}>${TIERS.map((t, i) => `<option value="${i + 1}" ${i + 1 === S.tier ? 'selected' : ''}>${t.nome}</option>`).join('')}</select></div>
   <div class="riga-btn">${b('tier', 'Vai a questo campionato', '')}${b('punti', '+3 punti')}${b('primo', 'Primo in classifica')}${b('fineStagione', 'Salta a fine stagione')}${b('trofeo', '+1 trofeo')}</div>`)}
+  ${sez('stella', 'Livello e coppe', `<p class="nota">Adesso: <b>${testoLivello()}</b></p><div class="riga-btn">${b('livelloSu', 'Passa al livello dopo')}${b('fortissimo', 'Vai a Fortissimo in Serie A')}${b('europa', 'Qualificati in Coppa dei Campioni')}${b('coppaTurno', 'Passa il turno di coppa')}</div>`)}
   ${sez('fulmine', 'Imprevisti e notizie', `<div class="riga-btn">${b('imprevisto', 'Fai succedere un imprevisto')}${b('conferenza', 'Conferenza stampa')}${b('coriandoli', 'Festa con i coriandoli')}</div>`)}
   <h3>${ic('stella')} Trucchi sempre attivi</h3><div class="chips wrap">${tg('gratis', 'Tutto gratis')}${tg('super', 'Super squadra')}${tg('vinci', 'Vinci sempre')}${tg('noInf', 'Niente infortuni')}${tg('noImpr', 'Niente imprevisti')}${tg('noStip', 'Niente stipendi')}</div>
   <p class="nota">«Tutto gratis»: giocatori, campioni, staff e stadio costano zero e i lavori finiscono subito. «Super squadra»: fortissima. «Vinci sempre»: in partita segni tu.</p>
@@ -542,6 +546,10 @@ function segreto(v){
   switch (v){
     case 'soldiImposta': { const n = Math.max(-1e9, Math.min(1e12, Math.round(+($('#sSoldi').value) || 0))); S.soldi = n; S.soldiStoria.push(n); fatto('Soldi: ' + euroBreve(n)); break; }
     case 'debiti': S.debiti = []; fatto('Debiti cancellati!'); break;
+    case 'livelloSu': { if (livello() >= LIV_MAX) return avviso('Sei già al livello più alto'); const x = ricominciaLivello(); disegna(); mostraLivello(x, () => mostraPendenti()); return; }
+    case 'fortissimo': S.diff = LIV_MAX; if (S.tier !== TOP){ S.tier = TOP; nuovaLegaLocale(TOP); genMercato(); } S.coppe = null; fatto('Livello Fortissimo in Serie A: le coppe partono alla prossima partita!'); break;
+    case 'europa': S.europa = { k: 'campioni', s: S.stagione }; S.coppe = null; fatto(coppeAttive() ? 'Sei in Coppa dei Campioni!' : 'Qualificato! Serve il livello Fortissimo in Serie A'); break;
+    case 'coppaTurno': { const c = coppeDellaStagione().find((x) => x.vivo && !x.vinta); if (!c) return avviso('Nessuna coppa in corso'); const tv = (S.trucchi = S.trucchi || {}).vinci; S.trucchi.vinci = true; giocaCoppa(c); S.trucchi.vinci = tv; salva(); disegna(); return mostraPendenti(); }
     case 'conti': S.conti = {}; S.movimenti = []; fatto('Bilancio azzerato'); break;
     case 'tifosi': S.tifosi += 10000; fatto('+10.000 tifosi'); break;
     case 'tifosi100': S.tifosi += 100000; fatto('+100.000 tifosi'); break;
