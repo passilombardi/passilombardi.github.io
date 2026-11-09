@@ -383,10 +383,24 @@ function giocaInDiretta(){
   if (modo() === 'giocatore'){ const io = S.rosa.find((p) => p.io); if (io && io.inf > 1) io.inf = 1; }
   const D = nuovaDiretta(); if (!D) return;
   if (modo() === 'giocatore'){
-    if (D.sq[D.noi].slots.some((s) => s.p && s.p.io)) return giocaPartitaVera(D);
+    if (D.sq[D.noi].slots.some((s) => s.p && s.p.io)) return sceltaPartita(D);
     const io = S.rosa.find((p) => p.io);
     if (io) avviso(io.inf > 0 ? `Sei infortunato (${(io.infT || 'infortunio').toLowerCase()}): salti solo questa partita, dalla prossima giochi tu!` : io.squal > 0 ? 'Sei squalificato: questa partita la guardi dalla tribuna.' : 'Oggi non giochi.');
   }
+  guardaDiretta(D);
+}
+// carriera da giocatore: prima della partita scegli se giocarla tu o guardarla
+function sceltaPartita(D){
+  const min = S.opz.durataP || 3;
+  foglio(`<h2>Come vuoi vivere la partita?</h2><p class="tenue">${esc(D.casa ? S.club.nome : D.avv.nome)} – ${esc(D.casa ? D.avv.nome : S.club.nome)}</p>
+    <div class="sc-par">
+      <button class="sc-p gioca" id="scGioca"><i>${ic('pallone')}</i><b>Gioca tu</b><span>Comandi il tuo giocatore come in FIFA: corri, passa, tira, crossa, dribbla. Dura ${min} minuti.</span></button>
+      <button class="sc-p" id="scGuarda"><i>${ic('occhio')}</i><b>Guarda la partita</b><span>La segui con la cronaca come prima, e ogni tanto la palla arriva a te.</span></button>
+    </div>`, () => { Dir = null; });
+  $('#scGioca').onclick = () => { chiudiFoglio(true); giocaPartitaVera(D); };
+  $('#scGuarda').onclick = () => { chiudiFoglio(true); guardaDiretta(D); };
+}
+function guardaDiretta(D){
   const io = S.club, avv = D.avv;
   const sp = D.casa ? calcPubblico(false).toLocaleString('it-IT') + ' spettatori attesi' : '';
   apriMatch({ diretta: true, casa: D.casa, avv, modH: D.sq[0].mod, modA: D.sq[1].mod, durata: 90 + D.rec, spett: sp,
