@@ -93,11 +93,13 @@ class Campo {
   resize(){
     const r = this.cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); this.W = r.width; this.H = r.height; this.cv.width = r.width * d; this.cv.height = r.height * d; this.x.setTransform(d, 0, 0, d, 0, 0);
     // telecamera TV: alta sulla tribuna, guarda il campo di sbieco
-    const C = this.camera = { y: CA + 40, z: 30 }; let fy = 32 - C.y, fz = -C.z; const l = Math.hypot(fy, fz); fy /= l; fz /= l;
-    C.fy = fy; C.fz = fz; C.uy = fz; C.uz = -fy;
-    const H = this.H, W = this.W; C.F = Math.min(H * 2.05, W * 1.05);
-    const n = this.p3(52.5, CA, 0, true);
-    C.cy = H * 1.0 - n.y;
+    const C = this.camera = { y: CA + 95, z: 31 }; let fy = 34 - C.y, fz = -C.z; const l = Math.hypot(fy, fz); fy /= l; fz /= l;
+    C.fy = fy; C.fz = fz; C.uy = fz; C.uz = -fy; C.F = 1; C.cy = 0;
+    const H = this.H, W = this.W;
+    // quanto si vede: circa 60 metri di campo in larghezza, tutto il campo in altezza
+    const a = this.p3(52.5, CA, 0, true), b = this.p3(52.5, -0.5, 0, true), m = this.p3(52.5, 34, 0, true);
+    C.F = Math.min(W / 56 / m.s, H * 0.86 / (a.y - b.y));
+    C.cy = H * 0.975 - this.p3(52.5, CA, 0, true).y;
     if (this.camX == null) this.camX = 52.5;
   }
   // punto del campo (metri, altezza z) sullo schermo
@@ -106,6 +108,56 @@ class Campo {
     return { x: this.W / 2 + (X - (crudo ? 52.5 : this.camX)) * s, y: (C.cy || 0) - (py * C.uy + pz * C.uz) * s, s, d };
   }
   proietta(x, y){ const q = this.p3(x * CL, y * CA, 0); return { x: q.x, y: q.y, k: q.s * 1.85 / 40 / 1.02 * 1.65 }; }
+  // giocatore con proporzioni vere (1,80 m), visto dalla telecamera TV
+  atleta(p, col){
+    const c = this.x, f = this.p3(p.mx, p.my, 0); if (f.x < -40 || f.x > this.W + 40) return;
+    const hv = f.y - this.p3(p.mx, p.my, 1).y, s = f.s, dir = p.dir || 1;
+    const gk = p.gk, maglia = gk ? (col.c1 === '#fcc419' ? '#22d3ee' : '#fcc419') : col.c1, rifin = gk ? '#1f2937' : col.c2;
+    const pant = gk ? '#1f2937' : (luminosita(col.c2) > 0.85 ? '#f1f3f5' : col.c2), calze = gk ? '#1f2937' : col.c1;
+    const pelle = p.pelle || '#e0ac69', pelleS = tono(pelle, -0.25), capelli = p.capelli || '#2b1d0e', scarpe = SCARPE[(p.num || 1) % SCARPE.length];
+    const run = Math.min(1, (p.v || 0) * 30 + 0.08), ph = p.fase || 0, lean = run * 0.16;
+    const X = (dx) => f.x + dx * s * dir, Y = (h) => f.y - h * hv;
+    // ombra (il sole è dietro la tribuna)
+    c.fillStyle = 'rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(f.x + s * 0.25, f.y + hv * 0.02, s * 0.5, Math.max(1.5, s * 0.16), -0.15, 0, 7); c.fill();
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    const hipH = 0.94, shH = 1.47, hx = lean * 0.45;
+    const gamba = (k) => {
+      const fase = ph + k * Math.PI, dietro = k === 0;
+      const aT = Math.sin(fase) * 0.62 * run, aS = aT - Math.max(0, -Math.cos(fase)) * 1.2 * run;
+      const kx = hx + Math.sin(aT) * 0.46, kh = hipH - Math.cos(aT) * 0.46, ax = kx + Math.sin(aS) * 0.44, ah = Math.max(0.05, kh - Math.cos(aS) * 0.44);
+      c.strokeStyle = dietro ? pelleS : pelle; c.lineWidth = Math.max(1.4, s * 0.13); c.beginPath(); c.moveTo(X(hx), Y(hipH)); c.lineTo(X(kx), Y(kh)); c.stroke();
+      c.strokeStyle = dietro ? tono(calze, -0.3) : calze; c.lineWidth = Math.max(1.3, s * 0.115); c.beginPath(); c.moveTo(X(kx + (ax - kx) * 0.15), Y(kh + (ah - kh) * 0.15)); c.lineTo(X(ax), Y(ah)); c.stroke();
+      c.strokeStyle = dietro ? tono(scarpe, -0.3) : scarpe; c.lineWidth = Math.max(1.4, s * 0.1); c.beginPath(); c.moveTo(X(ax - 0.04), Y(ah - 0.04)); c.lineTo(X(ax + 0.2), Y(ah - 0.06)); c.stroke();
+      c.strokeStyle = dietro ? tono(pant, -0.2) : pant; c.lineWidth = Math.max(1.8, s * 0.19); c.beginPath(); c.moveTo(X(hx), Y(hipH + 0.04)); c.lineTo(X(hx + (kx - hx) * 0.45), Y(hipH + (kh - hipH) * 0.45)); c.stroke();
+    };
+    const sx = hx + lean * 0.55;
+    const braccio = (k) => {
+      const fase = ph + (k ? 0 : Math.PI), dietro = k === 0;
+      const a1 = Math.sin(fase) * 0.8 * run, a2 = a1 - 0.9 * (0.4 + run * 0.6);
+      const ex = sx + Math.sin(a1) * 0.3, eh = shH - 0.04 - Math.cos(a1) * 0.3, wx = ex - Math.sin(a2) * 0.27, wh = eh - Math.cos(a2) * 0.27;
+      c.strokeStyle = dietro ? pelleS : pelle; c.lineWidth = Math.max(1.1, s * 0.085); c.beginPath(); c.moveTo(X(sx), Y(shH - 0.04)); c.lineTo(X(ex), Y(eh)); c.lineTo(X(wx), Y(wh)); c.stroke();
+      c.strokeStyle = dietro ? tono(maglia, -0.25) : maglia; c.lineWidth = Math.max(1.5, s * 0.13); c.beginPath(); c.moveTo(X(sx), Y(shH - 0.03)); c.lineTo(X(sx + (ex - sx) * 0.5), Y(shH - 0.04 + (eh - shH + 0.04) * 0.5)); c.stroke();
+      if (gk){ c.fillStyle = '#f8f9fa'; c.beginPath(); c.arc(X(wx), Y(wh), Math.max(1, s * 0.07), 0, 7); c.fill(); }
+    };
+    gamba(0); braccio(0);
+    // busto
+    const g = c.createLinearGradient(X(hx - 0.2), 0, X(hx + 0.2), 0); g.addColorStop(0, tono(maglia, -0.2)); g.addColorStop(0.6, maglia); g.addColorStop(1, tono(maglia, 0.12));
+    c.fillStyle = g; c.beginPath();
+    c.moveTo(X(hx - 0.15), Y(hipH + 0.02)); c.lineTo(X(hx + 0.15), Y(hipH + 0.02)); c.lineTo(X(sx + 0.17), Y(shH - 0.02)); c.quadraticCurveTo(X(sx + 0.12), Y(shH + 0.06), X(sx), Y(shH + 0.06)); c.quadraticCurveTo(X(sx - 0.16), Y(shH + 0.05), X(sx - 0.18), Y(shH - 0.04)); c.closePath(); c.fill();
+    c.strokeStyle = rifin; c.lineWidth = Math.max(0.8, s * 0.035); c.beginPath(); c.moveTo(X(sx - 0.05), Y(shH + 0.05)); c.lineTo(X(sx + 0.06), Y(shH + 0.05)); c.stroke();
+    // pantaloncini
+    c.fillStyle = pant; c.beginPath(); c.moveTo(X(hx - 0.16), Y(hipH + 0.06)); c.lineTo(X(hx + 0.16), Y(hipH + 0.06)); c.lineTo(X(hx + 0.17), Y(hipH - 0.12)); c.lineTo(X(hx - 0.17), Y(hipH - 0.12)); c.closePath(); c.fill();
+    // numero sulla schiena (quando corre verso sinistra/destra si vede di lato: numero piccolo)
+    if (s > 9 && p.num){ c.fillStyle = rifin; c.font = `800 ${Math.round(s * 0.2)}px "Barlow Condensed",Arial Narrow,sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(p.num, X(hx - 0.02), Y((hipH + shH) / 2 + 0.04)); }
+    gamba(1); braccio(1);
+    // collo e testa
+    const tx = sx + 0.03, th = shH + 0.2, r = 0.11;
+    c.strokeStyle = pelleS; c.lineWidth = Math.max(1, s * 0.08); c.beginPath(); c.moveTo(X(sx), Y(shH + 0.03)); c.lineTo(X(tx), Y(th - 0.06)); c.stroke();
+    const rr = Math.max(1.6, r * s);
+    c.fillStyle = pelle; c.beginPath(); c.ellipse(X(tx), Y(th), rr * 0.92, Math.max(1.6, r * hv * 1.08), 0, 0, 7); c.fill();
+    c.fillStyle = capelli; c.beginPath(); c.ellipse(X(tx - 0.02), Y(th + 0.035), rr * 0.95, Math.max(1, r * hv * 0.8), 0, Math.PI * 0.95, Math.PI * 2.05); c.fill();
+    if (p.taglio === 1){ c.beginPath(); c.ellipse(X(tx - 0.07), Y(th - 0.02), rr * 0.5, Math.max(1, r * hv * 0.75), 0, 0, 7); c.fill(); }
+  }
   omino(...a){ return Partita.prototype.omino.apply(this, a); }
   banner(t){ const e = this.elInfo; if (!e) return; e.textContent = t; e.classList.remove('su'); void e.offsetWidth; e.classList.add('su'); clearTimeout(this._inf); this._inf = setTimeout(() => e.classList.remove('su'), 2600); }
   cartellino(col, nome){ const d = document.createElement('div'); d.className = 'cg-cart ' + col; d.innerHTML = `<i></i><b>${esc(nome)}</b><small>${col === 'giallo' ? 'Ammonito' : 'Espulso'}</small>`; this.v.appendChild(d); setTimeout(() => d.remove(), 2400); }
@@ -306,7 +358,7 @@ class Campo {
     const mm = this.finito ? 'Fine' : (m > 90 ? '90+' + (m - 90) : m > 45 && !this.meta ? '45+' + (m - 45) : m) + '’'; if (this._mm !== mm){ this._mm = mm; this.elMin.textContent = mm; }
     if (!this.me.gk){ const b = this.b, me = this.me, mia = b.owner === me, comp = b.owner && b.owner.lato === me.lato && !mia, loro = b.owner && b.owner.lato !== me.lato;
       const aria = !b.owner && b.h > 0.5 && Math.hypot(b.mx - me.mx, b.my - me.my) < 4.5;
-      const lt = loro ? 'CONTRASTO' : aria ? 'TESTA' : 'TIRO', lp = comp ? 'DAMMI PALLA' : 'PASSAGGIO', lf = comp ? 'LANCIAMI' : 'FILTRANTE', lc = mia ? 'CROSS' : comp ? 'CROSSA!' : 'SCIVOLATA', la = mia ? 'ABILITÀ' : comp ? '–' : 'PRESSING';
+      const lt = loro ? 'CONTRASTO' : aria ? 'TESTA' : 'TIRO', lp = comp ? 'DAMMI PALLA' : 'PASSAGGIO', lf = comp ? 'LANCIAMI' : 'FILTRANTE', lc = mia ? 'CROSS' : comp ? 'CROSSA!' : 'SCIVOLATA', la = loro || !b.owner ? 'PRESSING' : 'ABILITÀ';
       if (this._lt !== lt){ this._lt = lt; this.bTiro.textContent = lt; } if (this._lp !== lp){ this._lp = lp; this.bPass.textContent = lp; }
       if (this._lf !== lf){ this._lf = lf; this.bFilt.textContent = lf; } if (this._lc !== lc){ this._lc = lc; this.bCross.textContent = lc; } if (this._la !== la){ this._la = la; this.bAbil.textContent = la; } }
   }
@@ -659,7 +711,7 @@ class Campo {
     // tribuna di fronte (in salita, piena di gente)
     const tr = this.tribuna || (this.tribuna = this.creaTribuna());
     poly([[-140, -3, 0], [245, -3, 0], [245, -40, 22], [-140, -40, 22]]); const tg = c.createLinearGradient(0, P(52.5, -40, 22).y, 0, P(52.5, -3, 0).y); tg.addColorStop(0, '#2c3442'); tg.addColorStop(1, '#3d4757'); c.fillStyle = tg; c.fill();
-    for (const f of tr){ const q = P(f.x, f.y, f.z); if (q.x < -4 || q.x > W + 4) continue; const sal = this.flash > 0 ? Math.abs(Math.sin(t * 12 + f.f)) * 3 : Math.abs(Math.sin(t * 2.2 + f.f)) * 0.7; const r = Math.max(1.2, q.s * 0.32); c.fillStyle = f.c; c.fillRect(q.x - r / 2, q.y - r - sal, r, r * 1.3); }
+    for (const f of tr){ const q = P(f.x, f.y, f.z); if (q.x < -4 || q.x > W + 4) continue; const sal = this.flash > 0 ? Math.abs(Math.sin(t * 12 + f.f)) * 3 : Math.abs(Math.sin(t * 2.2 + f.f)) * 0.7; const r = Math.max(1, q.s * 0.2); c.fillStyle = f.c; c.fillRect(q.x - r / 2, q.y - r - sal, r, r * 1.3); }
     // tetto
     poly([[-140, -40, 22], [245, -40, 22], [245, -44, 27], [-140, -44, 27]]); c.fillStyle = '#1b2230'; c.fill();
     // fascia bordo campo
@@ -671,12 +723,15 @@ class Campo {
       c.save(); c.beginPath(); c.rect(a.x, a2.y, b2.x - a.x, a.y - a2.y); c.clip(); c.font = `800 ${Math.max(7, (a.y - a2.y) * 0.62)}px "Barlow Condensed",Arial Narrow,sans-serif`; c.textBaseline = 'middle'; c.textAlign = 'center';
       c.fillStyle = (k + Math.floor(t / 3)) % 3 ? '#ffd23f' : '#22c55e'; c.fillText(led[((k % led.length) + led.length) % led.length], (a.x + b2.x) / 2, (a.y + a2.y) / 2 + 1); c.restore(); }
     // erba a strisce, come nei campi veri
-    const NS = 18;
-    for (let i = 0; i < NS; i++){ poly([[i * CL / NS - (i ? 0 : 4), -0.8, 0], [(i + 1) * CL / NS + (i === NS - 1 ? 4 : 0), -0.8, 0], [(i + 1) * CL / NS + (i === NS - 1 ? 4 : 0), CA + 3, 0], [i * CL / NS - (i ? 0 : 4), CA + 3, 0]]); c.fillStyle = i % 2 ? '#4fa83d' : '#5cb848'; c.fill(); }
-    { const lg = c.createLinearGradient(0, P(52.5, 0).y, 0, H); lg.addColorStop(0, 'rgba(0,0,0,.12)'); lg.addColorStop(0.5, 'rgba(255,255,220,.04)'); lg.addColorStop(1, 'rgba(0,0,0,.08)'); c.fillStyle = lg; c.fillRect(0, P(52.5, -0.8).y, W, H); }
+    const NS = 20;
+    for (let i = 0; i < NS; i++){ poly([[i * CL / NS - (i ? 0 : 6), -2.5, 0], [(i + 1) * CL / NS + (i === NS - 1 ? 6 : 0), -2.5, 0], [(i + 1) * CL / NS + (i === NS - 1 ? 6 : 0), CA + 6, 0], [i * CL / NS - (i ? 0 : 6), CA + 6, 0]]); c.fillStyle = i % 2 ? '#3f8a2e' : '#4b9a36'; c.fill(); }
+    // erba vera: fili e macchie (trama fissa sul campo) e luce dei riflettori
+    { const tex = this.trama || (this.trama = this.creaTrama()); const pat = c.createPattern(tex, 'repeat'); const o = P(0, 0); pat.setTransform && pat.setTransform(new DOMMatrix().translate(o.x % 256, 0)); c.fillStyle = pat; c.fillRect(0, P(52.5, -2.5).y, W, H); }
+    { const lg = c.createLinearGradient(0, P(52.5, -2).y, 0, H); lg.addColorStop(0, 'rgba(0,10,0,.22)'); lg.addColorStop(0.35, 'rgba(255,255,210,.05)'); lg.addColorStop(1, 'rgba(0,0,0,.10)'); c.fillStyle = lg; c.fillRect(0, P(52.5, -2.5).y, W, H);
+      const rg = c.createRadialGradient(W / 2, H * 0.45, H * 0.2, W / 2, H * 0.5, W * 0.75); rg.addColorStop(0, 'rgba(0,0,0,0)'); rg.addColorStop(1, 'rgba(0,0,0,.22)'); c.fillStyle = rg; c.fillRect(0, 0, W, H); }
     // linee del campo
-    c.strokeStyle = 'rgba(255,255,255,.92)'; c.lineCap = 'round'; c.lineJoin = 'round';
-    const linea = (pts) => { c.beginPath(); pts.forEach(([X, Y], k) => { const q = P(X, Y); k ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y); }); c.lineWidth = Math.max(1, P(52.5, (pts[0][1] + pts[pts.length - 1][1]) / 2).s * 0.12); c.stroke(); };
+    c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineCap = 'round'; c.lineJoin = 'round';
+    const linea = (pts) => { c.beginPath(); pts.forEach(([X, Y], k) => { const q = P(X, Y); k ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y); }); c.lineWidth = Math.max(1, P(52.5, (pts[0][1] + pts[pts.length - 1][1]) / 2).s * 0.1); c.stroke(); };
     const arco = (cx, cy, r, a0, a1) => { const pts = []; for (let k = 0; k <= 32; k++){ const a = a0 + (a1 - a0) * k / 32; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); } linea(pts); };
     linea([[0, 0], [CL, 0], [CL, CA], [0, CA], [0, 0]]); linea([[52.5, 0], [52.5, CA]]); arco(52.5, 34, 9.15, 0, Math.PI * 2);
     [[0, 1], [CL, -1]].forEach(([x0, d]) => { linea([[x0, 13.84], [x0 + d * 16.5, 13.84], [x0 + d * 16.5, 54.16], [x0, 54.16]]); linea([[x0, 24.84], [x0 + d * 5.5, 24.84], [x0 + d * 5.5, 43.16], [x0, 43.16]]);
@@ -700,7 +755,7 @@ class Campo {
     const L = this.tutti.map((p) => ({ p, y: p.my })); L.push({ palla: true, y: b.my + 0.01 }); L.sort((a2, b3) => a2.y - b3.y);
     for (const o of L){
       if (o.palla){
-        const g = P(b.mx, b.my, 0), q = P(b.mx, b.my, b.h + 0.11), r = Math.max(2.6, q.s * 0.2);
+        const g = P(b.mx, b.my, 0), q = P(b.mx, b.my, b.h + 0.11), r = Math.max(2.4, q.s * 0.13);
         c.fillStyle = `rgba(0,0,0,${clamp(0.38 - b.h * 0.05, 0.1, 0.38)})`; c.beginPath(); c.ellipse(g.x, g.y, r * 1.2, r * 0.45, 0, 0, 7); c.fill();
         const bg = c.createRadialGradient(q.x - r * 0.35, q.y - r * 0.35, r * 0.1, q.x, q.y, r); bg.addColorStop(0, '#fff'); bg.addColorStop(1, '#c9ced6');
         c.fillStyle = bg; c.beginPath(); c.arc(q.x, q.y, r, 0, 7); c.fill(); c.strokeStyle = 'rgba(0,0,0,.5)'; c.lineWidth = 0.6; c.stroke();
@@ -710,15 +765,15 @@ class Campo {
       const p = o.p; if (p.via) continue;
       const q = P(p.mx, p.my); if (q.x < -40 || q.x > W + 40) continue;
       const terra = p.scivola > 0 || p.aTerra > 0, salto = p.saltoT > 0 ? Math.sin(Math.min(1, p.saltoT / 0.45) * Math.PI) * q.s * 0.9 : 0;
-      if (terra || salto){ c.save(); c.translate(q.x, q.y - salto); if (terra) c.rotate((p.dir || 1) * 1.25); c.translate(-q.x, -q.y); this.omino(p, col[p.lato], p.gk, false, 1); c.restore(); }
-      else this.omino(p, col[p.lato], p.gk, false, 1);
+      if (terra || salto){ c.save(); c.translate(q.x, q.y - salto); if (terra) c.rotate((p.dir || 1) * 1.35); c.translate(-q.x, -q.y); this.atleta(p, col[p.lato]); c.restore(); }
+      else this.atleta(p, col[p.lato]);
     }
     // il tuo giocatore: freccia sopra e nome sotto (come in TV)
     const qm = P(me.mx, me.my), sm = qm.s;
     if (qm.x < -6 || qm.x > W + 6){ const sx = qm.x < 0 ? 16 : W - 16, sy = clamp(qm.y - 20, 60, H - 60), dd2 = qm.x < 0 ? -1 : 1;
       c.fillStyle = '#22d3ee'; c.beginPath(); c.moveTo(sx + dd2 * 12, sy); c.lineTo(sx - dd2 * 5, sy - 11); c.lineTo(sx - dd2 * 5, sy + 11); c.closePath(); c.fill(); }
     else {
-      const pul = Math.sin(t * 6) * 2, ty = qm.y - sm * 1.85 * 1.65 - 6 + pul;
+      const pul = Math.sin(t * 6) * 2, ty = this.p3(me.mx, me.my, 2.1).y - 4 + pul;
       c.fillStyle = '#22d3ee'; c.strokeStyle = 'rgba(0,0,0,.55)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(qm.x - 7, ty - 10); c.lineTo(qm.x + 7, ty - 10); c.lineTo(qm.x, ty); c.closePath(); c.fill(); c.stroke();
       c.font = `600 ${Math.round(clamp(sm * 0.5, 11, 16))}px Barlow,system-ui,sans-serif`; c.textAlign = 'center'; c.textBaseline = 'top'; c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,.55)'; c.strokeText(me.nome, qm.x, qm.y + 4); c.fillStyle = '#fff'; c.fillText(me.nome, qm.x, qm.y + 4);
       const off = b.owner && b.owner.lato === me.lato && b.owner !== me && this.inFuori(me);
@@ -738,10 +793,16 @@ class Campo {
     c.fillStyle = '#ffd23f'; c.beginPath(); c.arc(rx + b.mx / CL * rw, ry + b.my / CA * rh, 2.2, 0, 7); c.fill();
     if (this.flash > 0){ c.fillStyle = `rgba(255,255,255,${this.flash * 0.3})`; c.fillRect(0, 0, W, H); }
   }
+  creaTrama(){
+    const k = document.createElement('canvas'); k.width = k.height = 256; const g = k.getContext('2d');
+    for (let i = 0; i < 2600; i++){ const x = Math.random() * 256, y = Math.random() * 256, l = Math.random() < 0.5; g.fillStyle = l ? `rgba(200,255,160,${0.03 + Math.random() * 0.05})` : `rgba(0,30,0,${0.04 + Math.random() * 0.06})`; g.fillRect(x, y, 1 + Math.random() * 1.5, 1 + Math.random() * 2.5); }
+    for (let i = 0; i < 40; i++){ const x = Math.random() * 256, y = Math.random() * 256, r = 10 + Math.random() * 30, rg = g.createRadialGradient(x, y, 0, x, y, r); const l = Math.random() < 0.5; rg.addColorStop(0, l ? 'rgba(210,255,170,.05)' : 'rgba(0,25,0,.06)'); rg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = rg; g.fillRect(x - r, y - r, r * 2, r * 2); }
+    return k;
+  }
   creaTribuna(){
     const o = this.o, cols = [o.colH.c1, o.colH.c2, o.colA.c1, '#e5e7eb', '#9ca3af', '#f59e0b', '#ef4444', '#1f2937'];
     const L = [];
-    for (let r = 0; r < 26; r++) for (let k = 0; k < 120; k++){ const tt = r / 26; L.push({ x: -130 + k * 3.1 + (r % 2) * 1.5, y: -4.5 - tt * 34, z: 0.8 + tt * 20, c: Math.random() < 0.55 ? (Math.random() < 0.6 ? o.colH.c1 : o.colH.c2) : cols[(Math.random() * cols.length) | 0], f: Math.random() * 6 }); }
+    for (let r = 0; r < 44; r++) for (let k = 0; k < 230; k++){ const tt = r / 44; L.push({ x: -130 + k * 1.65 + (r % 2) * 0.8 + Math.random() * 0.5, y: -4.5 - tt * 34, z: 0.8 + tt * 20, c: Math.random() < 0.55 ? (Math.random() < 0.6 ? o.colH.c1 : o.colH.c2) : cols[(Math.random() * cols.length) | 0], f: Math.random() * 6 }); }
     return L;
   }
   // ---------- fine ----------
