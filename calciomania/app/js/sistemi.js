@@ -56,6 +56,7 @@ function estingui(id){
 function infortuna(p){
   const med = livStaff(S, 'med'), t = tipoInfortunio(RND, med);
   p.inf = Math.max(1, Math.round(ri(t[1], t[2]) * (1 - med * 0.06))); p.infT = t[0];
+  if (p.io) p.inf = 1; // nella carriera da giocatore salti al massimo una partita
   return p;
 }
 const disponibile = (p) => p.inf <= 0 && !(p.squal > 0) && !p.via;
