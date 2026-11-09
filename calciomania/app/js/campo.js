@@ -60,7 +60,8 @@ class Campo {
     try { const el = document.documentElement; const p = el.requestFullscreen ? el.requestFullscreen({ navigationUI: 'hide' }) : null;
       const gira = () => { try { const r = screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape'); if (r && r.catch) r.catch(() => {}); } catch (e) {} };
       if (p && p.then) p.then(gira).catch(gira); else gira(); } catch (e) {}
-    this.resize(); this._r = () => this.resize(); addEventListener('resize', this._r);
+    this.resize(); this._r = () => { this.resize(); if (this.g3 && this.g3.ok) this.g3.resize(); }; addEventListener('resize', this._r);
+    if (typeof Grafica3D !== 'undefined' && !(S.opz && S.opz.grafica2d)) Grafica3D.carica().then((ok) => { if (ok && !this.chiuso) try { this.g3 = new Grafica3D(this); } catch (e) { console.warn('3D non disponibile', e); this.g3 = null; } });
     const joy = v.querySelector('.az-joy'), pom = v.querySelector('.az-pom'); let pid = null;
     const muovi = (e) => { const r = joy.getBoundingClientRect(), R = r.width / 2; let dx = (e.clientX - r.left - R) / (R * 0.7), dy = (e.clientY - r.top - R) / (R * 0.7); const l = Math.hypot(dx, dy); if (l > 1){ dx /= l; dy /= l; } this.joy = { x: dx, y: dy }; pom.style.transform = `translate(${dx * R * 0.55}px,${dy * R * 0.55}px)`; };
     joy.addEventListener('pointerdown', (e) => { pid = e.pointerId; try { joy.setPointerCapture(pid); } catch (x) {} muovi(e); e.preventDefault(); });
@@ -104,6 +105,7 @@ class Campo {
   }
   // punto del campo (metri, altezza z) sullo schermo
   p3(X, Y, Z, crudo){
+    if (!crudo && this.g3 && this.g3.ok) return this.g3.proietta(X, Y, Z || 0);
     const C = this.camera, py = Y - C.y, pz = Z - C.z, d = Math.max(0.5, py * C.fy + pz * C.fz), s = C.F / d;
     return { x: this.W / 2 + (X - (crudo ? 52.5 : this.camX)) * s, y: (C.cy || 0) - (py * C.uy + pz * C.uz) * s, s, d };
   }
@@ -705,6 +707,7 @@ class Campo {
   disegna(){
     const c = this.x, W = this.W, H = this.H; if (!W || !this.camera) return;
     const P = (X, Y, Z = 0) => this.p3(X, Y, Z), t = performance.now() / 1000;
+    if (this.g3 && this.g3.ok){ this.g3.render(); c.clearRect(0, 0, W, H); return this.sopra(c, P, t); }
     const poly = (pts) => { c.beginPath(); pts.forEach(([X, Y, Z], k) => { const q = P(X, Y, Z || 0); k ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y); }); c.closePath(); };
     // cielo e tetto dello stadio
     const cielo = c.createLinearGradient(0, 0, 0, H * 0.3); cielo.addColorStop(0, '#5b7fa8'); cielo.addColorStop(1, '#a9c4dd'); c.fillStyle = cielo; c.fillRect(0, 0, W, H);
@@ -768,6 +771,11 @@ class Campo {
       if (terra || salto){ c.save(); c.translate(q.x, q.y - salto); if (terra) c.rotate((p.dir || 1) * 1.35); c.translate(-q.x, -q.y); this.atleta(p, col[p.lato]); c.restore(); }
       else this.atleta(p, col[p.lato]);
     }
+    this.sopra(c, P, t);
+  }
+  // segni sopra la partita: freccia e nome tuo, a chi passi, radar
+  sopra(c, P, t){
+    const W = this.W, H = this.H, b = this.b, me = this.me;
     // il tuo giocatore: freccia sopra e nome sotto (come in TV)
     const qm = P(me.mx, me.my), sm = qm.s;
     if (qm.x < -6 || qm.x > W + 6){ const sx = qm.x < 0 ? 16 : W - 16, sy = clamp(qm.y - 20, 60, H - 60), dd2 = qm.x < 0 ? -1 : 1;
@@ -834,6 +842,7 @@ class Campo {
     removeEventListener('resize', this._r); removeEventListener('keydown', this._kd); removeEventListener('keyup', this._ku);
     try { Suono.fermaFolla(); } catch (e) {}
     try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {}); } catch (e) {}
+    try { this.g3 && this.g3.distruggi(); } catch (e) {}
     this.v.remove(); document.body.classList.remove('in-partita');
     this.o.dopo && this.o.dopo();
   }
