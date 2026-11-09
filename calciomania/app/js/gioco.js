@@ -544,6 +544,7 @@ function menu(){
   ${modo() === 'presidente' ? `<button class="riga-menu" data-a="vai" data-v="club" data-sub="personalizza">${ic('pennello')} Personalizza club, maglie e nomi</button>` : ''}
   <button class="riga-menu oro" data-a="codice">${ic(S.codice ? 'bacchetta' : 'chiave')} ${S.codice ? 'Pannello segreto' : 'Aggiungi codice'}</button>
   <button class="riga-menu" data-a="comeSiGioca">${ic('aiuto')} Come si gioca</button>
+  ${modo() === 'giocatore' ? `<button class="riga-menu" data-a="durataPartita">${ic('cronometro')} Durata della partita<span>${S.opz.durataP || 3} minuti</span></button>` : ''}
   <button class="riga-menu" data-a="suono">${ic(S.opz.suono ? 'suono' : 'muto')} ${S.opz.suono ? 'Suoni attivi' : 'Suoni spenti'}</button>
   <button class="riga-menu" data-a="installa">${ic('scarica')} Metti l’app sul telefono</button>
   <button class="riga-menu rosso" data-a="ricomincia">${ic('cestino')} Ricomincia da capo</button></section>
@@ -721,6 +722,7 @@ document.addEventListener('click', (e) => {
     case 'segreto': segreto(v); break;
     case 'apriProgetto': sottoschermo.progetto = !sottoschermo.progetto; disegna(); break;
     case 'design': { S.stadio.design = Object.assign({}, S.stadio.design || {}); const k = b.dataset.k; S.stadio.design[k] = ['forma'].includes(k) ? +v : ['scritta', 'bandiere', 'fumogeni', 'notte'].includes(k) ? v === '1' : v; salva(); disegna(); break; }
+    case 'durataPartita': { const L = [2, 3, 5, 8, 10, 15]; S.opz.durataP = L[(L.indexOf(S.opz.durataP || 3) + 1) % L.length]; salva(); menu(); break; }
     case 'suono': S.opz.suono = !S.opz.suono; Suono.on = S.opz.suono; salva(); menu(); break;
     case 'comeSiGioca': comeSiGioca(); break;
     case 'salvataggi': salvataggi(); break;
