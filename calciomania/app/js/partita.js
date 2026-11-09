@@ -385,7 +385,7 @@ function giocaInDiretta(){
   if (modo() === 'giocatore'){
     if (D.sq[D.noi].slots.some((s) => s.p && s.p.io)) return giocaPartitaVera(D);
     const io = S.rosa.find((p) => p.io);
-    if (io) avviso(io.inf > 0 ? 'Sei infortunato: questa partita la guardi dalla tribuna. Dalla prossima giochi tu!' : io.squal > 0 ? 'Sei squalificato: questa partita la guardi dalla tribuna.' : 'Oggi non giochi.');
+    if (io) avviso(io.inf > 0 ? `Sei infortunato (${(io.infT || 'infortunio').toLowerCase()}): salti solo questa partita, dalla prossima giochi tu!` : io.squal > 0 ? 'Sei squalificato: questa partita la guardi dalla tribuna.' : 'Oggi non giochi.');
   }
   const io = S.club, avv = D.avv;
   const sp = D.casa ? calcPubblico(false).toLocaleString('it-IT') + ' spettatori attesi' : '';
