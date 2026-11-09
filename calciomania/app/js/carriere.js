@@ -314,9 +314,10 @@ function schermoIo(){
 }
 function cartaIo(){
   const io = ioG(), M = S.mio; if (!io || !M) return '';
+  if (io.inf > 1) io.inf = 1;
   const st = M.st, media = st.nv ? (st.sv / st.nv).toFixed(2) : '—', u = S.ultima && S.ultima.io;
   const tit = formazione().some((x) => x.p && x.p.io);
-  return `<section class="carta io-card"><div class="io-top">${avatarIo(io, 72)}<div><small>${RUOLI_N[io.r]} · ${io.eta} anni · n° ${io.num} ${nazDi(io.naz).f}</small><h2>${esc(M.nome)}</h2><span class="${tit ? 'verde' : 'giallo'}">${io.inf ? 'Infortunato' : io.squal ? 'Squalificato' : tit ? 'Titolare' : 'In panchina: allenati di più!'}</span></div>${badgeVal(io.val)}</div>
+  return `<section class="carta io-card"><div class="io-top">${avatarIo(io, 72)}<div><small>${RUOLI_N[io.r]} · ${io.eta} anni · n° ${io.num} ${nazDi(io.naz).f}</small><h2>${esc(M.nome)}</h2><span class="${io.inf > 0 || io.squal > 0 ? 'giallo' : 'verde'}">${io.inf > 0 ? `Infortunato (${esc((io.infT || 'infortunio').toLowerCase())}): salti la prossima partita` : io.squal > 0 ? `Squalificato: salti ${io.squal} partit${io.squal === 1 ? 'a' : 'e'}` : 'Titolare'}</span></div>${badgeVal(io.val)}</div>
     <div class="io-pot"><small>Bravura ${io.val} · potenziale ${io.pot}</small>${barra((io.val / io.pot) * 100, 'verde')}<small>Prossimo miglioramento</small>${barra((M.prog || 0) * 100)}</div>
     <div class="dati-g"><div><small>Presenze</small><b>${st.pres}</b></div><div><small>Gol</small><b>${st.gol}</b></div><div><small>Media voto</small><b>${media}</b></div><div><small>Energia</small><b>${Math.round(io.forma)}</b></div></div>
     ${u ? `<p class="nota">${u.gioca ? `Ultima partita: voto <b>${u.voto != null ? u.voto : '—'}</b>${u.gol ? `, <b>${u.gol} gol</b>` : ''}` : u.panchina ? 'Ultima partita: sei rimasto in panchina.' : 'Ultima partita: non hai giocato.'}</p>` : ''}
