@@ -150,7 +150,7 @@ function votiDiretta(D){
       const min = (P.min1 == null ? 90 + D.rec : P.min1) - P.min0; if (min < 10 && !P.gol) return;
       let v = 6 + clamp(diff * 0.3, -0.9, 0.9) + P.gol * 0.95 + P.ass * 0.5 - P.amm * 0.25 - P.esp * 1.6 + (p.val - media) / 40 + gauss() * 0.35;
       if (p.r === 'P') v += P.par * 0.25 - subiti * 0.35 + (subiti === 0 ? 0.6 : 0); else if (p.r === 'D') v += (subiti === 0 ? 0.4 : -subiti * 0.15);
-      if (P.inf) v -= 0.2;
+      if (P.inf) v -= 0.2; v += P.az || 0;
       v = clamp(Math.round(v * 2) / 2, 3.5, 10);
       out[p.id] = { v, lato, nome: nomeG(p), r: p.r, gol: P.gol, ass: P.ass, mio: lato === D.noi };
       if (!motm || v > out[motm].v || (v === out[motm].v && P.gol > out[motm].gol)) motm = p.id;
@@ -263,9 +263,65 @@ function apriMatch(o){
         for (let i = n; i < Dir.ev.length; i++) _partita.ev.push(Dir.ev[i]);
         if (Dir.pausaAuto){ break; }
       }
+      if (azioni.length && !finito && _partita.min >= azioni[0] && _partita.pausa <= 0 && !_partita.script && !$('#mCambi') && !$('#azione')){ azioni.shift(); avviaAzione(); }
       if (Dir.pausaAuto && _partita.min >= Dir.pausaAuto.min && !$('#mCambi')){ const pa = Dir.pausaAuto; Dir.pausaAuto = null; apriCambi(pa); }
       if (tab === 'stat' && !finito) $('#mPan', v).innerHTML = statHTML();
     }, 120);
+  }
+  // carriera da giocatore: ogni tanto la palla arriva a te e giochi tu l'azione
+  const ioSlot = () => o.diretta && modo() === 'giocatore' ? Dir.sq[Dir.noi].slots.find((s) => s.p && s.p.io && !s.esp) : null;
+  const azioni = ioSlot() ? azioniPartita(ioSlot().ruolo, o.durata) : [];
+  function avviaAzione(){
+    const sl = ioSlot(); if (!sl) return;
+    const noi = Dir.noi, sqN = Dir.sq[noi], sqA = Dir.sq[1 - noi], tm = tierMedia(S.tier), io = sl.p;
+    const sk = (p) => clamp(0.45 + (p.val - tm) / 40, 0.25, 0.95);
+    const g = (p) => ({ num: p.num || '', nome: p.c, p, sk: sk(p) });
+    const altri = attivi(sqN).filter((s) => s !== sl && s.ruolo !== 'P').sort((a, b) => ({ A: 0, C: 1, D: 2 }[a.ruolo] - { A: 0, C: 1, D: 2 }[b.ruolo]) || b.p.val - a.p.val);
+    const comp = sl.ruolo === 'P' ? altri.filter((s) => s.ruolo === 'D').concat(altri).slice(0, 2) : altri.slice(0, 3);
+    const avvA = attivi(sqA), per = (r) => avvA.filter((s) => s.ruolo === r).map((s) => g(s.p));
+    const gen = (n) => Array.from({ length: n }, (_, i) => ({ num: 2 + i, nome: '', sk: 0.5 }));
+    const dif = per('D').concat(gen(4)).slice(0, 4), cen = per('C').concat(gen(2)).slice(0, 2), att = per('A').concat(per('C')).concat(gen(2)).slice(0, 2);
+    const gkS = avvA.find((s) => s.ruolo === 'P'), F = sqA.forza || { dif: tm, por: tm };
+    const noiK = noi === 0 ? colH : colA, loroK = noi === 0 ? colA : colH;
+    _partita.pausa = Infinity;
+    new Azione({ tipo: sl.ruolo === 'P' ? 'portiere' : 'campo', min: _partita.min, punteggio: `${h.nome} ${gh} - ${ga} ${a.nome}`,
+      colNoi: { c1: noiK.c1, c2: noiK.c2, t: noiK.t, nome: S.club.nome }, colLoro: { c1: loroK.c1, c2: loroK.c2, t: loroK.t, nome: (noi === 0 ? a : h).nome },
+      io: { num: io.num || '', nome: io.c, r: sl.ruolo, p: io, sk: sk(io) }, mia: sk(io),
+      compagni: comp.map((s) => g(s.p)), avv: { gk: gkS ? g(gkS.p) : { num: 1, nome: '' }, dif, cen, att },
+      dspd: clamp(0.94 + ((F.dif || tm) - tm) / 70 + (S.diff || 0) * 0.025, 0.82, 1.15), gk: clamp(0.5 + ((F.por || tm) - tm) / 40 + (S.diff || 0) * 0.03, 0.25, 0.92),
+      fine: (es) => { applicaAzione(es, sl); if (_partita) _partita.pausa = 0; } });
+  }
+  function applicaAzione(es, sl){
+    const D = Dir, noi = D.noi, io = sl.p, min = Math.round((_partita.min + 0.05) * 100) / 100, P = (p) => D.pers[p.id] || (D.pers[p.id] = { min0: 0, gol: 0, ass: 0, amm: 0, esp: 0, par: 0 });
+    const gkA = attivi(D.sq[1 - noi]).find((s) => s.ruolo === 'P');
+    const ev = [];
+    const bonus = (x) => { P(io).az = (P(io).az || 0) + x; };
+    if (es.tipo === 'gol'){
+      const chi = es.p || io, ass = es.io ? (es.assist && es.assist.p) : (es.passatoDaMe ? io : null);
+      D.gol[noi]++; D.st.tiri[noi]++; D.st.porta[noi]++; P(chi).gol++; if (ass) P(ass).ass++;
+      D.marc.push({ lato: noi, min: Math.ceil(min), id: chi.id, nome: nomeG(chi), ass: ass ? nomeG(ass) : '', assId: ass && ass.id });
+      ev.push({ min, tipo: 'gol', lato: noi, mio: true, nome: nomeG(chi), t: (chi === io ? `GOOOL di ${nomeG(io)}! Lo hai segnato tu!` : frase('gol', nomeG(chi))) + (ass ? ` Assist di ${nomeG(ass)}.` : '') });
+      if (chi !== io && ass === io) bonus(0.2);
+    } else if (es.tipo === 'parata' && sl.ruolo === 'P'){
+      P(io).par++; bonus(0.3); ev.push({ min, tipo: 'parata', lato: 1 - noi, t: `Grande parata di ${nomeG(io)}!` });
+    } else if (es.tipo === 'presa'){
+      bonus(es.difesa ? 0 : 0.2); ev.push({ min, tipo: 'parata', lato: 1 - noi, t: es.difesa ? 'La difesa salva tutto davanti a ' + nomeG(io) + '.' : `${nomeG(io)} esce e blocca il pallone!` });
+    } else if (es.tipo === 'golSubito'){
+      const chi = es.p || (attivi(D.sq[1 - noi]).find((s) => s.ruolo === 'A') || attivi(D.sq[1 - noi])[1] || {}).p;
+      D.gol[1 - noi]++; D.st.tiri[1 - noi]++; D.st.porta[1 - noi]++; if (chi) P(chi).gol++; bonus(-0.2);
+      D.marc.push({ lato: 1 - noi, min: Math.ceil(min), id: chi && chi.id, nome: chi ? nomeG(chi) : 'Avversario', ass: '' });
+      ev.push({ min, tipo: 'gol', lato: 1 - noi, mio: false, nome: chi ? nomeG(chi) : '', t: frase('golAvv', chi ? nomeG(chi) : '') });
+    } else if (es.tipo === 'parata' || es.tipo === 'fuori' || es.tipo === 'palo'){
+      const chi = es.p || io; D.st.tiri[sl.ruolo === 'P' ? 1 - noi : noi]++;
+      if (sl.ruolo === 'P'){ ev.push({ min, tipo: 'occ', lato: 1 - noi, t: 'Tiro degli avversari: fuori!' }); }
+      else { if (es.tipo === 'parata' && !es.respinta){ D.st.porta[noi]++; if (gkA) P(gkA.p).par++; }
+        if (chi === io) bonus(es.tipo === 'parata' ? 0.1 : es.tipo === 'palo' ? 0.1 : -0.05);
+        ev.push({ min, tipo: es.tipo === 'fuori' ? 'occ' : es.tipo, lato: noi, t: `${nomeG(chi)}: ${es.tipo === 'parata' ? (es.respinta ? 'tiro respinto da un difensore!' : 'tiro parato dal portiere!') : es.tipo === 'palo' ? 'colpisce il palo!' : 'tiro fuori di poco!'}` }); }
+    } else if (es.tipo === 'persa'){
+      bonus(-0.15); ev.push({ min, tipo: 'info', lato: noi, t: `${nomeG(io)} perde il pallone.` });
+    } else ev.push({ min, tipo: 'info', lato: noi, t: sl.ruolo === 'P' ? 'Pericolo passato.' : `L’azione di ${nomeG(io)} sfuma.` });
+    ev.forEach((e) => { D.ev.push(e); _partita.ev.push(e); });
+    D.ev.sort((x, y) => x.min - y.min); _partita.ev.sort((x, y) => x.min - y.min);
   }
   function apriCambi(pa){
     if (!o.diretta || finito) return;
@@ -307,7 +363,7 @@ function apriMatch(o){
   v.querySelectorAll('[data-vel]').forEach((b) => b.onclick = () => { _partita.vel = +b.dataset.vel; S.opz.vel = +b.dataset.vel; v.querySelectorAll('[data-vel]').forEach((x) => x.classList.toggle('on', x === b)); });
   v.querySelectorAll('[data-vista]').forEach((b) => b.onclick = () => { S.opz.vista = b.dataset.vista; _partita.vista = b.dataset.vista; v.querySelectorAll('[data-vista]').forEach((x) => x.classList.toggle('on', x === b)); if (_partita.fine) _partita.disegna(); });
   $('#salta', v).onclick = () => {
-    const box = $('#mCambi', v); if (box) box.remove();
+    const box = $('#mCambi', v); if (box) box.remove(); azioni.length = 0; const az = $('#azione'); if (az) az.remove();
     if (o.diretta){ // i cambi per gli infortuni li fa l'allenatore
       while (!Dir.fine){ const n = Dir.ev.length; simMinuto(Dir); if (Dir.pausaAuto){ const pa = Dir.pausaAuto; Dir.pausaAuto = null; const sq = Dir.sq[Dir.noi], s = sq.slots[pa.slot]; const dentro = sq.panca.find((p) => s && p.r === s.ruolo) || sq.panca[0]; eseguiCambio(Dir, Dir.noi, pa.slot, dentro, Dir.simMin); } for (let i = n; i < Dir.ev.length; i++) if (!_partita.ev.includes(Dir.ev[i])) _partita.ev.push(Dir.ev[i]); }
       _partita.ev.sort((x, y) => x.min - y.min); _partita.pausa = 0;
