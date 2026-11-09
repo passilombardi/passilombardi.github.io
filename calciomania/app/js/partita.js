@@ -380,8 +380,13 @@ function apriMatch(o){
 
 // la partita giocata in diretta (da solo)
 function giocaInDiretta(){
+  if (modo() === 'giocatore'){ const io = S.rosa.find((p) => p.io); if (io && io.inf > 1) io.inf = 1; }
   const D = nuovaDiretta(); if (!D) return;
-  if (modo() === 'giocatore' && D.sq[D.noi].slots.some((s) => s.p && s.p.io)) return giocaPartitaVera(D);
+  if (modo() === 'giocatore'){
+    if (D.sq[D.noi].slots.some((s) => s.p && s.p.io)) return giocaPartitaVera(D);
+    const io = S.rosa.find((p) => p.io);
+    if (io) avviso(io.inf > 0 ? 'Sei infortunato: questa partita la guardi dalla tribuna. Dalla prossima giochi tu!' : io.squal > 0 ? 'Sei squalificato: questa partita la guardi dalla tribuna.' : 'Oggi non giochi.');
+  }
   const io = S.club, avv = D.avv;
   const sp = D.casa ? calcPubblico(false).toLocaleString('it-IT') + ' spettatori attesi' : '';
   apriMatch({ diretta: true, casa: D.casa, avv, modH: D.sq[0].mod, modA: D.sq[1].mod, durata: 90 + D.rec, spett: sp,
