@@ -25,6 +25,12 @@ function nuovaDiretta(){
   const m = calendario(d.n)[g].find(([h, a]) => h === L.mio || a === L.mio); if (!m) return null;
   const casa = m[0] === L.mio, avvI = casa ? m[1] : m[0], avv = d.squadre[avvI], noi = casa ? 0 : 1;
   const f = formazione();
+  // carriera da giocatore: tu giochi sempre (se non sei infortunato o squalificato)
+  const ioP = modo() === 'giocatore' && S.rosa.find((p) => p.io);
+  if (ioP && disponibile(ioP) && !f.some((x) => x.p === ioP)){
+    const L = f.map((x, i) => ({ x, i })).filter(({ x }) => x.ruolo === ioP.r).sort((a, b) => (a.x.p ? efficienza(a.x.p) : -1) - (b.x.p ? efficienza(b.x.p) : -1));
+    const k = L.length ? L[0].i : f.findIndex((x) => x.ruolo !== 'P'); if (k >= 0) f[k] = Object.assign({}, f[k], { p: ioP });
+  }
   const usati = new Set(f.filter((x) => x.p).map((x) => x.p.id));
   const panca = S.rosa.filter((p) => disponibile(p) && !usati.has(p.id)).sort((a, b) => efficienza(b) - efficienza(a)).slice(0, 9);
   const rosaA = rosaDi(avv, d.tier, d.stagione), modA = avv.mod || pick(['4-4-2', '4-3-3', '4-2-3-1', '3-5-2', '4-5-1'], rng(avv.nome + d.stagione));
@@ -375,6 +381,7 @@ function apriMatch(o){
 // la partita giocata in diretta (da solo)
 function giocaInDiretta(){
   const D = nuovaDiretta(); if (!D) return;
+  if (modo() === 'giocatore' && D.sq[D.noi].slots.some((s) => s.p && s.p.io)) return giocaPartitaVera(D);
   const io = S.club, avv = D.avv;
   const sp = D.casa ? calcPubblico(false).toLocaleString('it-IT') + ' spettatori attesi' : '';
   apriMatch({ diretta: true, casa: D.casa, avv, modH: D.sq[0].mod, modA: D.sq[1].mod, durata: 90 + D.rec, spett: sp,
