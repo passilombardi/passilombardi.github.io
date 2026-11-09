@@ -641,6 +641,22 @@ p.oro{color:var(--oro)}
 .focus-r .ic{width:26px;height:26px;color:var(--verde)}.focus-r span{display:flex;flex-direction:column}.focus-r small{color:var(--tenue)}
 .focus-r.on{border-color:var(--verde);background:var(--verdeT)}
 .aum-box{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}.aum-box>div{background:var(--card2,rgba(255,255,255,.05));border-radius:12px;padding:10px 6px;text-align:center}.aum-box span{display:block;font-size:12px;opacity:.7}.aum-box b{display:block;font-size:18px;margin-top:4px}.aum-box b{white-space:nowrap}.aum-box b.aum-verde{color:#22c55e}.aum-sl input{width:100%;accent-color:#d4af37;height:28px}.aum-pct{text-align:center;font-size:22px;margin:4px 0}.aum-veloci{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}.aum-veloci .btn{padding:8px 0;min-height:0}.aum-ch{text-align:center;margin:10px 0 4px}.aum-ch .verde{color:#22c55e}.aum-ch .oro{color:#d4af37}.aum-ch .arancio{color:#f97316}.aum-ch .rosso{color:#ef4444}
+.azione{position:fixed;inset:0;z-index:90;background:#05080c;display:flex;flex-direction:column;padding:calc(8px + env(safe-area-inset-top,0px)) 10px calc(10px + env(safe-area-inset-bottom,0px));gap:8px;touch-action:none;user-select:none;-webkit-user-select:none;max-width:980px;margin:0 auto}
+.az-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.az-tit b{display:block;font:800 22px var(--f-tit);color:#22d3ee;letter-spacing:.03em;text-transform:uppercase}.az-tit small{opacity:.75;font-size:13px}
+.az-salta{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:10px;padding:8px 14px;font-weight:700}
+.az-wrap{position:relative;flex:0 1 auto;aspect-ratio:1/1.12;max-height:calc(100% - 270px);width:100%;border-radius:14px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.08)}.az-wrap canvas{width:100%;height:100%;display:block}
+.az-msg{position:absolute;inset:0;display:grid;place-items:center;font:800 min(15vw,84px) var(--f-tit);color:#fff;text-shadow:0 4px 0 rgba(0,0,0,.45),0 0 24px rgba(0,0,0,.6);pointer-events:none;opacity:0;text-align:center;padding:0 10px}.az-msg.via{animation:azm 1.6s ease-out forwards}.az-msg.buono{color:#4ade80}.az-msg.male{color:#fca5a5}
+@keyframes azm{0%{opacity:0;transform:scale(.6)}15%{opacity:1;transform:scale(1.08)}30%{transform:scale(1)}85%{opacity:1}100%{opacity:0}}
+.az-tempo{position:absolute;left:10px;right:10px;top:8px;height:5px;border-radius:5px;background:rgba(0,0,0,.4)}.az-tempo i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#22d3ee,#22c55e)}
+.az-aiuto{position:absolute;left:8px;right:8px;bottom:6px;margin:0;font-size:12px;text-align:center;color:#fff;background:rgba(0,0,0,.45);border-radius:8px;padding:4px 6px;pointer-events:none}
+.az-ctrl{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:auto;min-height:200px}
+.az-joy{width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.1),rgba(255,255,255,.03));border:2px solid rgba(255,255,255,.18);display:grid;place-items:center;touch-action:none;flex:none}
+.az-pom{width:66px;height:66px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#cbd5e1);box-shadow:0 6px 16px rgba(0,0,0,.5);pointer-events:none;transition:transform .05s}
+.az-btns{display:grid;grid-template-columns:repeat(2,minmax(78px,96px));gap:10px}
+.az-b{aspect-ratio:1;border-radius:50%;border:3px solid;background:radial-gradient(circle at 50% 35%,rgba(255,255,255,.14),rgba(0,0,0,.35));color:#fff;font:800 15px var(--f-tit);letter-spacing:.02em;touch-action:none;box-shadow:0 0 18px rgba(0,0,0,.4)}
+.az-b.giu{transform:scale(.92);filter:brightness(1.4)}.az-b.tiro{border-color:#f97316}.az-b.pass{border-color:#38bdf8}.az-b.filt{border-color:#facc15}.az-b.scatto{border-color:#22c55e}
+.az-ctrl.por .az-btns{grid-template-columns:repeat(2,minmax(84px,104px))}
+@media (orientation:landscape) and (max-height:560px){.az-wrap{position:absolute;inset:0;max-height:none;aspect-ratio:auto;border-radius:0}.az-top{position:relative;z-index:2}.az-ctrl{position:absolute;left:12px;right:12px;bottom:12px;min-height:0;z-index:2}.az-joy{width:130px;height:130px}.az-b{opacity:.92}.az-aiuto{display:none}}
 .az-lista{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.az-lista .btn{flex:1 1 150px}
 </style>
 </head>
@@ -652,6 +668,7 @@ p.oro{color:var(--oro)}
 <script src="js/icone.js"></script>
 <script src="js/sistemi.js"></script>
 <script src="js/partita.js"></script>
+<script src="js/azione.js"></script>
 <script src="js/schermi.js"></script>
 <script src="js/coppe.js"></script>
 <script src="js/veri.js"></script>
