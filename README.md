@@ -29,3 +29,10 @@ Fonda la tua società di calcio con 1.000.000 € e portala dalla Terza Categori
 
 Sito: https://passilombardi.github.io/calciomania/
 Apri l'app: https://passilombardi.github.io/calciomania/app/
+
+## Calciomania 2
+
+Calciomania con la grafica nuova nera e oro: accesso con Google o email, «Scegli la carriera» con le tre carte (presidente, allenatore, giocatore) e le guide «Come si fa» per rosa, tattica e stadio. Usa lo stesso account e gli stessi salvataggi di Calciomania PM.
+
+Sito: https://passilombardi.github.io/calciomania2/
+Apri l'app: https://passilombardi.github.io/calciomania2/app/
