@@ -51,7 +51,7 @@ function disegna(){
   const badgeNav = (k) => k === 'mercato' && (S.offerte || []).length ? '<i class="pallino"></i>' : k === 'club' && S.stadio.cantieri.length ? '<i class="pallino blu"></i>' : k === 'squadra' && S.rosa.some((p) => p.inf > 0 || p.squal > 0) ? '<i class="pallino rosso"></i>' : '';
   app.innerHTML = `<div class="shell">
   <aside class="side">
-    <div class="side-logo"><b>CALCIOMANIA</b><span>2</span></div>
+    <div class="side-logo"><b>CALCIOMANIA</b></div>
     <button class="side-club" data-a="vai" data-v="home">${mioStemma(44)}<span><b>${esc(S.club.nome)}</b><small>${T.nome} · stagione ${S.stagione}</small></span></button>
     <nav class="side-nav">${navM().map(([k, n, i]) => `<button class="${schermo === k ? 'on' : ''}" data-a="vai" data-v="${k}">${ic(i)}<span>${n}</span>${badgeNav(k)}</button>`).join('')}</nav>
     <div class="side-soldi"><small>${SV.t}</small><b class="${SV.v < 0 ? 'rosso' : ''}">${euro(SV.v)}</b>${debitoTot() ? `<small>Debito ${euroBreve(debitoTot())}</small>` : ''}</div>

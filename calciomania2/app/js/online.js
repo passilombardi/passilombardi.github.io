@@ -109,6 +109,8 @@ window.Online = (function(){
     avviso('Ciao ' + O.nome() + '!');
     let c = null; try { c = await leggiCloud(S ? (S.modo || 'presidente') : (localStorage.getItem('calciomania-attiva') || undefined)); } catch (e) { err = testoErr(e); }
     ascoltaSalvataggio();
+    // Calciomania: dopo l'accesso si parte sempre da «Scegli la carriera»
+    if (!S && typeof schermataCarriere === 'function'){ schermataCarriere(false); return; }
     if (!S){
       const loc = carica();
       if (c && c.club){ S = c; segnaAttiva(S.modo || 'presidente'); migra(); Suono.on = S.opz.suono; schermo = 'home'; salva(true); disegna(); avviso('Ritrovata la tua ' + S.club.nome + '!'); O.riprendi(); }
