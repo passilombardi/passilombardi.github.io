@@ -70,7 +70,7 @@ function schermataIniziale(soloAccesso){
   document.body.classList.remove('in-partita');
   $('#app').innerHTML = `<div class="acc2"><div class="acc2-foto"></div><div class="acc2-c">
     <div class="acc2-logo">${PALLA2}</div>
-    <h1 class="acc2-tit">CALCIOMANIA<span>2</span></h1>
+    <h1 class="acc2-tit">CALCIOMANIA</h1>
     <p class="acc2-sotto">Presidente, allenatore, giocatore. Dalla Terza Categoria alla Serie A.</p>
     <button class="btn2 scuro" id="a2G"><svg viewBox="0 0 24 24" class="g2" aria-hidden="true"><path fill="currentColor" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3z"/><path fill="currentColor" d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z" opacity=".75"/><path fill="currentColor" d="M6.4 14a6 6 0 0 1 0-3.9V7.5H3.1a10 10 0 0 0 0 9z" opacity=".55"/><path fill="currentColor" d="M12 6c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.5l3.3 2.6C7.2 7.8 9.4 6 12 6z" opacity=".9"/></svg>CONTINUA CON GOOGLE</button>
     <div class="acc2-o"><span>oppure</span></div>
@@ -149,7 +149,7 @@ function impostazioni2(){
     <h3>Altro</h3>
     <button class="riga-menu" data-a="comeSiGioca">${ic('aiuto')} Come si gioca</button>
     <button class="riga-menu" data-a="installa">${ic('scarica')} Metti l’app sul telefono</button>
-    <p class="nota centro">Calciomania 2 · gratis, senza pubblicità · <a href="../">sito</a></p>`);
+    <p class="nota centro">Calciomania · gratis, senza pubblicità · <a href="../">sito</a></p>`);
   const x = $('#i2Esci'); if (x) x.onclick = () => { Online.logout().then(() => { chiudiFoglio(true); _ospite2 = false; schermataIniziale(); avviso('Sei uscito dall’account'); }); };
   const y = $('#i2Entra'); if (y) y.onclick = () => { chiudiFoglio(true); _ospite2 = false; S = null; document.body.classList.remove('in-partita'); mostraAccesso(); };
 }
@@ -235,3 +235,93 @@ schermoStadio = function(){
     'Con «Progetta il tuo stadio» scegli nome, colori dei seggiolini e tetto.'
   ]) + _stadioVecchio();
 };
+
+// ---------- PRESIDENTE: non gioca le partite, le fa giocare e le programma ----------
+// Il presidente non scende in campo: decide quando si gioca la giornata (subito, più giornate
+// di fila o da sola ogni tot ore) e poi guarda i risultati. Le partite in diretta restano
+// all'allenatore e al giocatore. I gironi online restano come prima (si gioca quando tutti sono pronti).
+const presLocale = () => S && modo() === 'presidente' && S.lega && !S.lega.online;
+let _batch2 = false;
+const _mostraPendentiVecchio = mostraPendenti;
+mostraPendenti = function(){ if (_batch2) return; return _mostraPendentiVecchio(); };
+const BLOCCA2 = ['stagione', 'scelta', 'stampa', 'livello', 'offerteCarriera', 'coppa'];
+
+// gioca fino a n giornate di fila; si ferma se serve una decisione del presidente
+function giocaGiornate2(n, auto){
+  if (!presLocale() || _occupato) return [];
+  const fatti = [];
+  _batch2 = true;
+  try {
+    for (let i = 0; i < n; i++){
+      if (!prossimaPartita() || problemiPerGiocare().length) break;
+      if (!S.obiettivi || S.obiettivi.s !== S.stagione) nuoviObiettivi();
+      preparaCoppe();
+      if (S.abbS !== S.stagione){ S.abbS = S.stagione; vendiAbbonamenti(); }
+      aggiornaMioSlot();
+      const D = nuovaDiretta(); if (!D) break;
+      finisciDiretta(D); chiudiDiretta(D); Dir = null;
+      sincronizza(false, false);
+      const k = S.pendenti.findIndex((p) => p.tipo === 'partita');
+      if (k >= 0) fatti.push(S.pendenti.splice(k, 1)[0].rep);
+      if (S.pendenti.some((p) => BLOCCA2.includes(p.tipo))) break;
+    }
+  } finally { _batch2 = false; }
+  if (S.opz.prog && !auto) S.opz.prog.ultimo = Date.now();
+  salva(true); disegna();
+  return fatti;
+}
+function mostraGiornate2(fatti, auto){
+  if (!fatti.length){ const pr = problemiPerGiocare(); avviso(pr.length ? pr[0].t : 'Non ci sono giornate da giocare'); return mostraPendenti(); }
+  if (fatti.length === 1 && !auto) return mostraRisultati(fatti[0], () => mostraPendenti());
+  const v = fatti.filter((r) => r.esito === 'V').length, nn = fatti.filter((r) => r.esito === 'N').length, p = fatti.length - v - nn;
+  foglio(`<h2>${ic('calendario')} ${auto ? 'Mentre eri via si è giocato' : 'Giornate giocate'}</h2>
+    <p class="tenue">${fatti.length} ${fatti.length === 1 ? 'partita' : 'partite'}: <b class="oro">${v} vinte</b>, ${nn} pareggiate, ${p} perse.</p>
+    <div class="ris2">${fatti.map((r) => `<div class="ris2-r"><small>Giornata ${r.r + 1}</small>${cartaRisultato(r)}</div>`).join('')}</div>
+    <div class="riga-btn"><button class="btn" data-a="chiudi">Ok</button><button class="btn sec" data-a="vai" data-v="campionato">${ic('lista')} Classifica</button></div>`, () => mostraPendenti());
+}
+const OGNI2 = [[0, 'Spento'], [3600e3, 'Ogni ora'], [6 * 3600e3, 'Ogni 6 ore'], [24 * 3600e3, 'Ogni giorno']];
+function programma2(){
+  const pr = S.opz.prog || { ogni: 0 };
+  const rimaste = (() => { const d = S.lega.dati; return d ? giornateTot(d.n) - d.giornata : 0; })();
+  const scelte = [[1, 'La prossima giornata'], [3, '3 giornate'], [5, '5 giornate'], [rimaste, 'Fino a fine campionato (' + rimaste + ')']].filter(([k], i) => k > 0 && (i < 3 ? k <= rimaste : true));
+  foglio(`<h2>${ic('calendario')} Programma le partite</h2>
+    <p class="tenue">Sei il presidente: la squadra la manda in campo l’allenatore. Tu decidi quando si gioca e poi guardi i risultati.</p>
+    <h3>Gioca adesso</h3>
+    <div class="prog2">${scelte.map(([k, t]) => `<button class="btn sec" data-a="prog2Gioca" data-v="${k}">${ic('play')} ${t}</button>`).join('')}</div>
+    <p class="nota">Se arriva un imprevisto, una conferenza stampa o la fine della stagione, ci si ferma per farti decidere.</p>
+    <h3>Gioca da sola</h3>
+    <div class="seg prog2-seg">${OGNI2.map(([ms, t]) => `<button class="${(pr.ogni || 0) === ms ? 'on' : ''}" data-a="prog2Ogni" data-v="${ms}">${t}</button>`).join('')}</div>
+    <p class="nota">La giornata si gioca da sola anche se il gioco è chiuso: quando torni trovi i risultati (al massimo 10 giornate alla volta).</p>`);
+}
+function controllaProgramma2(){
+  if (!presLocale() || _occupato || document.querySelector('.velo') || document.querySelector('.car2-pag, .acc2, .fonda')) return;
+  const pr = S.opz.prog; if (!pr || !pr.ogni) return;
+  const dovute = Math.min(10, Math.floor((Date.now() - (pr.ultimo || Date.now())) / pr.ogni));
+  if (dovute < 1) return;
+  const fatti = giocaGiornate2(dovute, true);
+  pr.ultimo = (pr.ultimo || Date.now()) + fatti.length * pr.ogni; if (fatti.length === dovute && Date.now() - pr.ultimo > pr.ogni) pr.ultimo = Date.now();
+  salva(true);
+  if (fatti.length) mostraGiornate2(fatti, true);
+}
+setInterval(controllaProgramma2, 60e3);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(controllaProgramma2, 500); });
+
+document.addEventListener('click', (ev) => {
+  const b = ev.target.closest('[data-a]'); if (!b) return;
+  const a = b.dataset.a, v = b.dataset.v;
+  if (a === 'prog2Gioca'){ ev.stopImmediatePropagation(); chiudiFoglio(true); mostraGiornate2(giocaGiornate2(+v), false); }
+  else if (a === 'prog2Ogni'){ ev.stopImmediatePropagation(); S.opz.prog = { ogni: +v, ultimo: Date.now() }; salva(); avviso(+v ? 'Le giornate si giocheranno da sole: ' + OGNI2.find((x) => x[0] === +v)[1].toLowerCase() : 'Partite automatiche spente'); programma2(); disegna(); }
+  else if (a === 'programma2'){ ev.stopImmediatePropagation(); programma2(); }
+  else if ((a === 'gioca' || a === 'giocaVeloce') && presLocale()){ ev.stopImmediatePropagation(); mostraGiornate2(giocaGiornate2(1), false); }
+}, true);
+
+const _homeVecchia = schermoHome;
+schermoHome = function(){
+  const h = _homeVecchia();
+  if (!presLocale()) return h;
+  const pr = S.opz.prog, tra = pr && pr.ogni ? Math.max(0, pr.ogni - (Date.now() - (pr.ultimo || Date.now()))) : 0;
+  const quando = pr && pr.ogni ? `<p class="prog2-info">${ic('cronometro')} Gioca da sola: prossima giornata ${tra < 60e3 ? 'tra poco' : 'tra ' + (tra >= 3600e3 ? Math.round(tra / 3600e3) + ' or' + (Math.round(tra / 3600e3) === 1 ? 'a' : 'e') : Math.round(tra / 60e3) + ' minuti')}</p>` : '';
+  return h.replace(/<div class="gioca-riga">[\s\S]*?<\/button><\/div>/, `<div class="gioca-riga"><button class="btn-gioca" data-a="gioca">${ic('calendario')} GIOCA LA GIORNATA</button><button class="btn-sim" data-a="programma2" title="Programma le partite">${ic('cronometro')}<span>Programma</span></button></div>${quando}`);
+};
+// all'avvio e quando torni nel gioco
+window.addEventListener('load', () => setTimeout(controllaProgramma2, 1500));
