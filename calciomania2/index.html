@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e0e0f">
+<meta name="description" content="Calciomania 2: il gioco di calcio gratis. Presidente, allenatore o giocatore: dalla Terza Categoria alla Serie A.">
+<title>Calciomania 2</title>
+<link rel="icon" href="app/icon-192.png">
+<link rel="apple-touch-icon" href="app/icon-180.png">
+<meta property="og:title" content="Calciomania 2">
+<meta property="og:description" content="Presidente, allenatore, giocatore. Dalla Terza Categoria alla Serie A.">
+<meta property="og:image" content="https://passilombardi.github.io/calciomania2/app/icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root{--fondo:#0e0e0f;--carta:#18181a;--linea:rgba(255,255,255,.08);--testo:#f4f4f5;--tenue:#a1a1a7;--oro:#d9ae3a;--ft:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;--f:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--fondo);color:var(--testo);font:16px/1.55 var(--f);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1040px;margin:0 auto;padding:0 max(16px,env(safe-area-inset-left,0px))}
+h1,h2,h3{font-family:var(--ft);line-height:1;margin:0 0 .35em;letter-spacing:.01em}
+h2{font-size:clamp(32px,6vw,46px)}h2 span{color:var(--oro)}
+p{margin:.4em 0}
+.hero{position:relative;overflow:hidden;padding:72px 0 48px;border-bottom:1px solid var(--linea)}
+.hero::before{content:'';position:absolute;inset:0;background:
+  radial-gradient(8% 9% at 10% 6%,rgba(255,250,235,.8),transparent 70%),radial-gradient(6% 7% at 24% 16%,rgba(255,250,235,.55),transparent 70%),
+  radial-gradient(8% 9% at 90% 6%,rgba(255,250,235,.8),transparent 70%),radial-gradient(6% 7% at 76% 16%,rgba(255,250,235,.55),transparent 70%),
+  repeating-linear-gradient(162deg,transparent 0 46px,rgba(255,255,255,.03) 46px 48px),linear-gradient(180deg,#1b1e20,#121414 60%,var(--fondo))}
+.hero>*{position:relative}
+.hero-in{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
+.logo{width:72px;height:72px;border-radius:18px;background:var(--oro);color:#111;display:grid;place-items:center;box-shadow:0 14px 30px -12px rgba(217,174,58,.7)}
+.logo svg{width:40px;height:40px}
+.hero h1{font-size:clamp(64px,12vw,112px);line-height:.88;margin:26px 0 0}.hero h1 span{display:block;color:var(--oro)}
+.sotto{font-size:clamp(18px,3vw,22px);color:#c9c9cd;max-width:520px;margin:14px 0 28px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:58px;padding:12px 34px;border-radius:14px;font:800 22px var(--ft);letter-spacing:.08em;text-decoration:none;color:#16120a;background:var(--oro);box-shadow:0 14px 34px -14px var(--oro);transition:transform .15s,filter .2s}
+.btn:hover{filter:brightness(1.08);transform:translateY(-2px)}
+.gratis{display:block;margin-top:12px;color:var(--tenue);font-size:14px}
+.tel{width:100%;max-width:300px;justify-self:center;border-radius:32px;border:7px solid #232325;box-shadow:0 30px 60px -20px #000;overflow:hidden;background:#000}
+.tel img{display:block;width:100%;height:auto}
+section{padding:56px 0;border-bottom:1px solid var(--linea)}
+.tre{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px}
+.c{background:var(--carta);border:1px solid var(--linea);border-radius:16px;padding:20px}
+.c h3{font-size:26px;display:flex;align-items:center;gap:10px}.c h3 i{width:30px;height:30px;border-radius:8px;background:var(--oro);color:#16120a;display:grid;place-items:center;font-style:normal;font-size:16px}
+.c p{color:var(--tenue);font-size:15px}
+.foto{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:24px}
+.foto figure{margin:0}.foto figcaption{color:var(--tenue);font-size:14px;text-align:center;margin-top:10px}
+.foto .tel{max-width:none}
+.lista{display:grid;grid-template-columns:1fr 1fr;gap:10px 28px;margin:20px 0 0;padding:0;list-style:none}
+.lista li{padding-left:28px;position:relative;color:#d4d4d8}.lista li::before{content:'✓';position:absolute;left:0;color:var(--oro);font-weight:800}
+.fine{text-align:center}
+footer{padding:28px 0 40px;text-align:center;color:var(--tenue);font-size:14px}footer a{color:var(--oro)}
+@media (max-width:760px){
+  .hero{padding:48px 0 36px}.hero-in{grid-template-columns:1fr}.hero .tel{max-width:260px}
+  .tre,.foto{grid-template-columns:1fr}.foto .tel{max-width:280px;margin:0 auto}.lista{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<header class="hero"><div class="wrap hero-in">
+  <div>
+    <div class="logo"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 7.3l3.4 2.5-1.3 4h-4.2l-1.3-4z" fill="currentColor"/><path d="M12 2.8v4.5M15.4 9.8l4.2-1.5M14.1 13.8l2.6 3.6M9.9 13.8l-2.6 3.6M8.6 9.8L4.4 8.3" stroke="currentColor" stroke-width="2"/></svg></div>
+    <h1>CALCIOMANIA<span>2</span></h1>
+    <p class="sotto">Presidente, allenatore o giocatore. Parti dalla Terza Categoria e arriva in Serie A.</p>
+    <a class="btn" href="app/">GIOCA ADESSO</a>
+    <span class="gratis">Gratis, senza pubblicità. Si gioca dal telefono e dal computer.</span>
+  </div>
+  <div class="tel"><img src="foto/carriere.jpg" alt="La schermata per scegliere la carriera" width="780" height="1688"></div>
+</div></header>
+
+<section><div class="wrap">
+  <h2>Tre <span>carriere</span></h2>
+  <p class="sotto" style="margin:0">Con lo stesso account puoi farle tutte e tre. Ognuna si salva per conto suo.</p>
+  <div class="tre">
+    <div class="c"><h3><i>♛</i>Presidente</h3><p>Fondi il club, scegli nome, colori e stemma. Gestisci soldi, stadio, staff e mercato.</p></div>
+    <div class="c"><h3><i>▦</i>Allenatore</h3><p>Scegli una panchina, il modulo e la tattica. Allena la squadra e non farti esonerare!</p></div>
+    <div class="c"><h3><i>⚽</i>Giocatore</h3><p>Crea il tuo calciatore, gioca le partite con il joystick, segna e fatti comprare dalle grandi.</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Com'è <span>fatto</span></h2>
+  <div class="foto">
+    <figure><div class="tel"><img src="foto/casa.jpg" alt="La casa della squadra con la prossima partita" width="780" height="1688" loading="lazy"></div><figcaption>La prossima partita e cosa fare</figcaption></figure>
+    <figure><div class="tel"><img src="foto/tattica.jpg" alt="La formazione in campo" width="780" height="1688" loading="lazy"></div><figcaption>Formazione e tattica, con la guida</figcaption></figure>
+    <figure><div class="tel"><img src="foto/accesso.jpg" alt="La pagina per entrare" width="780" height="1688" loading="lazy"></div><figcaption>Entra con Google, con l'email o come ospite</figcaption></figure>
+  </div>
+  <ul class="lista">
+    <li>Partite in diretta, anche in 3D, con cambi e tattica</li>
+    <li>Mercato con trattative, campioni veri e svincolati</li>
+    <li>Stadio da costruire e progettare come vuoi</li>
+    <li>Guide «Come si fa» per rosa, tattica e stadio</li>
+    <li>9 campionati, coppe e livelli di difficoltà</li>
+    <li>Gironi online con altre persone vere</li>
+  </ul>
+</div></section>
+
+<section class="fine"><div class="wrap">
+  <h2>Pronto a <span>giocare</span>?</h2>
+  <p style="color:var(--tenue);margin-bottom:22px">Sul telefono puoi anche metterla nella schermata Home, come una vera app.</p>
+  <a class="btn" href="app/">GIOCA ADESSO</a>
+</div></section>
+
+<footer>Calciomania 2 · gratis, senza pubblicità · <a href="../">tutti i giochi</a></footer>
+</body>
+</html>
