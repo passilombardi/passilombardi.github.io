@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://passilombardi.github.io/sitemap.xml
