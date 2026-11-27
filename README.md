@@ -36,9 +36,3 @@ Calciomania con la grafica nuova nera e oro: accesso con Google o email, «Scegl
 
 Sito: https://passilombardi.github.io/calciomania2/
 Apri l'app: https://passilombardi.github.io/calciomania2/app/
-
-## Chicken Company Snack
-
-Tantissime merendine, patatine, crostini, taralli e croccanti: cerchi, scegli la categoria, ordini almeno una settimana prima e dici quanto vorresti pagare. Se uno snack non c'è lo aggiungi tu con una foto ed entra nel catalogo per tutti. È sia sito sia app da installare.
-
-Apri: https://passilombardi.github.io/snack/
